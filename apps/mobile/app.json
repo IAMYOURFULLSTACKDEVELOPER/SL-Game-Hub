@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "SL Game Hub",
+    "slug": "sl-game-hub",
+    "scheme": "slgamehub",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": false,
+    "ios": { "bundleIdentifier": "com.slgamehub.app", "supportsTablet": true },
+    "android": { "package": "com.slgamehub.app" },
+    "plugins": ["expo-router"],
+    "sdkVersion": "58.0.0"
+  }
+}

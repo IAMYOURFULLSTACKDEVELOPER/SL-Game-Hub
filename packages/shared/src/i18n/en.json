@@ -1,0 +1,133 @@
+{
+  "app": {
+    "name": "SL Game Hub"
+  },
+  "nav": {
+    "games": "Games",
+    "profile": "Profile",
+    "admin": "Admin",
+    "signIn": "Sign in",
+    "signUp": "Sign up",
+    "signOut": "Sign out",
+    "theme": "Switch light or dark mode",
+    "home": "Home"
+  },
+  "home": {
+    "heroTitle": "Play free games, anywhere in Sierra Leone",
+    "heroText": "Light games that load fast, even on a slow connection.",
+    "featured": "Games to play",
+    "recent": "Continue playing",
+    "browseAll": "See all games"
+  },
+  "library": {
+    "title": "Game library",
+    "searchLabel": "Search by name",
+    "searchPlaceholder": "Search games",
+    "category": "Category",
+    "mode": "Mode",
+    "all": "All",
+    "single": "Single-player",
+    "multi": "Multiplayer",
+    "apply": "Search",
+    "empty": "No games match. Try a different name or clear the filters.",
+    "comingSoon": "Coming soon",
+    "players": "{min} to {max} players",
+    "onePlayer": "1 player"
+  },
+  "game": {
+    "play": "Play",
+    "comingSoonNote": "This game is still being built. Check back soon.",
+    "yourStats": "Your stats",
+    "played": "Played",
+    "wins": "Wins",
+    "losses": "Losses",
+    "draws": "Draws",
+    "bestScore": "Best score",
+    "signInToTrack": "Sign in to keep track of your stats.",
+    "version": "Version",
+    "back": "Back to games"
+  },
+  "auth": {
+    "signInTitle": "Sign in",
+    "signUpTitle": "Create your account",
+    "fullName": "Full name",
+    "username": "Username",
+    "usernameHint": "3 to 20 letters, numbers or underscores",
+    "email": "Email address",
+    "password": "Password",
+    "passwordHint": "At least 8 characters",
+    "confirmPassword": "Confirm password",
+    "ageBand": "Your age",
+    "ageChoose": "Choose your age range",
+    "ageNote": "Players under 13 get a private profile and limited chat.",
+    "under_13": "Under 13",
+    "13_17": "13 to 17",
+    "18_plus": "18 or older",
+    "submitSignIn": "Sign in",
+    "submitSignUp": "Create account",
+    "forgot": "Forgot your password?",
+    "noAccount": "New here? Create an account",
+    "haveAccount": "Already have an account? Sign in",
+    "resetTitle": "Reset your password",
+    "resetSend": "Send reset link",
+    "newPassword": "New password",
+    "savePassword": "Save new password"
+  },
+  "notice": {
+    "checkEmail": "Check your email to confirm your account, then sign in.",
+    "resetSent": "If that email has an account, a reset link is on its way.",
+    "passwordUpdated": "Password updated. You can sign in now.",
+    "profileSaved": "Profile saved.",
+    "done": "Done."
+  },
+  "errors": {
+    "fullNameRequired": "Enter your full name (2 to 80 characters).",
+    "usernameInvalid": "Username must be 3 to 20 letters, numbers or underscores.",
+    "usernameTaken": "That username is taken. Try another.",
+    "emailInvalid": "Enter a valid email address.",
+    "passwordShort": "Password must be 8 to 72 characters.",
+    "passwordMismatch": "The two passwords don't match.",
+    "ageRequired": "Choose your age range.",
+    "invalidCredentials": "Email or password is wrong. Check both and try again.",
+    "generic": "Something went wrong. Please try again.",
+    "linkExpired": "That link has expired. Request a new one."
+  },
+  "profile": {
+    "title": "Your profile",
+    "edit": "Edit profile",
+    "save": "Save changes",
+    "district": "District",
+    "noDistrict": "Not set",
+    "avatar": "Avatar",
+    "publicProfile": "Show my profile to other players",
+    "publicLocked": "Profiles of players under 13 stay private.",
+    "joined": "Joined",
+    "stats": "Game stats",
+    "noStats": "Play a game to see your stats here.",
+    "signInPrompt": "Sign in to see and edit your profile."
+  },
+  "admin": {
+    "title": "Admin",
+    "overview": "Overview",
+    "games": "Games",
+    "players": "Players",
+    "reports": "Reports",
+    "status": "Status",
+    "update": "Update",
+    "ban": "Suspend",
+    "unban": "Restore",
+    "suspended": "Suspended",
+    "resolve": "Resolve",
+    "dismiss": "Dismiss",
+    "noReports": "No open reports.",
+    "totalPlayers": "Players",
+    "totalGames": "Games",
+    "openReports": "Open reports",
+    "role": "Role"
+  },
+  "common": {
+    "loading": "Loading…",
+    "retry": "Try again",
+    "offline": "No connection. Check your data and try again."
+  }
+}

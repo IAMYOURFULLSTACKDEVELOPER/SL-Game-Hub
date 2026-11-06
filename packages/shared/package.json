@@ -1,0 +1,15 @@
+{
+  "name": "@slgh/shared",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test src/validation.test.ts src/i18n.test.ts src/games/snake.test.ts src/games/snake-and-ladder.test.ts src/games/checkers.test.ts src/games/word-search.test.ts src/games/chess.test.ts src/games/scrabble.test.ts src/games/uno.test.ts src/games/monopoly.test.ts src/games/dice.test.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.0"
+  }
+}

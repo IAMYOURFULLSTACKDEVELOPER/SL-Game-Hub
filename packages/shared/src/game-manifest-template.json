@@ -1,0 +1,11 @@
+{
+  "id": "my-awesome-game",
+  "name": "My Awesome Game",
+  "description": "A brief description of your game (max 400 characters)",
+  "version": "1.0.0",
+  "minPlayers": 1,
+  "maxPlayers": 1,
+  "modes": ["single"],
+  "entryPoint": "index.html",
+  "author": "Game Studio (optional)"
+}

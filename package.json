@@ -1,0 +1,16 @@
+{
+  "name": "sl-game-hub",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev -w @slgh/web",
+    "build:web": "npm run build -w @slgh/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "dev:mobile": "npm run start -w @slgh/mobile",
+    "test": "npm run test --workspaces --if-present",
+    "check:size": "node scripts/check-bundle-size.mjs"
+  }
+}
