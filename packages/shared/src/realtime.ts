@@ -1,4 +1,4 @@
-import type { GameEvent, TurnTimer } from './multiplayer';
+import type { GameEvent, GameEventType, TurnTimer } from './multiplayer';
 
 /**
  * Real-time game manager using Supabase Realtime

@@ -221,7 +221,7 @@ export async function blockUser(fd: FormData) {
 
   await supabase
     .from('user_blocks')
-    .insert({ blocker_id: admin.id, blocked_id });
+    .insert({ blocker_id: admin.id, blocked_id: blockedId });
 
   revalidatePath('/admin/chat');
   redirect('/admin/chat');

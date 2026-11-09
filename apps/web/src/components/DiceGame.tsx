@@ -3,29 +3,70 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import {
-  DiceEngine, DICE_MANIFEST, DICE_TARGETS, rollDice, rollDie, createPlayer,
-  type DiceState, type DicePair,
+  DiceEngine, DICE_MANIFEST, DICE_TARGETS, rollDice, createPlayer,
+  type DiceState,
 } from '@slgh/shared';
 import { createClient } from '@/lib/supabase/browser';
+import Die3D from './Die3D';
 
 const engine = new DiceEngine();
 const MAX = DICE_MANIFEST.maxPlayers;
 const COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#ec4899', '#14b8a6', '#f97316'];
-const PIPS: Record<number, number[]> = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 const newId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto
   ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36));
 const newCode = () => Array.from({ length: 6 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
 
-function Die({ value }: { value: number }) {
-  return (
-    <div className="grid h-20 w-20 grid-cols-3 grid-rows-3 gap-1 rounded-2xl border-4 border-red-500 bg-white p-2 shadow-lg">
-      {Array.from({ length: 9 }, (_, i) => (
-        <span key={i} className={`m-auto h-3.5 w-3.5 rounded-full ${PIPS[value].includes(i) ? 'bg-red-600' : ''}`} />
-      ))}
-    </div>
-  );
+export type RollMode = 'tap' | 'shake';
+const ROLL_MS = 1150;
+const SHAKE_DELTA = 14; // change in acceleration (m/s²) between readings that counts as shaking
+const SHAKE_MIN_MS = 250;
+const SHAKE_STOP_MS = 350;
+
+/** Rattle while the device is shaken; throw when the shaking stops */
+function useShake(active: boolean, onThrow: () => void) {
+  const [shaking, setShaking] = useState(false);
+  const [noSensor, setNoSensor] = useState(false);
+  const throwRef = useRef(onThrow);
+  throwRef.current = onThrow;
+
+  useEffect(() => {
+    if (!active) return;
+    if (!('DeviceMotionEvent' in window)) { setNoSensor(true); return; }
+    let last: { x: number; y: number; z: number } | null = null;
+    let seen = false;
+    let startedAt = 0;
+    let stopTimer: ReturnType<typeof setTimeout> | undefined;
+    const probe = setTimeout(() => { if (!seen) setNoSensor(true); }, 1500);
+    const onMotion = (e: DeviceMotionEvent) => {
+      const a = e.accelerationIncludingGravity;
+      if (a?.x == null || a.y == null || a.z == null) return;
+      seen = true;
+      setNoSensor(false);
+      const now = { x: a.x, y: a.y, z: a.z };
+      if (last && Math.abs(now.x - last.x) + Math.abs(now.y - last.y) + Math.abs(now.z - last.z) > SHAKE_DELTA) {
+        if (!startedAt) { startedAt = Date.now(); setShaking(true); }
+        clearTimeout(stopTimer);
+        stopTimer = setTimeout(() => {
+          const long = Date.now() - startedAt >= SHAKE_MIN_MS + SHAKE_STOP_MS;
+          startedAt = 0;
+          setShaking(false);
+          if (long) throwRef.current();
+        }, SHAKE_STOP_MS);
+      }
+      last = now;
+    };
+    window.addEventListener('devicemotion', onMotion);
+    return () => {
+      window.removeEventListener('devicemotion', onMotion);
+      clearTimeout(probe);
+      clearTimeout(stopTimer);
+      setShaking(false);
+    };
+  }, [active]);
+
+  return { shaking, noSensor };
 }
 
 function rollText(s: DiceState) {
@@ -37,28 +78,39 @@ function rollText(s: DiceState) {
   return `${who} rolled ${a} + ${b}${a === b ? ' — doubles!' : ''} +${r.points}`;
 }
 
-function Board({ state, myId, canRoll, onRoll, children }: {
-  state: DiceState; myId?: string; canRoll: boolean; onRoll: () => void; children?: ReactNode;
+function Board({ state, myId, canRoll, onRoll, rollMode, children }: {
+  state: DiceState; myId?: string; canRoll: boolean; onRoll: () => void; rollMode: RollMode; children?: ReactNode;
 }) {
-  const [faces, setFaces] = useState<DicePair | null>(null);
+  const [animating, setAnimating] = useState(false);
 
   useEffect(() => {
     if (!state.lastRoll) return;
-    const spin = setInterval(() => setFaces([rollDie(), rollDie()]), 80);
-    const stop = setTimeout(() => { clearInterval(spin); setFaces(null); }, 700);
-    return () => { clearInterval(spin); clearTimeout(stop); setFaces(null); };
+    setAnimating(true);
+    navigator.vibrate?.(40);
+    const t = setTimeout(() => setAnimating(false), ROLL_MS);
+    return () => clearTimeout(t);
   }, [state.turn, state.lastRoll]);
 
-  const animating = faces !== null;
-  const shown = faces ?? state.lastRoll?.dice ?? [6, 6];
+  const shown = state.lastRoll?.dice ?? [6, 6];
   const current = state.players[state.currentPlayerIndex];
   const finished = state.status === 'finished' && state.winner !== null;
+  const ready = canRoll && !animating && !finished;
+  const { shaking, noSensor } = useShake(rollMode === 'shake' && ready, onRoll);
+  const showShakePanel = rollMode === 'shake' && canRoll && !noSensor;
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col items-center gap-3 rounded-xl bg-[#2a0f4a] p-5 text-white">
-        <div className={`flex gap-4 ${animating ? 'animate-bounce' : ''}`}><Die value={shown[0]} /><Die value={shown[1]} /></div>
-        <p className="min-h-6 text-center font-semibold">{animating ? 'Rolling…' : rollText(state)}</p>
+      <div className="dice-tray flex flex-col items-center gap-3 rounded-xl p-5 text-white">
+        <div className={`flex h-32 items-center justify-center gap-8 ${shaking ? 'dice-rattle' : ''}`} data-testid="dice-tray">
+          {shown.map((v, k) => (
+            <div key={`${state.turn}-${k}`} className={state.lastRoll ? 'sl-die-drop' : ''} style={{ animationDelay: `${k * 90}ms` }}>
+              <Die3D value={v} size={76} still={!state.lastRoll} delayMs={k * 90} />
+            </div>
+          ))}
+        </div>
+        <p className="min-h-6 text-center font-semibold">
+          {shaking ? 'Rattling… stop shaking to throw!' : animating ? 'Rolling…' : rollText(state)}
+        </p>
         {!finished && (
           <p className="text-sm opacity-80">
             Turn: <strong style={{ color: COLORS[state.currentPlayerIndex] }}>{current.name}</strong>
@@ -84,11 +136,20 @@ function Board({ state, myId, canRoll, onRoll, children }: {
         ))}
       </ul>
 
-      {!finished && (
-        <button onClick={onRoll} disabled={!canRoll || animating} className="btn btn-primary w-full disabled:opacity-50">
-          {canRoll ? 'Roll Dice 🎲' : `Waiting for ${current.name}…`}
-        </button>
-      )}
+      {!finished && (showShakePanel ? (
+        <div className="rounded-lg border-2 border-dashed border-primary p-3 text-center font-bold" aria-live="polite">
+          {shaking ? '🎲 Rattling… stop shaking to throw!' : animating ? 'Rolling…' : '📳 Shake your phone to roll'}
+        </div>
+      ) : (
+        <>
+          {rollMode === 'shake' && canRoll && noSensor && (
+            <p className="text-center text-sm text-muted">This device can&apos;t detect shaking — tap the button to roll instead.</p>
+          )}
+          <button onClick={onRoll} disabled={!canRoll || animating} className="btn btn-primary w-full disabled:opacity-50">
+            {canRoll ? 'Roll Dice 🎲' : `Waiting for ${current.name}…`}
+          </button>
+        </>
+      ))}
       {finished && !animating && (
         <div className="rounded-lg border-2 border-accent p-4 text-center">
           <h2 className="text-xl font-bold">🏆 {state.players[state.winner!].name} wins!</h2>
@@ -113,7 +174,7 @@ function TargetSelect({ value, onChange }: { value: number; onChange: (n: number
 
 interface Seat { name: string; ai: boolean }
 
-function LocalDice() {
+function LocalDice({ rollMode }: { rollMode: RollMode }) {
   const [seats, setSeats] = useState<Seat[]>([{ name: 'Player 1', ai: false }, { name: 'Bot 2', ai: true }]);
   const [target, setTarget] = useState<number>(50);
   const [game, setGame] = useState<DiceState | null>(null);
@@ -135,7 +196,7 @@ function LocalDice() {
 
   if (game) {
     return (
-      <Board state={game} canRoll={game.status === 'playing' && !aiTurn} onRoll={roll}>
+      <Board state={game} canRoll={game.status === 'playing' && !aiTurn} onRoll={roll} rollMode={rollMode}>
         <div className="flex gap-2">
           <button onClick={start} className="btn btn-secondary flex-1">Restart</button>
           <button onClick={() => setGame(null)} className="btn btn-secondary flex-1">Change players</button>
@@ -177,7 +238,7 @@ function LocalDice() {
 
 interface Member { id: string; name: string; host: boolean; joinedAt: number }
 
-function OnlineDice() {
+function OnlineDice({ rollMode }: { rollMode: RollMode }) {
   const myId = useRef(newId()).current;
   const [name, setName] = useState('');
   const [codeInput, setCodeInput] = useState('');
@@ -187,6 +248,7 @@ function OnlineDice() {
   const [target, setTarget] = useState<number>(50);
   const [error, setError] = useState('');
   const [connected, setConnected] = useState(false);
+  const [rollSent, setRollSent] = useState(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const stateRef = useRef<DiceState | null>(null);
   const hostRef = useRef(false);
@@ -279,9 +341,15 @@ function OnlineDice() {
     publish(engine.initialize(players, { target }));
   };
 
+  // A guest waits for the host's next state before it can send another roll
+  useEffect(() => { setRollSent(false); }, [state?.turn, state?.currentPlayerIndex, state?.status]);
+
   const roll = () => {
     if (room?.host) hostRoll(myId);
-    else channelRef.current?.send({ type: 'broadcast', event: 'roll', payload: { by: myId } });
+    else if (!rollSent) {
+      setRollSent(true);
+      channelRef.current?.send({ type: 'broadcast', event: 'roll', payload: { by: myId } });
+    }
   };
 
   if (!room) {
@@ -350,7 +418,7 @@ function OnlineDice() {
     <div className="space-y-3">
       {header}
       {spectating && <p className="text-sm text-muted">A game is in progress — you are watching.</p>}
-      <Board state={state} myId={myId} canRoll={myTurn} onRoll={roll}>
+      <Board state={state} myId={myId} canRoll={myTurn && !rollSent} onRoll={roll} rollMode={rollMode}>
         {room.host && state.status === 'finished' && (
           <button onClick={startGame} className="btn btn-primary w-full">Play Again</button>
         )}
@@ -361,6 +429,24 @@ function OnlineDice() {
 
 export default function DiceGame({ onBack }: { onBack: () => void }) {
   const [mode, setMode] = useState<'local' | 'online'>('local');
+  const [rollMode, setRollMode] = useState<RollMode>('tap');
+  const [motionError, setMotionError] = useState('');
+
+  useEffect(() => { if (localStorage.getItem('dice_roll_mode') === 'shake') setRollMode('shake'); }, []);
+
+  const chooseRollMode = async (m: RollMode) => {
+    setMotionError('');
+    if (m === 'shake') {
+      // iPhone and iPad only report motion after the player allows it from a tap
+      const request = (globalThis.DeviceMotionEvent as unknown as { requestPermission?: () => Promise<string> } | undefined)?.requestPermission;
+      if (request) {
+        const answer = await request().catch(() => 'denied');
+        if (answer !== 'granted') { setMotionError('Motion access was not allowed, so shaking cannot be detected. Using tap to roll.'); return; }
+      }
+    }
+    setRollMode(m);
+    localStorage.setItem('dice_roll_mode', m);
+  };
   return (
     <main className="mx-auto max-w-2xl space-y-4 p-4">
       <button onClick={onBack} className="text-secondary">← Back to Dice</button>
@@ -379,7 +465,19 @@ export default function DiceGame({ onBack }: { onBack: () => void }) {
             </button>
           ))}
         </div>
-        {mode === 'local' ? <LocalDice /> : <OnlineDice />}
+        <div className="space-y-1">
+          <p className="text-sm font-semibold">How do you want to roll?</p>
+          <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="How to roll">
+            {(['tap', 'shake'] as const).map((m) => (
+              <button key={m} role="radio" aria-checked={rollMode === m} onClick={() => chooseRollMode(m)}
+                className={`btn ${rollMode === m ? 'btn-primary' : 'btn-secondary'}`}>
+                {m === 'tap' ? '👆 Tap to roll' : '📳 Shake to roll'}
+              </button>
+            ))}
+          </div>
+          {motionError && <p className="text-sm font-semibold text-red-500">{motionError}</p>}
+        </div>
+        {mode === 'local' ? <LocalDice rollMode={rollMode} /> : <OnlineDice rollMode={rollMode} />}
       </div>
     </main>
   );

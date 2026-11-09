@@ -178,7 +178,7 @@ export class UnoEngine implements GameEngine<UnoState, UnoMove> {
     }
 
     // Match action type
-    if (card.type !== 'number' && card.type === topCard.type && card.color !== 'wild') {
+    if (card.type !== 'number' && card.type === topCard.type) {
       return true;
     }
 

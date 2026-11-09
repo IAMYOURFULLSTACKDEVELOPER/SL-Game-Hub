@@ -5,10 +5,10 @@ import type { AntiCheatReport, RateLimitInfo } from './multiplayer';
  * Validates moves, detects suspicious behavior, and handles abuse reporting
  */
 export class AntiCheatSystem {
-  private suspiciousMoveThreshold: number = 5;
-  private timePerMoveMs: number = 30000; // 30 seconds max per move
-  private maxRapidMoves: number = 3;
-  private rapidMoveWindowMs: number = 1000; // 1 second
+  private static readonly suspiciousMoveThreshold: number = 5;
+  private static readonly timePerMoveMs: number = 30000; // 30 seconds max per move
+  private static readonly maxRapidMoves: number = 3;
+  private static readonly rapidMoveWindowMs: number = 1000; // 1 second
 
   /**
    * Validate a move for cheating

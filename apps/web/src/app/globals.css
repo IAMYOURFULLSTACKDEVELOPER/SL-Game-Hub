@@ -28,4 +28,45 @@
     @apply bg-white/90 backdrop-blur-xl border border-white/30 rounded-xl shadow-2xl;
   }
 }
+/* Snake & Ladder: player rings and the red 3D dice */
+.sl-ring { display: inline-block; border-radius: 9999px; border: 2px solid #000; box-shadow: inset -2px -3px 4px rgb(0 0 0 / 0.3), inset 2px 2px 3px rgb(255 255 255 / 0.5), 0 2px 4px rgb(0 0 0 / 0.45); }
+.sl-ring-current { animation: sl-ring-pulse 1.2s ease-in-out infinite; }
+@keyframes sl-ring-pulse { 50% { box-shadow: 0 0 0 4px rgb(255 255 255 / 0.9), 0 0 12px 4px rgb(0 0 0 / 0.5); } }
+.sl-die-scene { perspective: 600px; }
+.sl-die { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transform: rotateX(var(--rx)) rotateY(var(--ry)); animation: sl-die-tumble 1s cubic-bezier(.2,.7,.3,1) both; }
+.sl-die-face { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); border-radius: 18%; background: radial-gradient(circle at 30% 30%, #ff4d4d, #d10000 70%, #9b0000); border: 1px solid #7a0000; backface-visibility: hidden; }
+.sl-die-drop { animation: sl-die-drop 1s cubic-bezier(.3,.6,.4,1) both; filter: drop-shadow(0 6px 6px rgb(0 0 0 / 0.45)); }
+@keyframes sl-die-tumble { from { transform: rotateX(calc(var(--rx) - 900deg)) rotateY(calc(var(--ry) - 1260deg)); } }
+@keyframes sl-die-drop {
+  0% { transform: translateY(-320%) scale(1.8); opacity: 0; }
+  15% { opacity: 1; }
+  55% { transform: translateY(0) scale(1); }
+  70% { transform: translateY(-35%) scale(1.04); }
+  85% { transform: translateY(0) scale(1); }
+  93% { transform: translateY(-10%); }
+  100% { transform: translateY(0); }
+}
+/* Dice: felt tray and the rattle while the player shakes their phone */
+.dice-tray { background: radial-gradient(circle at 50% 40%, #1f8a45, #0b4d24 75%); box-shadow: inset 0 0 0 6px #5a3416, inset 0 8px 24px rgb(0 0 0 / 0.55); }
+.dice-rattle { animation: dice-rattle 0.12s linear infinite; }
+@keyframes dice-rattle {
+  0%, 100% { transform: translate(0, 0) rotate(0); }
+  25% { transform: translate(-5px, 2px) rotate(-7deg); }
+  50% { transform: translate(4px, -3px) rotate(6deg); }
+  75% { transform: translate(-2px, -3px) rotate(-3deg); }
+}
+/* Chess: gold and black marble board */
+.chess-frame { background: linear-gradient(135deg, #111, #2d2410 50%, #111); border: 3px solid #d4af37; box-shadow: 0 10px 30px rgb(0 0 0 / 0.5), inset 0 0 0 2px #7a5c10; }
+.chess-light { background: linear-gradient(135deg, #f6d873, #d6a630 55%, #f1cf66); }
+.chess-dark { background: linear-gradient(135deg, #222, #343434 50%, #121212); }
+.chess-piece { font-size: clamp(1.7rem, 9vw, 3.6rem); font-family: "Segoe UI Symbol", "DejaVu Sans", "Noto Sans Symbols 2", serif; }
+.chess-gold { color: #f7c948; -webkit-text-stroke: 1px #6b4a00; text-shadow: 0 2px 3px rgb(0 0 0 / 0.65), 0 -1px 0 #fff3b0; }
+.chess-black { color: #0d0d0d; -webkit-text-stroke: 1px #d4af37; text-shadow: 0 2px 3px rgb(0 0 0 / 0.6); }
+/* Checkers: wooden board with red and black discs */
+.checkers-frame { background: linear-gradient(135deg, #5a1d0e, #7b2e14 40%, #3e1408); border: 3px solid #d9b15a; box-shadow: 0 10px 30px rgb(0 0 0 / 0.5); }
+.checkers-light { background: linear-gradient(135deg, #f3d9a4, #e6c283); }
+.checkers-dark { background: linear-gradient(135deg, #6b2a12, #4a1a09); }
+.checkers-disc { width: 78%; height: 78%; border-radius: 9999px; box-shadow: inset 0 0 0 3px rgb(255 255 255 / 0.12), inset 0 0 0 7px rgb(0 0 0 / 0.25), inset 0 -4px 6px rgb(0 0 0 / 0.4), 0 4px 6px rgb(0 0 0 / 0.55); display: flex; align-items: center; justify-content: center; }
+.checkers-red { background: radial-gradient(circle at 35% 30%, #ff6b6b, #d11a1a 55%, #8f0b0b); }
+.checkers-black { background: radial-gradient(circle at 35% 30%, #555, #1b1b1b 55%, #000); }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }

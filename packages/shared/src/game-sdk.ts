@@ -331,13 +331,13 @@ export class ParentSDK {
     }
   }
 
-  private sendResponse(source: Window | null, id: string | undefined, payload: unknown) {
+  private sendResponse(source: MessageEventSource | null, id: string | undefined, payload: unknown) {
     if (!source) return;
-    source.postMessage({ type: 'response', id, payload }, '*');
+    (source as Window).postMessage({ type: 'response', id, payload }, '*');
   }
 
-  private sendError(source: Window | null, id: string | undefined, error: string) {
+  private sendError(source: MessageEventSource | null, id: string | undefined, error: string) {
     if (!source) return;
-    source.postMessage({ type: 'game_error', id, payload: error }, '*');
+    (source as Window).postMessage({ type: 'game_error', id, payload: error }, '*');
   }
 }

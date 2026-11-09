@@ -8,8 +8,6 @@ const GAME_IMAGES: Record<string, string> = {
   checkers: '/games/checkers.webp',
   chess: '/games/chess.webp',
   scrabble: '/games/scrabble.webp',
-  monopoly: '/games/sierrapoly.webp',
-  sierrapoly: '/games/sierrapoly.webp',
   'snake-and-ladder': '/games/snake-and-ladder.webp',
   snake: '/games/snake.webp',
   uno: '/games/uno.webp',

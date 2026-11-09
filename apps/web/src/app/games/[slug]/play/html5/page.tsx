@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ParentSDK } from '@slgh/shared';
-import { createClient } from '@slgh/shared';
+import { createClient } from '@/lib/supabase/browser';
 
 export default function HTML5GamePlayPage({ params }: { params: { slug: string } }) {
   const router = useRouter();

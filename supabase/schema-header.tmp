@@ -1,5 +1,0 @@
--- SL Game Hub: full database schema (Supabase project rpvnwjpccwzbtxvoeybj)
--- All migrations (0001-0013) followed by seed data, in the order they run.
--- Run once on an empty project. Regenerate after adding a migration.
--- Includes the Dice game (2-8 players) on the games dashboard: see 0013_dice.sql and the seed below.
-

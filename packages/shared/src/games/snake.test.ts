@@ -125,7 +125,7 @@ describe('Snake Game', () => {
       const state = engine.initialize([player], { boardSize: 5 });
 
       // Create a test state at the edge
-      const edgeState = { ...state, snake: [0], direction: 'up' };
+      const edgeState = { ...state, snake: [0], direction: 'up' as const };
 
       const nextState = engine.tick(edgeState);
       assert.strictEqual(nextState.status, 'finished');

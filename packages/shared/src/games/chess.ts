@@ -226,6 +226,12 @@ export class ChessEngine implements GameEngine<ChessState, ChessMove> {
 
     const { from, to } = move;
     const row = from.row;
+    const rookAt = (col: number) => {
+      const p = state.board[row][col];
+      return p?.type === 'rook' && p.color === piece.color && !p.hasMoved;
+    };
+    if (move.castle === 'kingside' && !rookAt(7)) return false;
+    if (move.castle === 'queenside' && !rookAt(0)) return false;
 
     // Kingside castling
     if (move.castle === 'kingside') {
@@ -291,7 +297,7 @@ export class ChessEngine implements GameEngine<ChessState, ChessMove> {
   }
 
   private applyMoveRaw(state: ChessState, move: ChessMove): ChessState {
-    const newState = { ...state, board: state.board.map(r => [...r]) };
+    const newState = { ...state, board: state.board.map(r => [...r]), castlingRights: { ...state.castlingRights } };
     const { from, to } = move;
     const piece = newState.board[from.row][from.col]!;
 
@@ -487,13 +493,13 @@ export class ChessEngine implements GameEngine<ChessState, ChessMove> {
         // Handle castling
         if (piece.type === 'king' && !piece.hasMoved) {
           if (toCol === 6 && toRow === fromRow) {
-            const castleMove = { ...move, castle: 'kingside' };
+            const castleMove: ChessMove = { ...move, castle: 'kingside' };
             if (this.isValidMove(state, castleMove, state.currentPlayerIndex)) {
               moves.push(castleMove);
             }
           }
           if (toCol === 2 && toRow === fromRow) {
-            const castleMove = { ...move, castle: 'queenside' };
+            const castleMove: ChessMove = { ...move, castle: 'queenside' };
             if (this.isValidMove(state, castleMove, state.currentPlayerIndex)) {
               moves.push(castleMove);
             }
@@ -549,34 +555,30 @@ export class ChessEngine implements GameEngine<ChessState, ChessMove> {
         const topMoves = scoredMoves.slice(0, Math.min(3, scoredMoves.length));
         return getRandomMove(topMoves.map((m) => m.move));
 
-      case 'hard':
-        // Use piece-square tables and material evaluation
-        const bestMoves = moves.map((move) => {
-          let score = 0;
-          const destPiece = state.board[move.to.row][move.to.col];
-          if (destPiece) {
-            score += this.getPieceValue(destPiece.type) * 10;
+      case 'hard': {
+        // Two-ply search: material won minus the best capture the opponent can make in reply
+        const me = state.currentTurn;
+        let best: { move: ChessMove; score: number } | null = null;
+        for (const move of moves) {
+          const next = this.applyMove(state, move);
+          if (next.checkmate) return move;
+          const captured = state.board[move.to.row][move.to.col];
+          let score = (captured ? this.getPieceValue(captured.type) * 10 : 0) + (move.enPassant ? 10 : 0);
+          if (move.promotion) score += (this.getPieceValue(move.promotion) - 1) * 10;
+          score += this.getPositionValue(state.board[move.from.row][move.from.col]!.type, move.to.row, move.to.col, me) * 0.3;
+          if (next.inCheck) score += 2;
+          if (next.stalemate) score -= 50;
+          let worstReply = 0;
+          for (const reply of next.status === 'playing' ? this.getLegalMoves(next) : []) {
+            const victim = next.board[reply.to.row][reply.to.col];
+            if (victim) worstReply = Math.max(worstReply, this.getPieceValue(victim.type) * 10);
           }
-
-          // Position evaluation using simplified piece-square tables
-          score += this.getPositionValue(state.board[move.from.row][move.from.col]!.type, move.to.row, move.to.col, state.currentTurn);
-
-          // Prefer checks
-          const testState = this.applyMoveRaw(state, move);
-          if (this.isKingInCheck(testState, state.currentTurn === 'white' ? 'black' : 'white')) {
-            score += 5;
-          }
-
-          // Avoid moving into check
-          if (this.isKingInCheck(testState, state.currentTurn)) {
-            score -= 100;
-          }
-
-          return { move, score };
-        });
-
-        bestMoves.sort((a, b) => b.score - a.score);
-        return bestMoves[0].move;
+          score -= worstReply * 0.9;
+          score += Math.random() * 0.5;
+          if (!best || score > best.score) best = { move, score };
+        }
+        return best!.move;
+      }
 
       default:
         return getRandomMove(moves);

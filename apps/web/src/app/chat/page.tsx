@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { createClient } from '@slgh/shared';
+import { createClient } from '@/lib/supabase/browser';
 
 export default function ChatPage() {
   const [rooms, setRooms] = useState<any[]>([]);

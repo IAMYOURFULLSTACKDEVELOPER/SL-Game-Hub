@@ -1,10 +1,24 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { t } from '@slgh/shared';
+import {
+  t, SNAKE_RULES, DICE_RULES, CHECKERS_RULES, CHESS_RULES, WORD_SEARCH_RULES, SCRABBLE_RULES,
+  type RuleSection,
+} from '@slgh/shared';
 import { createClient } from '@/lib/supabase/server';
 import { getMe } from '@/lib/session';
 import { GAME_COLS, gameImage, type GameRow } from '@/lib/games';
 import { playersLabel } from '@/components/GameCard';
+import SnakeAndLadderRulebook from '@/components/SnakeAndLadderRulebook';
+import Rulebook from '@/components/Rulebook';
+
+const RULEBOOKS: Record<string, { title: string; sections: RuleSection[] }> = {
+  snake: { title: 'Snake Rulebook', sections: SNAKE_RULES },
+  checkers: { title: 'Checkers Rulebook', sections: CHECKERS_RULES },
+  chess: { title: 'Chess Rulebook', sections: CHESS_RULES },
+  'word-search': { title: 'Word Search Rulebook', sections: WORD_SEARCH_RULES },
+  scrabble: { title: 'Scrabble Official Game Rulebook', sections: SCRABBLE_RULES },
+  dice: { title: 'Dice Rulebook', sections: DICE_RULES },
+};
 
 export default async function GameDetail({ params }: { params: { slug: string } }) {
   if (!/^[a-z0-9-]{2,40}$/.test(params.slug)) notFound();
@@ -36,6 +50,12 @@ export default async function GameDetail({ params }: { params: { slug: string } 
           ? <p className="rounded-lg border-2 border-accent p-3 font-semibold">{t('game.comingSoonNote')}</p>
           : <Link href={`/games/${g.slug}/play`} className="btn btn-primary w-full">{t('game.play')}</Link>}
       </div>
+
+      {g.slug === 'snake-and-ladder'
+        ? <div className="card p-5"><SnakeAndLadderRulebook open /></div>
+        : RULEBOOKS[g.slug] && (
+          <div className="card p-5"><Rulebook title={RULEBOOKS[g.slug].title} sections={RULEBOOKS[g.slug].sections} open /></div>
+        )}
 
       <section className="card p-5"><h2 className="mb-2">{t('game.yourStats')}</h2>
         {!me ? <p className="text-muted">{t('game.signInToTrack')}</p> : (

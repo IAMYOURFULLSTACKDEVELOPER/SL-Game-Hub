@@ -264,7 +264,7 @@ export default function GameUploadPage() {
         {/* Submit Button */}
         <button
           type="submit"
-          disabled={uploading || (validation && !validation.valid)}
+          disabled={uploading || validation?.valid === false}
           className="btn btn-primary w-full"
         >
           {uploading ? 'Uploading...' : 'Upload Game'}

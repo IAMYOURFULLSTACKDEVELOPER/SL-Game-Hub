@@ -24,6 +24,10 @@ export interface CheckersState extends GameState {
   mustJump: boolean; // true if current player has a jump available
   redPieces: number;
   blackPieces: number;
+  /** During a multi-jump, the square of the piece that must keep jumping */
+  jumpingFrom?: number | null;
+  /** Moves by both players since the last capture or crowning (draw at 80 = 40 each) */
+  quietMoves?: number;
 }
 
 /** Checkers game manifest */
@@ -97,6 +101,7 @@ export class CheckersEngine implements GameEngine<CheckersState, CheckersMove> {
 
     // Check if must jump and this is not a jump
     if (state.mustJump && !isJump) return false;
+    if (state.jumpingFrom != null && from !== state.jumpingFrom) return false;
 
     const fromRow = Math.floor(from / 8);
     const fromCol = from % 8;
@@ -169,20 +174,25 @@ export class CheckersEngine implements GameEngine<CheckersState, CheckersMove> {
 
     // Check for king promotion
     const toRow = Math.floor(to / 8);
+    let crowned = false;
     if (piece === 'red' && toRow === 7) {
       newState.board[to] = 'red_king';
+      crowned = true;
     } else if (piece === 'black' && toRow === 0) {
       newState.board[to] = 'black_king';
+      crowned = true;
     }
+    newState.quietMoves = isJump || crowned ? 0 : (state.quietMoves ?? 0) + 1;
 
-    // Check for multi-jump
-    if (isJump) {
-      const canContinueJump = this.hasJumpAvailable(newState, to, state.currentTurn);
-      if (canContinueJump) {
+    // Multi-jump: the same piece must keep jumping (a piece that is crowned ends its move)
+    if (isJump && !crowned) {
+      newState.jumpingFrom = to;
+      if (this.hasJumpAvailable(newState, to, state.currentTurn)) {
         newState.mustJump = true;
         return newState;
       }
     }
+    newState.jumpingFrom = null;
 
     // Switch turn
     newState.currentTurn = state.currentTurn === 'red' ? 'black' : 'red';
@@ -199,6 +209,9 @@ export class CheckersEngine implements GameEngine<CheckersState, CheckersMove> {
     } else if (!this.hasAnyValidMove(newState, newState.currentTurn)) {
       newState.status = 'finished';
       newState.winner = newState.currentTurn === 'red' ? 1 : 0;
+    } else if ((newState.quietMoves ?? 0) >= 80) {
+      newState.status = 'finished';
+      newState.winner = null;
     }
 
     return newState;
@@ -207,6 +220,8 @@ export class CheckersEngine implements GameEngine<CheckersState, CheckersMove> {
   getLegalMoves(state: CheckersState): CheckersMove[] {
     const moves: CheckersMove[] = [];
     const playerColor = state.currentTurn;
+
+    if (state.jumpingFrom != null) return this.getJumpsForPiece(state, state.jumpingFrom);
 
     // If must jump, only return jumps
     if (state.mustJump) {

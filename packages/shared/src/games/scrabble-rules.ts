@@ -1,0 +1,102 @@
+import type { RuleSection } from '../rulebook';
+import { TILE_DISTRIBUTION } from './scrabble';
+
+export const SCRABBLE_RULES: RuleSection[] = [
+  { title: 'Introduction', intro: 'Scrabble is a word-building board game in which players compete to achieve the highest score by forming meaningful words using individual letter tiles. Players take turns placing letters on the board to create words horizontally or vertically. Each letter has a specific point value, and players earn additional points by using special premium squares on the board. Scrabble challenges players’ vocabulary, spelling, strategic thinking, and ability to form words.' },
+  { title: 'Objective of the game', intro: 'The main objective of Scrabble is to score more points than your opponents by creating valid words on the game board. Players earn points based on:', rules: [
+    'The individual value of each letter used.',
+    'Special bonus squares on the board.',
+    'Additional points for playing all seven tiles in one turn.',
+  ], note: 'The player with the highest final score wins the game.' },
+  { title: 'Number of players', rules: [
+    'Minimum players: 2', 'Maximum players: 4', 'Recommended players: 2–4',
+    'Each player competes individually, although players may also agree to play in teams.',
+  ] },
+  { title: 'Game components', steps: [
+    'One Scrabble board containing 15 rows and 15 columns.',
+    'A set of 100 letter tiles.',
+    'Letter racks for holding tiles.',
+    'A tile bag for drawing letters.',
+    'A dictionary or agreed-upon word reference for resolving disputed words.',
+    'Paper and a pen, or a score sheet, for recording scores.',
+  ] },
+  { title: 'The game board', intro: 'The Scrabble board consists of 225 squares arranged in a 15 × 15 grid. The board uses rows labelled A to O, columns numbered 1 to 15, and a centre starting square at H8. There are four types of premium squares:', rules: [
+    'Double Letter (DL): the letter’s point value is multiplied by two. Example: B (3 points) on a Double Letter square earns 6 points.',
+    'Triple Letter (TL): the letter’s point value is multiplied by three. Example: B (3 points) on a Triple Letter square earns 9 points.',
+    'Double Word (DW): the total value of the word is multiplied by two.',
+    'Triple Word (TW): the total value of the word is multiplied by three.',
+    'Important: a premium square only applies when a tile is first placed on it. It cannot be used again on later turns.',
+    'The centre star at H8 is the starting square. It also acts as a Double Word square.',
+  ] },
+  { title: 'Letter tile values and distribution', intro: 'Standard English Scrabble uses 100 tiles, including two blank tiles.', tables: [{
+    head: ['Letter', 'Points', 'Number of tiles'],
+    rows: [...TILE_DISTRIBUTION.map((t) => [t.letter || 'Blank', String(t.value), String(t.count)]), ['TOTAL', '', '100']],
+  }], note: 'Blank tiles have no point value. However, they can represent any letter chosen by the player.' },
+  { title: 'Preparing to play', steps: [
+    'Place the Scrabble board on a flat surface.',
+    'Put all 100 letter tiles into the tile bag.',
+    'Each player draws one tile to determine who starts. The player who draws the letter closest to A goes first. A blank tile takes precedence over all letters.',
+    'Return the drawn tiles to the bag and mix them again.',
+    'Each player draws seven tiles and places them on their letter rack.',
+    'Keep your tiles hidden from other players.',
+  ], note: 'The game is now ready to begin.' },
+  { title: 'How to play', intro: 'Starting the game: the first player must form a word using at least two letters. The word must be placed horizontally or vertically, cover the centre star at H8, and be a valid word in the agreed dictionary. The first player adds up the points earned from the word and records the score.', rules: [
+    'Taking your turn — place letters on the board to form a word; or exchange some or all of your tiles, if enough tiles remain in the bag; or pass your turn without playing.',
+    'After placing tiles, draw new tiles from the bag until you have seven tiles on your rack, or until the bag is empty.',
+    'Words must be formed horizontally from left to right or vertically from top to bottom.',
+    'Diagonal words are not allowed.',
+    'A newly placed word must connect to an existing word, except for the first word.',
+    'At least one tile in every new play must connect to a tile already on the board.',
+    'All letters placed during a turn must form one continuous line.',
+    'Every new word formed by the placement must be valid.',
+    'Players may build on existing words by adding letters to them.',
+    'Players cannot move or remove letters that have already been played.',
+  ] },
+  { title: 'Scoring system', intro: 'Players earn points by adding together the values of the letters in the words they create.', rules: [
+    'Example 1 — Normal word: CAT = C (3) + A (1) + T (1) = 5 points.',
+    'Example 2 — Double Letter: C (3) on a Double Letter square = 6, so CAT = 6 + 1 + 1 = 8 points.',
+    'Example 3 — Triple Word: CAT (5 points) covering a Triple Word square = 5 × 3 = 15 points.',
+    'Example 4 — Combining premiums: a word scoring 10 after letter bonuses that covers a Double Word square = 10 × 2 = 20 points.',
+    'When a play creates multiple words, score every word formed. Apply any newly covered premium squares to the relevant words.',
+    'Seven-tile bonus (Bingo): if you use all seven tiles from your rack in one turn, you receive an additional 50 bonus points, added to the score for the words formed during that turn.',
+  ] },
+  { title: 'Special rules', rules: [
+    'Blank tiles: there are two. A blank can represent any letter; you announce (choose) the letter when playing it; it remains that letter for the rest of the game; it is always worth zero points — even on a letter premium square.',
+    'Reusing existing letters: you can use letters already on the board to form new words. If CAT is on the board, another player may add S to make CATS and scores the complete word, including the existing letters.',
+    'Word challenges: if a player believes an opponent has played an invalid word, they may challenge it using the agreed dictionary. Under the common standard procedure, an invalid word is removed and that player loses the turn; if the word is valid, the challenger loses their next turn. On SL Game Hub every word is checked automatically against the game dictionary, so invalid words cannot be played — simply try another word.',
+    'Exchanging tiles: instead of playing a word you may exchange one or more tiles, but at least seven tiles must remain in the bag. Put the unwanted tiles aside, draw the same number of replacements, and return the exchanged tiles to the bag. Exchanging counts as your turn.',
+    'Passing a turn: you may pass if you cannot or do not want to play. Passing earns no points.',
+  ] },
+  { title: 'Invalid words', intro: 'The following are generally not allowed in standard English Scrabble:', rules: [
+    'Proper names, such as John, London and Africa.',
+    'Abbreviations and acronyms.',
+    'Prefixes and suffixes used independently when they are not valid words.',
+    'Words requiring apostrophes or hyphens.',
+    'Foreign words that are not accepted in the agreed Scrabble dictionary.',
+    'Words that cannot be verified in the agreed dictionary.',
+  ], note: 'Plurals, verb forms, and other grammatical variations are allowed when they are valid dictionary entries.' },
+  { title: 'Ending the game', intro: 'The game ends when one player uses all their remaining tiles and there are no tiles left in the bag; or all players pass repeatedly (two full rounds of scoreless turns) and no further valid play is possible.', rules: [
+    'Each player subtracts the value of their remaining tiles from their score.',
+    'If a player has used all their tiles and the bag is empty, that player receives the total value of all opponents’ remaining tiles as additional points.',
+  ], note: 'The player with the highest final score wins.' },
+  { title: 'Determining the winner', rules: [
+    'After all final scores have been calculated, compare the scores of all players.',
+    'The player with the highest score is declared the SCRABBLE CHAMPION!',
+    'If two or more players finish with the same score, the game is a tie.',
+  ] },
+  { title: 'Important game etiquette', steps: [
+    'Respect other players and their turns.',
+    'Do not reveal your tiles to opponents.',
+    'Do not change letters after completing a turn.',
+    'Do not use dictionaries to search for words during your turn unless all players agree.',
+    'Keep track of scores accurately.',
+    'Allow fair challenges when a word is disputed.',
+    'Do not interfere with another player’s rack or tiles.',
+    'Follow the same rules throughout the game.',
+  ] },
+  { title: 'Quick reference guide', tables: [{ head: ['Game rule', 'Instruction'], rows: [
+    ['Number of players', '2–4'], ['Starting tiles', '7 per player'], ['Board size', '15 × 15'], ['Starting position', 'Centre star (H8)'],
+    ['Word direction', 'Horizontal or vertical'], ['Diagonal words', 'Not allowed'], ['Double Letter', 'Letter score × 2'], ['Triple Letter', 'Letter score × 3'],
+    ['Double Word', 'Word score × 2'], ['Triple Word', 'Word score × 3'], ['Seven-tile bonus', '50 extra points'], ['Blank tile', '0 points'], ['Winning condition', 'Highest final score'],
+  ] }], note: 'Scrabble is a game of vocabulary, creativity, strategy, and friendly competition. Think carefully before placing your letters, take advantage of premium squares, build on existing words, and always look for opportunities to earn bonus points. BUILD WORDS. SCORE POINTS. BECOME THE SCRABBLE CHAMPION!' },
+];

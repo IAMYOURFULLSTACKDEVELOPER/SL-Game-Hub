@@ -3,7 +3,7 @@
  * Validates HTML5 game bundles uploaded by admins
  */
 
-export interface GameManifest {
+export interface UploadGameManifest {
   id: string;
   name: string;
   description: string;
@@ -132,7 +132,9 @@ export function validateManifest(manifest: unknown): ValidationResult {
     }
   }
 
-  if (m.minPlayers !== undefined && m.maxPlayers !== undefined && m.minPlayers > m.maxPlayers) {
+  const minP = typeof m.minPlayers === 'number' ? m.minPlayers : undefined;
+  const maxP = typeof m.maxPlayers === 'number' ? m.maxPlayers : undefined;
+  if (minP !== undefined && maxP !== undefined && minP > maxP) {
     errors.push('minPlayers cannot be greater than maxPlayers');
   }
 

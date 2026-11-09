@@ -25,43 +25,45 @@ export default function RoadmapPage() {
             status="Available Now"
             color="green"
           />
-        </div>
-      </section>
-
-      {/* In Development */}
-      <section>
-        <h2 className="text-2xl font-bold mb-4 text-blue-600">🚧 In Development</h2>
-        <div className="grid gap-4 sm:grid-cols-2">
+          <GameCard
+            name="Dice"
+            icon="🎲"
+            image="/games/dice.webp"
+            description="Roll two dice and race to the target score. Doubles score double, snake eyes cost 10 points."
+            status="Available Now"
+            color="green"
+          />
           <GameCard
             name="Checkers"
             icon="♟️"
             image="/games/checkers.webp"
             description="Classic checkers/draughts game. Capture opponent pieces and king your pieces to win."
-            status="Coming Soon"
-            color="blue"
+            status="Available Now"
+            color="green"
           />
           <GameCard
             name="Chess"
             icon="♔"
             image="/games/chess.webp"
             description="The ultimate strategy game. Play chess with AI or other players."
-            status="Coming Soon"
-            color="blue"
+            status="Available Now"
+            color="green"
           />
           <GameCard
             name="Word Search"
             icon="🔍"
-            description="Find hidden words in a grid of letters. Multiple categories and difficulty levels."
-            status="Coming Soon"
-            color="blue"
+            image="/games/word-search.webp"
+            description="Find hidden words in a grid of letters. 500 boards, 30+ word banks, four difficulty levels."
+            status="Available Now"
+            color="green"
           />
           <GameCard
             name="Scrabble"
             icon="📝"
             image="/games/scrabble.webp"
             description="Word-building board game. Create words from letter tiles and score points."
-            status="Coming Soon"
-            color="blue"
+            status="Available Now"
+            color="green"
           />
         </div>
       </section>
@@ -73,16 +75,9 @@ export default function RoadmapPage() {
           <GameCard
             name="UNO"
             icon="🃏"
+            image="/games/uno.webp"
             description="Classic card game. Match colors and numbers, use action cards, and be the first to empty your hand."
-            status="Planned"
-            color="purple"
-          />
-          <GameCard
-            name="Monopoly"
-            icon="🏠"
-            image="/games/sierrapoly.webp"
-            description="Property trading game. Buy, sell, and trade properties to bankrupt your opponents."
-            status="Planned"
+            status="Coming Soon"
             color="purple"
           />
           <GameCard
@@ -176,7 +171,7 @@ export default function RoadmapPage() {
   );
 }
 
-function GameCard({ name, icon, image, description, status, color }: any) {
+function GameCard({ name, icon, image, description, status, color }: { name: string; icon: string; image?: string; description: string; status: string; color: 'green' | 'blue' | 'purple' }) {
   const colorClasses = {
     green: 'bg-green-50 border-green-200',
     blue: 'bg-blue-50 border-blue-200',
