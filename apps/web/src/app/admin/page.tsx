@@ -1,15 +1,8 @@
 import { t } from '@slgh/shared';
-import { createClient } from '@/lib/supabase/server';
+import { api, query } from '@/lib/convex';
 
 export default async function Overview() {
-  const s = createClient();
-  const count = (table: string, f?: (q: any) => any) => {
-    const q = s.from(table).select('id', { count: 'exact', head: true });
-    return (f ? f(q) : q).then((r: { count: number | null }) => r.count ?? 0);
-  };
-  const [players, games, reports] = await Promise.all([
-    count('profiles'), count('games'), count('reports', (q) => q.eq('status', 'open')),
-  ]);
+  const { players, games, reports } = await query(api.games.adminOverview, {});
   return (
     <>
       <h1 className="mb-4">{t('admin.overview')}</h1>

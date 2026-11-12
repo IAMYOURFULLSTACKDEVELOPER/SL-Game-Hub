@@ -2,7 +2,7 @@
 
 ## Overview
 
-The game publishing system allows admins to upload HTML5 games to the platform without redeploying the application. Games are stored in Supabase Storage and loaded dynamically.
+The game publishing system allows admins to upload HTML5 games to the platform without redeploying the application. Games are stored in Convex file storage and loaded dynamically.
 
 ## Features
 
@@ -18,14 +18,15 @@ The game publishing system allows admins to upload HTML5 games to the platform w
 
 #### `game_versions` Table
 - Tracks all versions of uploaded games
-- Links to Supabase Storage for bundles and thumbnails
+- Links to Convex file storage for bundles and thumbnails (`bundle_storage_id`, `thumbnail_storage_id`)
 - Stores game manifest JSON
 - Supports rollback functionality
 
-### Storage Buckets
+### File Storage
 
-- `game-bundles`: Private bucket for game ZIP files (max 10MB)
-- `game-thumbnails`: Public bucket for game thumbnails (max 512KB)
+- Bundles (ZIP, max 10MB) and thumbnails (max 512KB) are uploaded to Convex file storage
+  through admin-only upload URLs (`gameVersions:generateUploadUrl`), then recorded by `gameVersions:create`.
+- Players get a bundle URL only for the current version of a published game (`gameVersions:current`).
 
 ### Security
 
@@ -193,7 +194,7 @@ Draft → Review → Approved → Published → Unpublished
 - Stored in `packages/shared/src/games/`
 
 ### Uploaded Games
-- Stored in Supabase Storage
+- Stored in Convex file storage
 - Loaded dynamically via iframe
 - Require manifest
 - Can be updated without redeployment

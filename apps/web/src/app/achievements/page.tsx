@@ -1,41 +1,18 @@
-import { createClient } from '@/lib/supabase/server';
+import { api, query } from '@/lib/convex';
 import { requireUser } from '@/lib/session';
+import { PageHeader } from '@/components/PageHeader';
 
 export default async function AchievementsPage() {
-  const user = await requireUser();
-  const supabase = createClient();
+  await requireUser();
 
-  // Get user's achievements
-  const { data: userAchievements } = await supabase
-    .from('user_achievements')
-    .select('*, achievements!inner(slug,name,description,icon,type,reward_coins)')
-    .eq('user_id', user.id)
-    .order('earned_at', { ascending: false });
-
-  // Get all available achievements
-  const { data: allAchievements } = await supabase
-    .from('achievements')
-    .select('*')
-    .eq('is_active', true)
-    .order('type');
-
-  // Get user's badges
-  const { data: userBadges } = await supabase
-    .from('user_badges')
-    .select('*, badges!inner(slug,name,description,icon,rarity)')
-    .eq('user_id', user.id)
-    .order('obtained_at', { ascending: false });
-
-  // Get all available badges
-  const { data: allBadges } = await supabase
-    .from('badges')
-    .select('*')
-    .eq('is_active', true)
-    .order('rarity');
+  // Every active achievement and badge, plus the ones this player has earned/owns
+  const {
+    achievements: allAchievements, earned: userAchievements, badges: allBadges, ownedBadges: userBadges,
+  } = await query(api.achievements.mine, {});
 
   return (
     <main className="mx-auto max-w-5xl space-y-6 p-4">
-      <h1 className="text-3xl font-bold">Achievements & Badges</h1>
+      <PageHeader icon="medal" tone="gold" title="Achievements & Badges" subtitle="Every win, streak and milestone you have unlocked." />
 
       {/* Stats Summary */}
       <div className="grid gap-4 sm:grid-cols-3">
@@ -49,7 +26,7 @@ export default async function AchievementsPage() {
         </div>
         <div className="card p-4 text-center">
           <div className="text-3xl font-bold text-primary">
-            {userAchievements?.reduce((sum, a) => sum + (a.achievements.reward_coins || 0), 0) || 0}
+            {userAchievements.reduce((sum, a) => sum + a.reward_coins, 0)}
           </div>
           <div className="text-muted">Coins from Achievements</div>
         </div>
@@ -86,14 +63,14 @@ export default async function AchievementsPage() {
 
 function AchievementCard({ achievement, earned, earnedAt }: { achievement: any; earned: boolean; earnedAt?: string }) {
   return (
-    <div className={`p-4 rounded-lg border ${earned ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200 opacity-75'}`}>
+    <div className={`p-4 rounded-lg border ${earned ? 'bg-primary/10 border-primary/30' : 'bg-bg/60 border-border opacity-75'}`}>
       <div className="flex items-start gap-3">
         <span className="text-4xl">{achievement.icon}</span>
         <div className="flex-1">
           <h3 className="font-bold">{achievement.name}</h3>
           <p className="text-sm text-muted">{achievement.description}</p>
           <div className="flex items-center gap-2 mt-2 text-xs">
-            <span className="px-2 py-1 bg-gray-200 rounded">{achievement.type}</span>
+            <span className="px-2 py-1 bg-text/10 rounded">{achievement.type}</span>
             {achievement.reward_coins > 0 && (
               <span className="text-yellow-600">🪙 {achievement.reward_coins}</span>
             )}
@@ -112,9 +89,9 @@ function AchievementCard({ achievement, earned, earnedAt }: { achievement: any; 
 function BadgeCard({ badge, owned, equipped }: { badge: any; owned: boolean; equipped?: boolean }) {
   return (
     <div className={`p-4 rounded-lg border text-center ${
-      equipped ? 'bg-blue-50 border-blue-200 ring-2 ring-blue-500' :
-      owned ? 'bg-green-50 border-green-200' :
-      'bg-gray-50 border-gray-200 opacity-50'
+      equipped ? 'bg-secondary/10 border-secondary/30 ring-2 ring-secondary' :
+      owned ? 'bg-primary/10 border-primary/30' :
+      'bg-bg/60 border-border opacity-50'
     }`}>
       <span className="text-5xl block mb-2">{badge.icon}</span>
       <h3 className="font-bold">{badge.name}</h3>

@@ -1,25 +1,11 @@
 import { t, GAME_STATUSES } from '@slgh/shared';
-import { createClient } from '@/lib/supabase/server';
+import { api, query } from '@/lib/convex';
 import { setGameStatus } from '../../actions';
 import Link from 'next/link';
 
 export default async function AdminGames() {
-  const supabase = createClient();
-  const { data: games } = await supabase.from('games').select('id,slug,name,icon,status,version,coming_soon,is_builtin').order('sort_order');
-
-  // Fetch version counts for non-built-in games
-  const gameIds = games?.filter(g => !g.is_builtin).map(g => g.id) || [];
-  const { data: versions } = gameIds.length > 0
-    ? await supabase
-        .from('game_versions')
-        .select('game_id')
-        .in('game_id', gameIds)
-    : { data: [] };
-
-  const versionCounts = (versions || []).reduce((acc, v) => {
-    acc[v.game_id] = (acc[v.game_id] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  // Every game, with version counts for uploaded (non-built-in) games
+  const games = await query(api.games.adminList, {});
 
   return (
     <>
@@ -37,7 +23,7 @@ export default async function AdminGames() {
               <span className="font-normal text-muted ml-2">
                 v{g.version}
                 {g.coming_soon ? ` · ${t('library.comingSoon')}` : ''}
-                {!g.is_builtin && versionCounts[g.id] ? ` · ${versionCounts[g.id]} version(s)` : ''}
+                {!g.is_builtin && g.version_count ? ` · ${g.version_count} version(s)` : ''}
               </span>
               {!g.is_builtin && (
                 <div className="flex gap-2 mt-1">

@@ -63,3 +63,17 @@ export function shuffle<T>(array: T[]): T[] {
   }
   return arr;
 }
+
+// Third-person verbs that change when the player is called "You" (vs-bots games name the human "You").
+const YOU_VERBS: Record<string, string> = {
+  is: 'are', has: 'have', plays: 'play', draws: 'draw', keeps: 'keep', passes: 'pass', wins: 'win', picks: 'pick',
+  owes: 'owe', goes: 'go', drops: 'drop', bids: 'bid', collects: 'collect', leaves: 'leave', pays: 'pay', stays: 'stay',
+  receives: 'receive', lands: 'land', gets: 'get',
+};
+
+/** Fix a log line's grammar when its subject is "You": "You plays" becomes "You play", "You's turn" becomes "Your turn". */
+export function youGrammar(text: string): string {
+  let t = text.replace(/\bYou's\b/g, 'Your').replace(/\b(to|by|from|with|for) You\b/g, '$1 you');
+  if (/^[^A-Za-z]*You\b/.test(t)) t = t.replace(/\b(is|has|plays|draws|keeps|passes|wins|picks|owes|goes|drops|bids|collects|leaves|pays|stays|receives|lands|gets)\b/g, (w) => YOU_VERBS[w]);
+  return t;
+}

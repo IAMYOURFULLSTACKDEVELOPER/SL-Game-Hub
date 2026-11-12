@@ -1,38 +1,43 @@
 import React, { useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useConvex } from 'convex/react';
+import { useAuthActions } from '@convex-dev/auth/react';
 import { AGE_BANDS, t, validateSignUp } from '@slgh/shared';
-import { supabase } from '@/supabase';
+import { api } from '@/convex';
+import { authErrorKey } from '@/auth';
 import { Banner, Button, Chip, Field, Screen, Txt } from '@/ui';
 
 export default function SignUp() {
   const router = useRouter();
+  const convex = useConvex();
+  const { signIn } = useAuthActions();
   const [f, setF] = useState({ fullName: '', username: '', email: '', password: '', confirmPassword: '', ageBand: '' });
   const [err, setErr] = useState('');
-  const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const set = (k: keyof typeof f) => (v: string) => setF((p) => ({ ...p, [k]: v }));
 
   async function submit() {
-    setNotice('');
     const errors = validateSignUp(f);
     const first = Object.values(errors)[0];
     if (first) { setErr(t(first)); return; }
     setBusy(true); setErr('');
-    const { data: free } = await supabase.rpc('username_available', { u: f.username.trim() });
-    if (free === false) { setBusy(false); setErr(t('errors.usernameTaken')); return; }
-    const { data, error } = await supabase.auth.signUp({
-      email: f.email.trim(), password: f.password,
-      options: { data: { full_name: f.fullName.trim(), username: f.username.trim(), age_band: f.ageBand } },
-    });
-    setBusy(false);
-    if (error) { setErr(t('errors.generic')); return; }
-    if (data.session) router.replace('/'); else { setNotice(t('notice.checkEmail')); }
+    try {
+      if (!await convex.query(api.users.usernameAvailable, { username: f.username.trim() })) {
+        setErr(t('errors.usernameTaken')); return;
+      }
+      await signIn('password', {
+        flow: 'signUp', email: f.email.trim(), password: f.password,
+        fullName: f.fullName.trim(), username: f.username.trim(), ageBand: f.ageBand,
+      });
+      router.replace('/');
+    } catch (e) {
+      setErr(t(authErrorKey(e)));
+    } finally { setBusy(false); }
   }
   return (
     <Screen>
       <Banner text={err} />
-      <Banner kind="ok" text={notice} />
       <Field label={t('auth.fullName')} value={f.fullName} onChangeText={set('fullName')} autoComplete="name" maxLength={80} />
       <Field label={t('auth.username')} hint={t('auth.usernameHint')} value={f.username} onChangeText={set('username')} autoCapitalize="none" maxLength={20} />
       <Field label={t('auth.email')} value={f.email} onChangeText={set('email')} keyboardType="email-address" autoCapitalize="none" autoComplete="email" />

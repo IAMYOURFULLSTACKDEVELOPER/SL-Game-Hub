@@ -1,26 +1,12 @@
-import { createClient } from '@/lib/supabase/server';
+import { api, query } from '@/lib/convex';
 import { requireAdmin } from '@/lib/session';
 import { deleteChatMessage, muteUser, blockUser } from '@/app/actions';
 
 export default async function AdminChatPage() {
   await requireAdmin();
-  const supabase = createClient();
 
-  // Get flagged messages
-  const { data: flaggedMessages } = await supabase
-    .from('chat_messages')
-    .select('*, profiles!inner(username,avatar), chat_rooms!inner(name)')
-    .eq('is_flagged', true)
-    .eq('is_deleted', false)
-    .order('created_at', { ascending: false })
-    .limit(50);
-
-  // Get muted users
-  const { data: mutedUsers } = await supabase
-    .from('chat_participants')
-    .select('*, profiles!inner(username,avatar), chat_rooms!inner(name)')
-    .eq('is_muted', true)
-    .order('muted_until', { ascending: false });
+  // Flagged messages and muted players
+  const { flagged: flaggedMessages, muted: mutedUsers } = await query(api.chat.moderation, {});
 
   return (
     <main className="mx-auto max-w-5xl space-y-6 p-4">
@@ -32,7 +18,7 @@ export default async function AdminChatPage() {
         {flaggedMessages && flaggedMessages.length > 0 ? (
           <div className="space-y-4">
             {flaggedMessages.map((msg: any) => (
-              <div key={msg.id} className="p-4 border rounded bg-red-50">
+              <div key={msg.id} className="p-4 border rounded bg-danger/10">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">

@@ -1,179 +1,82 @@
 'use server';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
-import {
-  GAME_STATUSES, isAvatarId, isEmail, USERNAME_RE, validatePasswords, validateSignUp,
-} from '@slgh/shared';
-import { createClient } from '@/lib/supabase/server';
+import { GAME_STATUSES, type GameStatus } from '@slgh/shared';
+import type { Id, TableNames } from '@slgh/backend/convex/_generated/dataModel';
+import { api, errorMessage, mutate } from '@/lib/convex';
 import { requireAdmin, requireUser } from '@/lib/session';
 
+// Sign in / sign up / password reset / sign out run in the browser (components/AuthForm.tsx),
+// because Convex Auth keeps the session in cookies set by its /api/auth route.
+
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? '').slice(0, 300);
-const SITE = () => process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
-// Only same-site relative paths are allowed as post-login destinations (prevents open redirects).
-const safeNext = (n: string) => (n.startsWith('/') && !n.startsWith('//') && !n.includes('\\') ? n : '/');
 const qs = (o: Record<string, string>) => new URLSearchParams(o).toString();
+// Form fields carry document ids as strings; the Convex functions validate them.
+const id = <T extends TableNames>(fd: FormData, k: string) => str(fd, k) as Id<T>;
 
-export async function signIn(fd: FormData) {
-  const email = str(fd, 'email').trim(), password = str(fd, 'password'), next = safeNext(str(fd, 'next'));
-  if (!isEmail(email) || !password) redirect(`/login?${qs({ error: 'errors.invalidCredentials', next })}`);
-  const { error } = await createClient().auth.signInWithPassword({ email, password });
-  if (error) redirect(`/login?${qs({ error: 'errors.invalidCredentials', next })}`);
-  redirect(next);
-}
-
-export async function signUp(fd: FormData) {
-  const input = {
-    fullName: str(fd, 'fullName'), username: str(fd, 'username'), email: str(fd, 'email'),
-    password: str(fd, 'password'), confirmPassword: str(fd, 'confirmPassword'), ageBand: str(fd, 'ageBand'),
-  };
-  // Re-fill non-secret fields on error (saves retyping on slow phones). Never includes passwords.
-  const keep = { fullName: input.fullName, username: input.username, email: input.email, ageBand: input.ageBand };
-  const errors = validateSignUp(input);
-  const first = Object.values(errors)[0];
-  if (first) redirect(`/signup?${qs({ ...keep, error: first })}`);
-
-  const supabase = createClient();
-  const { data: free } = await supabase.rpc('username_available', { u: input.username.trim() });
-  if (free === false) redirect(`/signup?${qs({ ...keep, error: 'errors.usernameTaken' })}`);
-
-  const { data, error } = await supabase.auth.signUp({
-    email: input.email.trim(), password: input.password,
-    options: {
-      emailRedirectTo: `${SITE()}/auth/callback`,
-      data: { full_name: input.fullName.trim(), username: input.username.trim(), age_band: input.ageBand },
-    },
-  });
-  if (error) redirect(`/signup?${qs({ ...keep, error: 'errors.generic' })}`);
-  if (data.session) redirect('/');                                  // email confirmation OFF
-  redirect(`/login?${qs({ notice: 'notice.checkEmail' })}`);         // email confirmation ON
-}
-
-export async function requestPasswordReset(fd: FormData) {
-  const email = str(fd, 'email').trim();
-  if (isEmail(email)) {
-    await createClient().auth.resetPasswordForEmail(email, { redirectTo: `${SITE()}/auth/callback?next=/reset-password` });
-  }
-  // Same answer whether or not the email exists (no account enumeration).
-  redirect(`/forgot-password?${qs({ notice: 'notice.resetSent' })}`);
-}
-
-export async function updatePassword(fd: FormData) {
-  const password = str(fd, 'password'), confirm = str(fd, 'confirmPassword');
-  const errs = validatePasswords(password, confirm);
-  const first = Object.values(errs)[0];
-  if (first) redirect(`/reset-password?${qs({ error: first })}`);
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect(`/forgot-password?${qs({ error: 'errors.linkExpired' })}`);
-  const { error } = await supabase.auth.updateUser({ password });
-  if (error) redirect(`/reset-password?${qs({ error: 'errors.generic' })}`);
-  await supabase.auth.signOut();
-  redirect(`/login?${qs({ notice: 'notice.passwordUpdated' })}`);
-}
-
-export async function signOut() {
-  await createClient().auth.signOut();
-  redirect('/');
+/** Runs a mutation; on failure returns the error message instead of throwing. */
+async function attempt(run: () => Promise<unknown>): Promise<string | null> {
+  try { await run(); return null; } catch (e) { return errorMessage(e); }
 }
 
 export async function updateProfile(fd: FormData) {
   const me = await requireUser();
-  const fullName = str(fd, 'fullName').trim(), username = str(fd, 'username').trim();
-  const avatar = str(fd, 'avatar'), districtRaw = str(fd, 'districtId');
-  if (fullName.length < 2 || fullName.length > 80) redirect(`/profile?${qs({ error: 'errors.fullNameRequired' })}`);
-  if (!USERNAME_RE.test(username)) redirect(`/profile?${qs({ error: 'errors.usernameInvalid' })}`);
-  if (!isAvatarId(avatar)) redirect(`/profile?${qs({ error: 'errors.generic' })}`);
-  const districtId = districtRaw ? Number(districtRaw) : null;
-  if (districtId !== null && !Number.isInteger(districtId)) redirect(`/profile?${qs({ error: 'errors.generic' })}`);
-
-  const { error } = await createClient().from('profiles').update({
-    full_name: fullName, username, avatar, district_id: districtId,
+  const districtId = str(fd, 'districtId');
+  const error = await attempt(() => mutate(api.users.updateProfile, {
+    full_name: str(fd, 'fullName'), username: str(fd, 'username'), avatar: str(fd, 'avatar'),
+    district_id: districtId || null,
     is_public: me.age_band === 'under_13' ? false : fd.get('isPublic') === 'on',
-  }).eq('id', me.id);
-  if (error) redirect(`/profile?${qs({ error: error.code === '23505' ? 'errors.usernameTaken' : 'errors.generic' })}`);
+  }));
+  if (error) redirect(`/profile?${qs({ error })}`);
   revalidatePath('/', 'layout');
   redirect(`/profile?${qs({ notice: 'notice.profileSaved' })}`);
 }
 
-// ---------- Admin (every action re-checks the role; RLS is the second lock) ----------
+// ---------- Admin (every action re-checks the role; the Convex function is the second lock) ----------
 export async function setGameStatus(fd: FormData) {
   await requireAdmin();
-  const id = str(fd, 'id'), status = str(fd, 'status');
-  if (!GAME_STATUSES.includes(status as never)) redirect('/admin/games');
-  await createClient().from('games').update({
-    status, published_at: status === 'published' ? new Date().toISOString() : null,
-  }).eq('id', id);
+  const status = str(fd, 'status');
+  if (GAME_STATUSES.includes(status as GameStatus)) {
+    await mutate(api.games.setStatus, { id: id<'games'>(fd, 'id'), status: status as GameStatus });
+  }
   revalidatePath('/games'); revalidatePath('/'); revalidatePath('/admin/games');
   redirect('/admin/games');
 }
 
 export async function setPlayerBanned(fd: FormData) {
   const admin = await requireAdmin();
-  const id = str(fd, 'id');
-  if (id === admin.id) redirect('/admin/players');                  // can't suspend yourself
-  await createClient().from('profiles').update({ banned: fd.get('banned') === 'true' }).eq('id', id);
+  const playerId = str(fd, 'id');
+  if (playerId !== admin.id) {                                       // can't suspend yourself
+    await mutate(api.users.setBanned, { id: playerId as Id<'users'>, banned: fd.get('banned') === 'true' });
+  }
   revalidatePath('/admin/players');
   redirect('/admin/players');
 }
 
 export async function resolveReport(fd: FormData) {
-  const admin = await requireAdmin();
+  await requireAdmin();
   const status = str(fd, 'status');
-  if (status !== 'resolved' && status !== 'dismissed') redirect('/admin/reports');
-  await createClient().from('reports').update({ status, resolved_by: admin.id }).eq('id', str(fd, 'id'));
+  if (status === 'resolved' || status === 'dismissed') {
+    await mutate(api.reports.resolve, { id: id<'reports'>(fd, 'id'), status });
+  }
   revalidatePath('/admin/reports');
   redirect('/admin/reports');
 }
 
 export async function rollbackToVersion(fd: FormData) {
   await requireAdmin();
-  const versionId = str(fd, 'versionId');
-  const gameId = str(fd, 'gameId');
-  const supabase = createClient();
-
-  // Get the version to rollback to
-  const { data: version } = await supabase
-    .from('game_versions')
-    .select('*')
-    .eq('id', versionId)
-    .single();
-
-  if (!version) {
-    redirect('/admin/games');
-  }
-
-  // Update the game to use this version
-  await supabase
-    .from('games')
-    .update({
-      version: version.version,
-      thumbnail_url: version.thumbnail_path,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', gameId);
-
-  // Mark this version as current
-  await supabase
-    .from('game_versions')
-    .update({ is_current: true })
-    .eq('id', versionId);
-
+  const slug = await mutate(api.gameVersions.rollback, { versionId: id<'game_versions'>(fd, 'versionId') }).catch(() => null);
+  if (!slug) redirect('/admin/games');
   revalidatePath('/admin/games');
-  revalidatePath(`/admin/games/${version.manifest.id}/versions`);
-  redirect(`/admin/games/${version.manifest.id}/versions`);
+  revalidatePath(`/admin/games/${slug}/versions`);
+  redirect(`/admin/games/${slug}/versions`);
 }
 
 export async function registerForTournament(fd: FormData) {
-  const user = await requireUser();
+  await requireUser();
   const tournamentId = str(fd, 'tournamentId');
-  const supabase = createClient();
-
-  const { error } = await supabase.rpc('register_for_tournament', { p_tournament_id: tournamentId });
-
-  if (error) {
-    redirect(`/tournaments/${tournamentId}?error=${encodeURIComponent(error.message)}`);
-  }
-
+  const error = await attempt(() => mutate(api.tournaments.register, { tournamentId: tournamentId as Id<'tournaments'> }));
+  if (error) redirect(`/tournaments/${tournamentId}?error=${encodeURIComponent(error)}`);
   revalidatePath(`/tournaments/${tournamentId}`);
   redirect(`/tournaments/${tournamentId}?notice=registered`);
 }
@@ -181,31 +84,15 @@ export async function registerForTournament(fd: FormData) {
 // Chat moderation actions
 export async function deleteChatMessage(fd: FormData) {
   await requireAdmin();
-  const messageId = str(fd, 'messageId');
-  const supabase = createClient();
-
-  await supabase
-    .from('chat_messages')
-    .update({ is_deleted: true })
-    .eq('id', messageId);
-
+  await mutate(api.chat.deleteMessage, { messageId: id<'chat_messages'>(fd, 'messageId') });
   revalidatePath('/admin/chat');
   redirect('/admin/chat');
 }
 
 export async function muteUser(fd: FormData) {
   await requireAdmin();
-  const participantId = str(fd, 'participantId');
   const duration = Number(str(fd, 'duration')) || 60; // Default 60 minutes
-  const supabase = createClient();
-
-  const mutedUntil = new Date(Date.now() + duration * 60 * 1000).toISOString();
-
-  await supabase
-    .from('chat_participants')
-    .update({ is_muted: true, muted_until: mutedUntil })
-    .eq('id', participantId);
-
+  await mutate(api.chat.mute, { participantId: id<'chat_participants'>(fd, 'participantId'), minutes: duration });
   revalidatePath('/admin/chat');
   redirect('/admin/chat');
 }
@@ -213,57 +100,44 @@ export async function muteUser(fd: FormData) {
 export async function blockUser(fd: FormData) {
   const admin = await requireAdmin();
   const blockedId = str(fd, 'blockedId');
-  const supabase = createClient();
-
-  if (blockedId === admin.id) {
-    redirect('/admin/chat'); // Can't block yourself
+  if (blockedId !== admin.id) {                                      // can't block yourself
+    await mutate(api.chat.block, { blockedId: blockedId as Id<'users'> });
   }
-
-  await supabase
-    .from('user_blocks')
-    .insert({ blocker_id: admin.id, blocked_id: blockedId });
-
   revalidatePath('/admin/chat');
   redirect('/admin/chat');
 }
 
 // Rewards system actions
-export async function claimDailyBonus(fd: FormData) {
-  const user = await requireUser();
-  const supabase = createClient();
-
-  const { data } = await supabase.rpc('process_daily_login');
-
+export async function claimDailyBonus() {
+  await requireUser();
+  const coins = await mutate(api.rewards.claimDailyBonus, {});
   revalidatePath('/shop');
-  redirect(`/shop?notice=${data > 0 ? `claimed_${data}` : 'already_claimed'}`);
+  redirect(`/shop?notice=${coins > 0 ? `claimed_${coins}` : 'already_claimed'}`);
 }
 
 export async function purchaseCosmetic(fd: FormData) {
-  const user = await requireUser();
-  const cosmeticId = str(fd, 'cosmeticId');
-  const supabase = createClient();
-
-  const { error } = await supabase.rpc('purchase_cosmetic', { p_cosmetic_id: cosmeticId });
-
-  if (error) {
-    redirect(`/shop?error=${encodeURIComponent(error.message)}`);
-  }
-
+  await requireUser();
+  const error = await attempt(() => mutate(api.rewards.purchaseCosmetic, { cosmeticId: id<'cosmetics'>(fd, 'cosmeticId') }));
+  if (error) redirect(`/shop?error=${encodeURIComponent(error)}`);
   revalidatePath('/shop');
   redirect('/shop?notice=purchased');
 }
 
 export async function equipCosmetic(fd: FormData) {
-  const user = await requireUser();
-  const cosmeticId = str(fd, 'cosmeticId');
-  const supabase = createClient();
-
-  const { error } = await supabase.rpc('equip_cosmetic', { p_cosmetic_id: cosmeticId });
-
-  if (error) {
-    redirect(`/shop?error=${encodeURIComponent(error.message)}`);
-  }
-
+  await requireUser();
+  const error = await attempt(() => mutate(api.rewards.equipCosmetic, { cosmeticId: id<'cosmetics'>(fd, 'cosmeticId') }));
+  if (error) redirect(`/shop?error=${encodeURIComponent(error)}`);
   revalidatePath('/shop');
   redirect('/shop?notice=equipped');
+}
+
+// Wallet withdrawals (admin). Approving sends the money through Monime straight away.
+export async function reviewWithdrawal(fd: FormData) {
+  await requireAdmin();
+  const withdrawal = id<'withdrawals'>(fd, 'id');
+  const error = await attempt(() => str(fd, 'decision') === 'approve'
+    ? mutate(api.wallet.approveWithdrawal, { id: withdrawal })
+    : mutate(api.wallet.rejectWithdrawal, { id: withdrawal }));
+  revalidatePath('/admin/wallet');
+  redirect(`/admin/wallet${error ? `?error=${encodeURIComponent(error)}` : ''}`);
 }

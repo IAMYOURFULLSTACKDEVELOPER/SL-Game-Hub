@@ -99,7 +99,7 @@ export default function GamePreviewPage({ params }: { params: { slug: string } }
         <button onClick={() => router.push('/admin/games')} className="text-secondary">
           ← Back to Games
         </button>
-        <div className="card p-6 mt-4 bg-red-50 border border-red-200">
+        <div className="card p-6 mt-4 bg-danger/10 border border-danger/30">
           <h2 className="text-xl font-bold text-red-800">Error</h2>
           <p className="text-red-700">{error}</p>
         </div>
@@ -174,7 +174,7 @@ export default function GamePreviewPage({ params }: { params: { slug: string } }
             <h2 className="font-bold mb-2">SDK Events</h2>
             <div className="h-64 overflow-y-auto bg-gray-900 text-green-400 text-xs p-2 rounded font-mono">
               {logs.length === 0 ? (
-                <p className="text-gray-500">Waiting for game events...</p>
+                <p className="text-muted">Waiting for game events...</p>
               ) : (
                 logs.map((log, i) => <div key={i}>{log}</div>)
               )}

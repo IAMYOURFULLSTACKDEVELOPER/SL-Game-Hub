@@ -1,7 +1,8 @@
 import type { GameEvent, GameEventType, TurnTimer } from './multiplayer';
 
 /**
- * Real-time game manager using Supabase Realtime
+ * Real-time game manager. With Convex, "realtime" is a query subscription:
+ * store events in a table and have clients `useQuery` them (see packages/backend/convex/dice.ts).
  * Handles WebSocket connections for multiplayer games
  */
 export class RealtimeGameManager {
@@ -19,15 +20,8 @@ export class RealtimeGameManager {
    * Connect to the game channel
    */
   async connect(): Promise<void> {
-    // TODO: Implement with Supabase Realtime
-    // This would typically look like:
-    // const supabase = getSupabaseClient();
-    // this.channel = supabase.channel(`game:${this.matchId}`);
-    // this.channel.on('broadcast', { event: 'game_event' }, (payload) => {
-    //   this.handleEvent(payload.payload);
-    // });
-    // this.channel.subscribe();
-    throw new Error('Not implemented - requires Supabase Realtime');
+    // TODO: Implement as a Convex mutation + query subscription (see packages/backend/convex/dice.ts)
+    throw new Error('Not implemented - use a Convex query subscription');
   }
 
   /**
@@ -50,13 +44,13 @@ export class RealtimeGameManager {
       timestamp: new Date().toISOString(),
     };
 
-    // TODO: Broadcast event via Supabase Realtime
+    // TODO: Write the event with a Convex mutation; subscribers get it through their query
     // this.channel.send({
     //   type: 'broadcast',
     //   event: 'game_event',
     //   payload: fullEvent,
     // });
-    throw new Error('Not implemented - requires Supabase Realtime');
+    throw new Error('Not implemented - use a Convex query subscription');
   }
 
   /**

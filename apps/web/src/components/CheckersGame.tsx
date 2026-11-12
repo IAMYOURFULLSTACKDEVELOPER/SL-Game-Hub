@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { CheckersEngine, CHECKERS_RULES, createPlayer, type CheckersState, type CheckersMove, type Difficulty } from '@slgh/shared';
 import Rulebook from './Rulebook';
+import { sfx } from '@/lib/sound';
+import { useEndSfx } from '@/lib/useGameSfx';
 
 const engine = new CheckersEngine();
 const SAVE_KEY = 'checkers_game_state_v2';
@@ -43,10 +45,12 @@ export default function CheckersGame({ onBack }: { onBack: () => void }) {
   };
 
   const legal = useMemo(() => (game && game.status === 'playing' ? engine.getLegalMoves(game) : []), [game]);
+  useEndSfx(!!game && (game.status === 'finished' || !!result));
 
   const play = (m: CheckersMove) => {
     if (!game) return;
     const next = engine.applyMove(game, m);
+    sfx(m.isJump ? 'capture' : 'move');
     setHistory((h) => [...h, next]);
     setLastMove(m);
     setSelected(next.jumpingFrom != null ? next.jumpingFrom : null);
@@ -70,7 +74,7 @@ export default function CheckersGame({ onBack }: { onBack: () => void }) {
         </div>
         {mode === 'bot' && (
           <label className="block text-sm font-semibold">Bot level:
-            <select value={difficulty} onChange={(e) => setDifficulty(e.target.value as Difficulty)} className="ml-2 rounded border px-2 py-1">
+            <select value={difficulty} onChange={(e) => setDifficulty(e.target.value as Difficulty)} className="ml-2 field">
               <option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option>
             </select>
           </label>
@@ -164,9 +168,9 @@ export default function CheckersGame({ onBack }: { onBack: () => void }) {
 
 function Shell({ onBack, children }: { onBack: () => void; children: ReactNode }) {
   return (
-    <main className="mx-auto max-w-2xl space-y-4 p-4">
-      <button onClick={onBack} className="text-secondary">← Back to Checkers</button>
-      <div className="card space-y-4 p-5">
+    <main className="mx-auto max-w-2xl space-y-3 px-2 py-3 sm:space-y-4 sm:p-4">
+      <button onClick={onBack} className="back-link">← Back to Checkers</button>
+      <div className="card space-y-4 p-3 sm:p-5">
         <h1>🔴 Checkers</h1>
         {children}
       </div>

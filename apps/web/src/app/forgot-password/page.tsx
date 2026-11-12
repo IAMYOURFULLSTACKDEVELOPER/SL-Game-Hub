@@ -1,19 +1,23 @@
+import Link from 'next/link';
 import { t } from '@slgh/shared';
-import { requestPasswordReset } from '../actions';
 import { Flash } from '@/components/Flash';
+import { AuthShell } from '@/components/AuthShell';
+import { Icon } from '@/components/Icon';
+import { AuthForm } from '@/components/AuthForm';
 
 export const metadata = { title: t('auth.resetTitle') };
 
 export default function Forgot({ searchParams }: { searchParams: { error?: string; notice?: string } }) {
   return (
-    <main className="mx-auto max-w-md p-4">
-      <h1 className="mb-4">{t('auth.resetTitle')}</h1>
+    <AuthShell title={t('auth.resetTitle')}>
       <Flash error={searchParams.error} notice={searchParams.notice} />
-      <form action={requestPasswordReset} className="card space-y-4 p-4">
+      <AuthForm kind="requestReset" className="space-y-4">
         <div><label className="label" htmlFor="email">{t('auth.email')}</label>
-          <input id="email" name="email" type="email" required autoComplete="email" inputMode="email" className="input" /></div>
-        <button className="btn btn-primary w-full">{t('auth.resetSend')}</button>
-      </form>
-    </main>
+          <div className="input-icon"><Icon name="mail" />
+            <input id="email" name="email" type="email" required autoComplete="email" inputMode="email" className="input" /></div></div>
+        <button className="btn btn-primary btn-lg w-full"><Icon name="mail" />{t('auth.resetSend')}</button>
+      </AuthForm>
+      <p className="mt-6 border-t border-border pt-5 text-center"><Link href="/login" className="back-link"><Icon name="arrowLeft" size={18} />{t('auth.signInTitle')}</Link></p>
+    </AuthShell>
   );
 }

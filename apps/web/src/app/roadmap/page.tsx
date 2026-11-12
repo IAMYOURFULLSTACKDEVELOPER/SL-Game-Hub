@@ -1,7 +1,9 @@
+import { PageHeader } from '@/components/PageHeader';
+
 export default function RoadmapPage() {
   return (
     <main className="mx-auto max-w-5xl space-y-8 p-4">
-      <h1 className="text-3xl font-bold">Game Roadmap</h1>
+      <PageHeader icon="map" tone="blue" title="Game Roadmap" subtitle="What we are building next." />
       <p className="text-muted">
         We're constantly adding new games and features. Here's what's coming to SL Game Hub!
       </p>
@@ -157,7 +159,7 @@ export default function RoadmapPage() {
       </section>
 
       {/* Contribute */}
-      <section className="card p-6 bg-blue-50 border-blue-200">
+      <section className="card p-6 bg-secondary/10 border-secondary/30">
         <h2 className="text-xl font-bold mb-2">Want to Help?</h2>
         <p className="text-muted mb-4">
           We're always looking for feedback and suggestions. If you have ideas for new games or features,
@@ -173,9 +175,9 @@ export default function RoadmapPage() {
 
 function GameCard({ name, icon, image, description, status, color }: { name: string; icon: string; image?: string; description: string; status: string; color: 'green' | 'blue' | 'purple' }) {
   const colorClasses = {
-    green: 'bg-green-50 border-green-200',
-    blue: 'bg-blue-50 border-blue-200',
-    purple: 'bg-purple-50 border-purple-200',
+    green: 'bg-primary/10 border-primary/30',
+    blue: 'bg-secondary/10 border-secondary/30',
+    purple: 'bg-purple-500/10 border-purple-500/30',
   };
 
   return (

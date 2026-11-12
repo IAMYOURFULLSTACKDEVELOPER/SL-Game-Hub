@@ -4,12 +4,21 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { SnakeEngine, type SnakeState, type SnakeMove, SNAKE_MANIFEST } from '@slgh/shared';
 import { createPlayer } from '@slgh/shared';
-import DiceGame from './DiceGame';
-import SnakeAndLadderGame from './SnakeAndLadderGame';
-import ChessGame from './ChessGame';
-import CheckersGame from './CheckersGame';
-import WordSearchGame from './WordSearchGame';
-import ScrabbleGame from './ScrabbleGame';
+import dynamic from 'next/dynamic';
+import { DiceLoader } from './Art';
+
+// Each game is its own download: opening Chess never fetches Scrabble's code.
+const loading = () => <main className="mx-auto max-w-2xl p-4"><DiceLoader label="Setting up the game" /></main>;
+const DiceGame = dynamic(() => import('./DiceGame'), { loading });
+const SnakeAndLadderGame = dynamic(() => import('./SnakeAndLadderGame'), { loading });
+const ChessGame = dynamic(() => import('./ChessGame'), { loading });
+const CheckersGame = dynamic(() => import('./CheckersGame'), { loading });
+const WordSearchGame = dynamic(() => import('./WordSearchGame'), { loading });
+const ScrabbleGame = dynamic(() => import('./ScrabbleGame'), { loading });
+const UnoGame = dynamic(() => import('./UnoGame'), { loading });
+const SalonePolyGame = dynamic(() => import('./SalonePolyGame'), { loading });
+import { sfx } from '@/lib/sound';
+import { useEndSfx } from '@/lib/useGameSfx';
 
 export default function BuiltInGamePlay({ slug }: { slug: string }) {
   const router = useRouter();
@@ -40,6 +49,14 @@ export default function BuiltInGamePlay({ slug }: { slug: string }) {
     return <WordSearchGame onBack={back('word-search')} />;
   }
 
+  if (slug === 'uno') {
+    return <UnoGame onBack={back('uno')} />;
+  }
+
+  if (slug === 'salone-poly') {
+    return <SalonePolyGame onBack={back('salone-poly')} />;
+  }
+
   if (slug === 'scrabble') {
     return <ScrabbleGame onBack={back('scrabble')} />;
   }
@@ -51,7 +68,7 @@ export default function BuiltInGamePlay({ slug }: { slug: string }) {
       </button>
       <div className="card p-5">
         <h1>Coming Soon</h1>
-        <p>This game is not yet available. Snake, Snake &amp; Ladder, Chess, Checkers, Word Search, Scrabble and Dice are ready to play!</p>
+        <p>This game is not yet available. Snake, Snake &amp; Ladder, Chess, Checkers, Word Search, Scrabble, UNO, Salone-Poly and Dice are ready to play!</p>
       </div>
     </main>
   );
@@ -65,6 +82,9 @@ function SnakeGame({ router }: { router: ReturnType<typeof useRouter> }) {
   const [isAIPlaying, setIsAIPlaying] = useState(false);
   const engineRef = useRef(new SnakeEngine(20, 150));
   const gameLoopRef = useRef<number | null>(null);
+  const lastScore = useRef(0);
+  useEffect(() => { if (score > lastScore.current) sfx('pop'); lastScore.current = score; }, [score]);
+  useEndSfx(gameOver, true);
 
   useEffect(() => {
     const player = createPlayer('player', 'You', false);
@@ -109,29 +129,30 @@ function SnakeGame({ router }: { router: ReturnType<typeof useRouter> }) {
     };
   }, [state, gameOver, isAIPlaying, difficulty]);
 
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (!state || gameOver || isAIPlaying) return;
-
-    const keyMap: Record<string, SnakeMove> = {
-      ArrowUp: 'up',
-      ArrowDown: 'down',
-      ArrowLeft: 'left',
-      ArrowRight: 'right',
-      w: 'up',
-      s: 'down',
-      a: 'left',
-      d: 'right',
-    };
-
-    const move = keyMap[e.key];
-    if (move && engineRef.current.isValidMove(state, move, 0)) {
-      e.preventDefault();
-      setState((prevState) => {
-        if (!prevState) return prevState;
-        return engineRef.current.applyMove(prevState, move);
-      });
-    }
+  // Keyboard, swipe and the on-screen pad all steer through here.
+  const turn = useCallback((move: SnakeMove) => {
+    if (!state || gameOver || isAIPlaying || !engineRef.current.isValidMove(state, move, 0)) return false;
+    setState((prevState) => (prevState ? engineRef.current.applyMove(prevState, move) : prevState));
+    return true;
   }, [state, gameOver, isAIPlaying]);
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    const keyMap: Record<string, SnakeMove> = {
+      ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+      w: 'up', s: 'down', a: 'left', d: 'right',
+    };
+    const move = keyMap[e.key];
+    if (move && turn(move)) e.preventDefault();
+  }, [turn]);
+
+  const swipe = useRef<{ x: number; y: number } | null>(null);
+  const onSwipeEnd = (e: React.PointerEvent) => {
+    const start = swipe.current; swipe.current = null;
+    if (!start) return;
+    const dx = e.clientX - start.x, dy = e.clientY - start.y;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
+    turn(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'));
+  };
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
@@ -180,75 +201,57 @@ function SnakeGame({ router }: { router: ReturnType<typeof useRouter> }) {
   }
 
   const boardSize = state.boardSize;
-  const cellSize = Math.min(30, Math.floor(600 / boardSize));
+  const pad = (move: SnakeMove, label: string, d: string, area: string) => (
+    <button type="button" aria-label={label} onClick={() => turn(move)} style={{ gridArea: area }}
+      className="btn btn-outline h-14 min-h-0 w-14 rounded-2xl p-0">
+      <svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
+    </button>
+  );
 
   return (
-    <main className="mx-auto max-w-2xl space-y-4 p-4">
-      <button onClick={() => router.push('/games/snake')} className="text-secondary">
+    <main className="mx-auto max-w-2xl space-y-3 px-2 py-3 sm:space-y-4 sm:p-4">
+      <button onClick={() => router.push('/games/snake')} className="back-link">
         ← Back to Snake
       </button>
 
-      <div className="card space-y-4 p-5">
-        <div className="flex items-center justify-between">
+      <div className="card space-y-4 p-3 sm:p-5">
+        <div className="flex items-center justify-between gap-3">
           <h1>{SNAKE_MANIFEST.name}</h1>
-          <div className="text-2xl font-bold">Score: {score}</div>
+          <div className="stat-num text-2xl" aria-live="polite">{score}<span className="sr-only"> points</span></div>
         </div>
 
-        <div className="flex gap-4 items-center">
-          <label>
-            Difficulty:
-            <select
-              value={difficulty}
-              onChange={(e) => setDifficulty(e.target.value as 'easy' | 'medium' | 'hard')}
-              className="ml-2 border rounded px-2 py-1"
-            >
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-2 text-sm font-semibold">
+            Difficulty
+            <select value={difficulty} onChange={(e) => setDifficulty(e.target.value as 'easy' | 'medium' | 'hard')} className="field">
               <option value="easy">Easy</option>
               <option value="medium">Medium</option>
               <option value="hard">Hard</option>
             </select>
           </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={isAIPlaying}
-              onChange={(e) => setIsAIPlaying(e.target.checked)}
-            />
+          <label className="flex items-center gap-2 text-sm font-semibold">
+            <input type="checkbox" className="h-5 w-5" checked={isAIPlaying} onChange={(e) => setIsAIPlaying(e.target.checked)} />
             AI Play
           </label>
         </div>
 
+        {/* Scales to the screen; swipe on it to steer */}
         <div
-          className="border-2 border-border mx-auto"
-          style={{
-            width: boardSize * cellSize,
-            height: boardSize * cellSize,
-            position: 'relative',
-            backgroundColor: '#1a1a2e',
-          }}
+          className="mx-auto grid aspect-square w-full max-w-[480px] select-none overflow-hidden rounded-xl border-2 border-border"
+          style={{ gridTemplateColumns: `repeat(${boardSize}, 1fr)`, backgroundColor: '#1a1a2e', touchAction: 'none' }}
+          onPointerDown={(e) => { swipe.current = { x: e.clientX, y: e.clientY }; }}
+          onPointerUp={onSwipeEnd}
+          onPointerCancel={() => { swipe.current = null; }}
         >
           {Array.from({ length: boardSize * boardSize }).map((_, i) => {
-            const x = i % boardSize;
-            const y = Math.floor(i / boardSize);
             const isSnake = state.snake.includes(i);
             const isHead = state.snake[0] === i;
             const isFood = state.food === i;
-
             return (
               <div
                 key={i}
                 style={{
-                  position: 'absolute',
-                  left: x * cellSize,
-                  top: y * cellSize,
-                  width: cellSize,
-                  height: cellSize,
-                  backgroundColor: isHead
-                    ? '#4ade80'
-                    : isSnake
-                    ? '#22c55e'
-                    : isFood
-                    ? '#ef4444'
-                    : 'transparent',
+                  backgroundColor: isHead ? '#4ade80' : isSnake ? '#22c55e' : isFood ? '#ef4444' : 'transparent',
                   border: isSnake || isFood ? '1px solid #166534' : '1px solid #2d2d44',
                   borderRadius: isFood ? '50%' : '2px',
                 }}
@@ -257,33 +260,31 @@ function SnakeGame({ router }: { router: ReturnType<typeof useRouter> }) {
           })}
         </div>
 
-        <div className="text-sm text-muted">
-          {!isAIPlaying && (
-            <>
-              Controls: Arrow keys or WASD to move
-              <br />
-              Avoid walls and yourself. Eat food to grow and score points.
-            </>
-          )}
-          {isAIPlaying && <>Watch the AI play! Change difficulty to see different strategies.</>}
-        </div>
+        {!isAIPlaying && (
+          <div className="touch-only mx-auto grid w-fit gap-2" style={{ gridTemplateAreas: '". up ." "left . right" ". down ."' }}>
+            {pad('up', 'Up', 'm6 15 6-6 6 6', 'up')}
+            {pad('left', 'Left', 'm15 6-6 6 6 6', 'left')}
+            {pad('right', 'Right', 'm9 6 6 6-6 6', 'right')}
+            {pad('down', 'Down', 'm6 9 6 6 6-6', 'down')}
+          </div>
+        )}
+
+        <p className="text-sm text-muted">
+          {isAIPlaying
+            ? 'Watch the AI play! Change difficulty to see different strategies.'
+            : <>Swipe on the board or use the arrows<span className="hidden [@media(pointer:fine)]:inline"> (or arrow keys / WASD)</span>. Avoid walls and yourself; eat food to grow.</>}
+        </p>
 
         <div className="flex gap-2">
-          <button onClick={handleRestart} className="btn btn-primary flex-1">
-            Restart
-          </button>
-          <button onClick={handleSaveAndExit} className="btn btn-secondary flex-1">
-            Save & Exit
-          </button>
+          <button onClick={handleRestart} className="btn btn-primary flex-1">Restart</button>
+          <button onClick={handleSaveAndExit} className="btn btn-outline flex-1">Save &amp; Exit</button>
         </div>
 
         {gameOver && (
-          <div className="rounded-lg border-2 border-accent p-4 text-center">
-            <h2 className="text-xl font-bold">Game Over!</h2>
+          <div className="flash rounded-2xl border border-accent/40 bg-accent/10 p-4 text-center">
+            <h2>Game Over!</h2>
             <p className="text-lg">Final Score: {score}</p>
-            <button onClick={handleRestart} className="btn btn-primary mt-2">
-              Play Again
-            </button>
+            <button onClick={handleRestart} className="btn btn-primary mt-2">Play Again</button>
           </div>
         )}
       </div>

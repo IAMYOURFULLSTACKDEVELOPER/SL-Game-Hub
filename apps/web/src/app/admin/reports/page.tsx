@@ -1,10 +1,9 @@
 import { t } from '@slgh/shared';
-import { createClient } from '@/lib/supabase/server';
+import { api, query } from '@/lib/convex';
 import { resolveReport } from '../../actions';
 
 export default async function AdminReports() {
-  const { data: reports } = await createClient().from('reports')
-    .select('id,reason,details,created_at').eq('status', 'open').order('created_at', { ascending: false }).limit(100);
+  const reports = await query(api.reports.listOpen, {});
   return (
     <>
       <h1 className="mb-4">{t('admin.reports')}</h1>

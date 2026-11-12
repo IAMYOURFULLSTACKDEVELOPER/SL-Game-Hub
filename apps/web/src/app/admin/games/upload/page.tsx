@@ -232,7 +232,7 @@ export default function GameUploadPage() {
         {validation && (
           <div
             className={`p-4 rounded-lg ${
-              validation.valid ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
+              validation.valid ? 'bg-primary/10 border border-primary/30' : 'bg-danger/10 border border-danger/30'
             }`}
           >
             {validation.errors.length > 0 && (

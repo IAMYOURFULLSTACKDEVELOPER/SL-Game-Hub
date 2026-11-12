@@ -17,7 +17,22 @@
     "heroText": "Light games that load fast, even on a slow connection.",
     "featured": "Games to play",
     "recent": "Continue playing",
-    "browseAll": "See all games"
+    "browseAll": "See all games",
+    "eyebrow": "Free · Fast · Made in Salone",
+    "heroLead": "Play free games,",
+    "heroHighlight": "anywhere in Sierra Leone",
+    "browseCta": "Browse games",
+    "badgeTournaments": "Weekly tournaments",
+    "badgeFast": "Loads fast on 3G",
+    "whyTitle": "Built for how Salone plays",
+    "fastTitle": "Loads in seconds",
+    "fastText": "Made for slow connections and older phones. No big downloads.",
+    "freeTitle": "Free to play",
+    "freeText": "No fees and nothing to install. Open a game and start playing.",
+    "friendsTitle": "Play with friends",
+    "friendsText": "Multiplayer, chat, leaderboards and tournaments across every district.",
+    "ctaTitle": "Ready to play?",
+    "ctaText": "Create a free account to save your scores, climb the leaderboards and join tournaments."
   },
   "library": {
     "title": "Game library",
@@ -32,6 +47,7 @@
     "empty": "No games match. Try a different name or clear the filters.",
     "comingSoon": "Coming soon",
     "players": "{min} to {max} players",
+    "playersExact": "{n} players",
     "onePlayer": "1 player"
   },
   "game": {
@@ -69,13 +85,14 @@
     "noAccount": "New here? Create an account",
     "haveAccount": "Already have an account? Sign in",
     "resetTitle": "Reset your password",
-    "resetSend": "Send reset link",
+    "resetSend": "Send reset code",
+    "resetCode": "Reset code (from the email)",
     "newPassword": "New password",
     "savePassword": "Save new password"
   },
   "notice": {
     "checkEmail": "Check your email to confirm your account, then sign in.",
-    "resetSent": "If that email has an account, a reset link is on its way.",
+    "resetSent": "If that email has an account, we sent it a 6-digit reset code.",
     "passwordUpdated": "Password updated. You can sign in now.",
     "profileSaved": "Profile saved.",
     "done": "Done."
@@ -90,7 +107,8 @@
     "ageRequired": "Choose your age range.",
     "invalidCredentials": "Email or password is wrong. Check both and try again.",
     "generic": "Something went wrong. Please try again.",
-    "linkExpired": "That link has expired. Request a new one."
+    "linkExpired": "That link has expired. Request a new one.",
+    "codeInvalid": "That code is wrong or has expired. Request a new one."
   },
   "profile": {
     "title": "Your profile",
@@ -112,6 +130,7 @@
     "games": "Games",
     "players": "Players",
     "reports": "Reports",
+    "wallet": "Wallet",
     "status": "Status",
     "update": "Update",
     "ban": "Suspend",
