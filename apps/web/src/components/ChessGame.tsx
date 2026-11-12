@@ -6,6 +6,8 @@ import {
   type ChessState, type ChessMove, type ChessPiece, type PieceType, type Difficulty,
 } from '@slgh/shared';
 import Rulebook from './Rulebook';
+import { sfx } from '@/lib/sound';
+import { useEndSfx } from '@/lib/useGameSfx';
 
 const engine = new ChessEngine();
 const SAVE_KEY = 'chess_game_state_v2';
@@ -69,12 +71,14 @@ export default function ChessGame({ onBack }: { onBack: () => void }) {
   const play = (m: ChessMove) => {
     if (!game) return;
     const next = engine.applyMove(game, m);
+    sfx(game.board[m.to.row][m.to.col] || m.enPassant ? 'capture' : 'move');
     setHistory((h) => [...h, next]);
     setMoves((ms) => [...ms, notation(game, m) + (next.checkmate ? '#' : next.inCheck ? '+' : '')]);
     setLastMove(m); setSelected(null); setPromo(null);
   };
 
   const legal = useMemo(() => (game && game.status === 'playing' ? engine.getLegalMoves(game) : []), [game]);
+  useEndSfx(!!game && (game.status === 'finished' || !!result), mode === 'bot' && !!game?.checkmate && game.currentTurn === humanColor);
   const botTurn = !!game && game.status === 'playing' && !result && game.players[game.currentPlayerIndex].isAI;
 
   useEffect(() => {
@@ -99,12 +103,12 @@ export default function ChessGame({ onBack }: { onBack: () => void }) {
         {mode === 'bot' && (
           <div className="flex flex-wrap gap-4 text-sm font-semibold">
             <label>Play as:
-              <select value={humanColor} onChange={(e) => setHumanColor(e.target.value as 'white' | 'black')} className="ml-2 rounded border px-2 py-1">
+              <select value={humanColor} onChange={(e) => setHumanColor(e.target.value as 'white' | 'black')} className="ml-2 field">
                 <option value="white">Gold (moves first)</option><option value="black">Black</option>
               </select>
             </label>
             <label>Bot level:
-              <select value={difficulty} onChange={(e) => setDifficulty(e.target.value as Difficulty)} className="ml-2 rounded border px-2 py-1">
+              <select value={difficulty} onChange={(e) => setDifficulty(e.target.value as Difficulty)} className="ml-2 field">
                 <option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option>
               </select>
             </label>
@@ -245,9 +249,9 @@ function CapturedRow({ pieces, color, lead }: { pieces: PieceType[]; color: 'whi
 
 function Shell({ onBack, children }: { onBack: () => void; children: ReactNode }) {
   return (
-    <main className="mx-auto max-w-2xl space-y-4 p-4">
-      <button onClick={onBack} className="text-secondary">← Back to Chess</button>
-      <div className="card space-y-4 p-5">
+    <main className="mx-auto max-w-2xl space-y-3 px-2 py-3 sm:space-y-4 sm:p-4">
+      <button onClick={onBack} className="back-link">← Back to Chess</button>
+      <div className="card space-y-4 p-3 sm:p-5">
         <h1>♟️ Chess</h1>
         {children}
       </div>

@@ -1,32 +1,29 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import type { Session } from '@supabase/supabase-js';
-import { supabase } from './supabase';
+import React from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ConvexAuthProvider } from '@convex-dev/auth/react';
+import { useQuery } from 'convex/react';
+import type { FunctionReturnType } from 'convex/server';
+import { api, convex } from './convex';
 
-export interface Me {
-  id: string; username: string; full_name: string; avatar: string; role: 'player' | 'admin';
-  age_band: 'under_13' | '13_17' | '18_plus'; banned: boolean; is_public: boolean; district_id: number | null;
-}
-interface AuthState { session: Session | null; me: Me | null; loading: boolean; refreshMe: () => Promise<void>; }
-const Ctx = createContext<AuthState>({ session: null, me: null, loading: true, refreshMe: async () => {} });
-export const useAuth = () => useContext(Ctx);
+export type Me = NonNullable<FunctionReturnType<typeof api.users.me>>;
 
+/** Keeps the session in AsyncStorage and refreshes it automatically. */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [me, setMe] = useState<Me | null>(null);
-  const [loading, setLoading] = useState(true);
+  return <ConvexAuthProvider client={convex} storage={AsyncStorage}>{children}</ConvexAuthProvider>;
+}
 
-  const loadMe = useCallback(async (s: Session | null) => {
-    if (!s) { setMe(null); return; }
-    const { data } = await supabase.from('profiles')
-      .select('id,username,full_name,avatar,role,age_band,banned,is_public,district_id').eq('id', s.user.id).single();
-    setMe((data as Me | null) ?? null);
-  }, []);
+/** The signed-in player's profile; live, so it updates as soon as it is saved. */
+export function useAuth() {
+  const me = useQuery(api.users.me);
+  return { me: me ?? null, loading: me === undefined };
+}
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => { setSession(data.session); loadMe(data.session).finally(() => setLoading(false)); });
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => { setSession(s); loadMe(s); });
-    return () => sub.subscription.unsubscribe();
-  }, [loadMe]);
-
-  return <Ctx.Provider value={{ session, me, loading, refreshMe: () => loadMe(session) }}>{children}</Ctx.Provider>;
+/** Turns an auth error into an i18n key: our backend throws keys such as errors.usernameTaken. */
+export function authErrorKey(e: unknown) {
+  const m = e instanceof Error ? e.message : String(e);
+  const key = m.match(/errors\.\w+/)?.[0];
+  if (key) return key;
+  if (/InvalidSecret|InvalidAccountId|Invalid credentials/i.test(m)) return 'errors.invalidCredentials'; // same for both: no account enumeration
+  if (/Could not verify code|Invalid code/i.test(m)) return 'errors.codeInvalid';
+  return /fetch|network/i.test(m) ? 'common.offline' : 'errors.generic';
 }

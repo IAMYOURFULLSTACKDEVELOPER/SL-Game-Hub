@@ -1,31 +1,14 @@
-import { createClient } from '@/lib/supabase/server';
+import { api, query } from '@/lib/convex';
 import { registerForTournament } from '@/app/actions';
 import Link from 'next/link';
 
 export default async function TournamentDetailPage({ params }: { params: { id: string } }) {
-  const supabase = createClient();
+  const data = await query(api.tournaments.get, { id: params.id });
 
-  const { data: tournament } = await supabase
-    .from('tournaments')
-    .select('*, games!inner(slug,name,icon)')
-    .eq('id', params.id)
-    .single();
-
-  if (!tournament) {
+  if (!data) {
     return <div className="p-4">Tournament not found</div>;
   }
-
-  const { data: registrations } = await supabase
-    .from('tournament_registrations')
-    .select('*, profiles!inner(username,avatar)')
-    .eq('tournament_id', params.id)
-    .eq('status', 'registered');
-
-  const { data: matches } = await supabase
-    .from('tournament_matches')
-    .select('*')
-    .eq('tournament_id', params.id)
-    .order('round', { ascending: true });
+  const { tournament, registrations, matches } = data;
 
   return (
     <main className="mx-auto max-w-5xl space-y-6 p-4">
@@ -79,7 +62,7 @@ export default async function TournamentDetailPage({ params }: { params: { id: s
               <div className="flex justify-between">
                 <span className="text-muted">Registration:</span>
                 <span className="font-medium">
-                  {new Date(tournament.registration_starts_at).toLocaleDateString()} - {new Date(tournament.registration_ends_at).toLocaleDateString()}
+                  {new Date(tournament.registration_starts_at).toLocaleDateString()} - {tournament.registration_ends_at ? new Date(tournament.registration_ends_at).toLocaleDateString() : '…'}
                 </span>
               </div>
             )}
@@ -115,7 +98,7 @@ export default async function TournamentDetailPage({ params }: { params: { id: s
         <h2 className="text-xl font-bold mb-4">Participants ({registrations?.length || 0})</h2>
         <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
           {registrations?.map((reg: any) => (
-            <div key={reg.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
+            <div key={reg.id} className="flex items-center gap-2 p-2 bg-bg/60 rounded">
               <span className="text-2xl">{reg.profiles.avatar}</span>
               <span className="font-medium">{reg.profiles.username}</span>
             </div>

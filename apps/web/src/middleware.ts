@@ -1,33 +1,18 @@
-import { createServerClient } from '@supabase/ssr';
-import { NextResponse, type NextRequest } from 'next/server';
+import { convexAuthNextjsMiddleware, createRouteMatcher } from '@convex-dev/auth/nextjs/server';
+import { NextResponse } from 'next/server';
 
-// Refreshes the auth cookie and gates private routes. Admin ROLE is re-checked in the admin layout,
-// and enforced for data by Row Level Security.
-export async function middleware(req: NextRequest) {
-  let res = NextResponse.next({ request: req });
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll: () => req.cookies.getAll(),
-        setAll(list: { name: string; value: string; options?: Record<string, unknown> }[]) {
-          list.forEach(({ name, value }) => req.cookies.set(name, value));
-          res = NextResponse.next({ request: req });
-          list.forEach(({ name, value, options }) => res.cookies.set(name, value, options as never));
-        },
-      },
-    }
-  );
-  const { data: { user } } = await supabase.auth.getUser();
-  const p = req.nextUrl.pathname;
-  if (!user && (p.startsWith('/admin') || p.startsWith('/profile'))) {
+const isPrivate = createRouteMatcher(['/admin(.*)', '/profile(.*)', '/wallet(.*)']);
+
+// Serves /api/auth (sign in/out), refreshes the auth cookie, and gates private routes.
+// Admin ROLE is re-checked in the admin layout, and enforced for data by the Convex functions.
+export default convexAuthNextjsMiddleware(async (req, { convexAuth }) => {
+  if (isPrivate(req) && !(await convexAuth.isAuthenticated())) {
     const url = req.nextUrl.clone();
     url.pathname = '/login';
-    url.search = `?next=${encodeURIComponent(p)}`;
+    url.search = `?next=${encodeURIComponent(req.nextUrl.pathname)}`;
     return NextResponse.redirect(url);
   }
-  return res;
-}
+});
 
-export const config = { matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'] };
+// Everything except static files and Next.js internals.
+export const config = { matcher: ['/((?!.*\\..*|_next).*)', '/', '/(api|trpc)(.*)'] };

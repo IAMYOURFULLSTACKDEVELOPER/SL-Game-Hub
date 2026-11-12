@@ -1,22 +1,24 @@
 import React, { useEffect, useState } from 'react';
+import { useMutation, useQuery } from 'convex/react';
+import { useAuthActions } from '@convex-dev/auth/react';
 import { Pressable, Switch, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { AVATARS, USERNAME_RE, avatarEmoji, t } from '@slgh/shared';
-import { supabase } from '@/supabase';
-import { useAuth } from '@/auth';
+import { api } from '@/convex';
+import { authErrorKey, useAuth } from '@/auth';
 import { useColors } from '@/theme';
 import { Banner, Button, Card, Chip, Field, Loading, Screen, Txt } from '@/ui';
 
-type District = { id: number; name: string };
-type StatRow = { played: number; wins: number; best_score: number; games: { name: string; icon: string } | null };
 
 export default function Profile() {
   const router = useRouter();
   const c = useColors();
-  const { me, loading, refreshMe } = useAuth();
-  const [districts, setDistricts] = useState<District[]>([]);
-  const [stats, setStats] = useState<StatRow[]>([]);
-  const [f, setF] = useState({ fullName: '', username: '', avatar: 'av_lion', districtId: null as number | null, isPublic: true });
+  const { me, loading } = useAuth();
+  const { signOut } = useAuthActions();
+  const updateProfile = useMutation(api.users.updateProfile);
+  const districts = useQuery(api.games.districts) ?? [];
+  const stats = useQuery(api.games.myStats, me ? {} : 'skip') ?? [];
+  const [f, setF] = useState({ fullName: '', username: '', avatar: 'av_lion', districtId: null as string | null, isPublic: true });
   const [err, setErr] = useState('');
   const [ok, setOk] = useState('');
   const [busy, setBusy] = useState(false);
@@ -24,9 +26,6 @@ export default function Profile() {
   useEffect(() => {
     if (!me) return;
     setF({ fullName: me.full_name, username: me.username, avatar: me.avatar, districtId: me.district_id, isPublic: me.is_public });
-    supabase.from('districts').select('id,name').order('name').then((r) => setDistricts((r.data ?? []) as District[]));
-    supabase.from('game_stats').select('played,wins,best_score,games(name,icon)').eq('user_id', me.id).order('last_played_at', { ascending: false })
-      .then((r) => setStats((r.data ?? []) as unknown as StatRow[]));
   }, [me]);
 
   if (loading) return <Screen><Loading /></Screen>;
@@ -41,13 +40,15 @@ export default function Profile() {
     if (f.fullName.trim().length < 2) { setErr(t('errors.fullNameRequired')); return; }
     if (!USERNAME_RE.test(f.username.trim())) { setErr(t('errors.usernameInvalid')); return; }
     setBusy(true);
-    const { error } = await supabase.from('profiles').update({
-      full_name: f.fullName.trim(), username: f.username.trim(), avatar: f.avatar, district_id: f.districtId,
-      is_public: under13 ? false : f.isPublic,
-    }).eq('id', me!.id);
-    setBusy(false);
-    if (error) setErr(error.code === '23505' ? t('errors.usernameTaken') : t('errors.generic'));
-    else { setOk(t('notice.profileSaved')); refreshMe(); }
+    try {
+      await updateProfile({
+        full_name: f.fullName.trim(), username: f.username.trim(), avatar: f.avatar, district_id: f.districtId,
+        is_public: under13 ? false : f.isPublic,
+      });
+      setOk(t('notice.profileSaved'));
+    } catch (e) {
+      setErr(t(authErrorKey(e)));
+    } finally { setBusy(false); }
   }
 
   return (
@@ -84,7 +85,7 @@ export default function Profile() {
         {stats.length === 0 ? <Txt muted>{t('profile.noStats')}</Txt> : stats.map((s, i) => (
           <Txt key={i}>{s.games?.icon} {s.games?.name}: {t('game.played')} {s.played}, {t('game.wins')} {s.wins}, {t('game.bestScore')} {s.best_score}</Txt>))}
       </Card>
-      <Button variant="outline" title={t('nav.signOut')} onPress={() => supabase.auth.signOut()} />
+      <Button variant="outline" title={t('nav.signOut')} onPress={() => void signOut()} />
     </Screen>
   );
 }

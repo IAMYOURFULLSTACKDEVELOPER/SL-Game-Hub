@@ -13,7 +13,6 @@ const GAME_IMAGES: Record<string, string> = {
   uno: '/games/uno.webp',
   'word-search': '/games/word-search.webp',
   dice: '/games/dice.webp',
+  'salone-poly': '/games/salone-poly.webp',
 };
 export const gameImage = (g: Pick<GameRow, 'slug' | 'thumbnail_url'>) => GAME_IMAGES[g.slug] ?? g.thumbnail_url;
-export const GAME_COLS =
-  'id,slug,name,description,icon,thumbnail_url,min_players,max_players,modes,coming_soon,version';

@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ParentSDK } from '@slgh/shared';
-import { createClient } from '@/lib/supabase/browser';
 
 export default function HTML5GamePlayPage({ params }: { params: { slug: string } }) {
   const router = useRouter();
@@ -47,11 +46,11 @@ export default function HTML5GamePlayPage({ params }: { params: { slug: string }
       await parentSDK.handleMessage(event, {
         onSubmitScore: async (submission) => {
           setScore(submission.score);
-          // In production, submit to Supabase
+          // In production, submit to Convex
           console.log('Score submitted:', submission);
         },
         onGetPlayerInfo: () => {
-          // In production, fetch from Supabase
+          // In production, fetch from Convex
           return {
             id: 'user-id',
             username: 'Player',
@@ -59,11 +58,11 @@ export default function HTML5GamePlayPage({ params }: { params: { slug: string }
           };
         },
         onSaveData: async (data) => {
-          // In production, save to Supabase
+          // In production, save to Convex
           console.log('Data saved:', data);
         },
         onLoadData: async (key) => {
-          // In production, load from Supabase
+          // In production, load from Convex
           console.log('Data loaded:', key);
           return null;
         },
@@ -74,7 +73,7 @@ export default function HTML5GamePlayPage({ params }: { params: { slug: string }
           console.error('Game error:', err);
         },
         onRequestHighScores: async (limit) => {
-          // In production, fetch from Supabase
+          // In production, fetch from Convex
           console.log('High scores requested:', limit);
           return [];
         },
@@ -104,7 +103,7 @@ export default function HTML5GamePlayPage({ params }: { params: { slug: string }
         <button onClick={() => router.push(`/games/${params.slug}`)} className="text-secondary">
           ← Back to Game
         </button>
-        <div className="card p-6 mt-4 bg-red-50 border border-red-200">
+        <div className="card p-6 mt-4 bg-danger/10 border border-danger/30">
           <h2 className="text-xl font-bold text-red-800">Error</h2>
           <p className="text-red-700">{error}</p>
         </div>
@@ -140,7 +139,7 @@ export default function HTML5GamePlayPage({ params }: { params: { slug: string }
       </div>
 
       {score !== null && (
-        <div className="card p-4 bg-green-50 border border-green-200">
+        <div className="card p-4 bg-primary/10 border border-primary/30">
           <h2 className="font-bold text-green-800">Score: {score}</h2>
         </div>
       )}

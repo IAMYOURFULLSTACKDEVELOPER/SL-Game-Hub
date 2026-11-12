@@ -1,10 +1,17 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ['@slgh/shared'],
+  transpilePackages: ['@slgh/shared', '@slgh/backend'],
   poweredByHeader: false,
   compress: true,
   async headers() {
     return [{
+      // The service worker must never be served stale, or players get stuck on an old version.
+      source: '/sw.js',
+      headers: [
+        { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
+        { key: 'Content-Type', value: 'application/javascript; charset=utf-8' },
+      ],
+    }, {
       source: '/(.*)',
       headers: [
         { key: 'X-Content-Type-Options', value: 'nosniff' },

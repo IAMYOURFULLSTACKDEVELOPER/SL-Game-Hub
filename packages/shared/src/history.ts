@@ -3,7 +3,7 @@ import type { GameMatch, MatchParticipant, GameMove } from './multiplayer';
 /**
  * Game history and replay system
  * Note: This is a stub implementation. The actual implementation should use
- * the Supabase client from the app context (web/mobile).
+ * a Convex function in packages/backend/convex.
  */
 export class GameHistory {
   /**
@@ -15,32 +15,32 @@ export class GameHistory {
     limit: number = 20,
     offset: number = 0
   ): Promise<GameMatch[]> {
-    // TODO: Implement with actual Supabase client
-    throw new Error('Not implemented - requires Supabase client from app context');
+    // TODO: Implement with a Convex function
+    throw new Error('Not implemented - requires a Convex function (packages/backend/convex)');
   }
 
   /**
    * Get match details
    */
   static async getMatch(matchId: string): Promise<GameMatch> {
-    // TODO: Implement with actual Supabase client
-    throw new Error('Not implemented - requires Supabase client from app context');
+    // TODO: Implement with a Convex function
+    throw new Error('Not implemented - requires a Convex function (packages/backend/convex)');
   }
 
   /**
    * Get match participants
    */
   static async getMatchParticipants(matchId: string): Promise<MatchParticipant[]> {
-    // TODO: Implement with actual Supabase client
-    throw new Error('Not implemented - requires Supabase client from app context');
+    // TODO: Implement with a Convex function
+    throw new Error('Not implemented - requires a Convex function (packages/backend/convex)');
   }
 
   /**
    * Get move history for a match
    */
   static async getMoveHistory(matchId: string): Promise<GameMove[]> {
-    // TODO: Implement with actual Supabase client
-    throw new Error('Not implemented - requires Supabase client from app context');
+    // TODO: Implement with a Convex function
+    throw new Error('Not implemented - requires a Convex function (packages/backend/convex)');
   }
 
   /**
@@ -53,8 +53,8 @@ export class GameHistory {
     draws: number;
     winRate: number;
   }> {
-    // TODO: Implement with actual Supabase client
-    throw new Error('Not implemented - requires Supabase client from app context');
+    // TODO: Implement with a Convex function
+    throw new Error('Not implemented - requires a Convex function (packages/backend/convex)');
   }
 
   /**
@@ -68,8 +68,8 @@ export class GameHistory {
     winRate: number;
     avgScore: number;
   }> {
-    // TODO: Implement with actual Supabase client
-    throw new Error('Not implemented - requires Supabase client from app context');
+    // TODO: Implement with a Convex function
+    throw new Error('Not implemented - requires a Convex function (packages/backend/convex)');
   }
 }
 
@@ -94,7 +94,7 @@ export class ReplaySystem {
    */
   async load(): Promise<void> {
     // TODO: Load match and moves from database
-    throw new Error('Not implemented - requires Supabase client from app context');
+    throw new Error('Not implemented - requires a Convex function (packages/backend/convex)');
   }
 
   /**

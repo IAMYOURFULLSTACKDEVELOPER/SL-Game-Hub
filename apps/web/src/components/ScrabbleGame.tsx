@@ -6,6 +6,8 @@ import {
   type ScrabbleState, type Placement, type Difficulty, type SquareType,
 } from '@slgh/shared';
 import Rulebook from './Rulebook';
+import { sfx } from '@/lib/sound';
+import { useEndSfx } from '@/lib/useGameSfx';
 
 const engine = new ScrabbleEngine();
 let dictionaryPromise: Promise<void> | null = null;
@@ -73,6 +75,7 @@ export default function ScrabbleGame({ onBack }: { onBack: () => void }) {
 
   const commit = (s: ScrabbleState, m: Parameters<typeof engine.applyMove>[1]) => {
     const next = engine.applyMove(s, m);
+    sfx('move');
     setGame(next);
     setMessage(next.log.at(-1) ?? '');
   };
@@ -93,25 +96,26 @@ export default function ScrabbleGame({ onBack }: { onBack: () => void }) {
   const resize = (n: number) => setSeats((s) => Array.from({ length: n }, (_, i) => s[i] ?? { name: `Bot ${i + 1}`, ai: true, level: 'medium' }));
   const updateSeat = (i: number, patch: Partial<Seat>) => setSeats((s) => s.map((x, j) => (j === i ? { ...x, ...patch } : x)));
 
+  useEndSfx(game?.status === 'finished');
   if (!game) {
     return (
       <Shell onBack={onBack}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/games/boards/scrabble.png" alt="Scrabble board" className="mx-auto w-full max-w-md rounded-xl" />
         <label className="text-sm font-semibold">Players:
-          <select value={seats.length} onChange={(e) => resize(Number(e.target.value))} className="ml-2 rounded border px-2 py-1">
+          <select value={seats.length} onChange={(e) => resize(Number(e.target.value))} className="ml-2 field">
             {[2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
         </label>
         <ul className="space-y-2">
           {seats.map((s, i) => (
             <li key={i} className="flex flex-wrap items-center gap-2">
-              <input value={s.name} maxLength={20} onChange={(e) => updateSeat(i, { name: e.target.value })} className="flex-1 rounded border px-2 py-1" aria-label={`Player ${i + 1} name`} />
-              <select value={s.ai ? 'ai' : 'human'} onChange={(e) => updateSeat(i, { ai: e.target.value === 'ai' })} className="rounded border px-2 py-1" aria-label={`Player ${i + 1} type`}>
+              <input value={s.name} maxLength={20} onChange={(e) => updateSeat(i, { name: e.target.value })} className="field min-w-0 flex-1" aria-label={`Player ${i + 1} name`} />
+              <select value={s.ai ? 'ai' : 'human'} onChange={(e) => updateSeat(i, { ai: e.target.value === 'ai' })} className="field" aria-label={`Player ${i + 1} type`}>
                 <option value="human">Human</option><option value="ai">Bot</option>
               </select>
               {s.ai && (
-                <select value={s.level} onChange={(e) => updateSeat(i, { level: e.target.value as Difficulty })} className="rounded border px-2 py-1" aria-label={`Player ${i + 1} bot level`}>
+                <select value={s.level} onChange={(e) => updateSeat(i, { level: e.target.value as Difficulty })} className="field" aria-label={`Player ${i + 1} bot level`}>
                   <option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option>
                 </select>
               )}
@@ -293,9 +297,9 @@ function Tile({ letter, value, blank, pending, recent }: { letter: string; value
 
 function Shell({ onBack, children, wide = false }: { onBack: () => void; children: ReactNode; wide?: boolean }) {
   return (
-    <main className={`mx-auto space-y-4 p-4 ${wide ? 'max-w-5xl' : 'max-w-2xl'}`}>
-      <button onClick={onBack} className="text-secondary">← Back to Scrabble</button>
-      <div className="card space-y-4 p-5">
+    <main className={`mx-auto space-y-3 px-2 py-3 sm:space-y-4 sm:p-4 ${wide ? 'max-w-5xl' : 'max-w-2xl'}`}>
+      <button onClick={onBack} className="back-link">← Back to Scrabble</button>
+      <div className="card space-y-4 p-3 sm:p-5">
         <h1>🔠 Scrabble</h1>
         {children}
       </div>

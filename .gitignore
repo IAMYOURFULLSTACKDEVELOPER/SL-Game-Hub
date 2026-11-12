@@ -10,3 +10,6 @@ apps/web/public/games/scrabble/words.txt
 # expo
 .expo/
 dist/
+
+# convex local deployment data
+.convex/

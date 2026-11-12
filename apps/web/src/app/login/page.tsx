@@ -1,25 +1,29 @@
 import Link from 'next/link';
 import { t } from '@slgh/shared';
-import { signIn } from '../actions';
 import { Flash } from '@/components/Flash';
+import { AuthShell } from '@/components/AuthShell';
+import { Icon } from '@/components/Icon';
+import { AuthForm } from '@/components/AuthForm';
 
 export const metadata = { title: t('auth.signInTitle') };
 
 export default function Login({ searchParams }: { searchParams: { error?: string; notice?: string; next?: string } }) {
   return (
-    <main className="mx-auto max-w-md p-4">
-      <h1 className="mb-4">{t('auth.signInTitle')}</h1>
+    <AuthShell title={t('auth.signInTitle')} subtitle="Welcome back. Your games are waiting.">
       <Flash error={searchParams.error} notice={searchParams.notice} />
-      <form action={signIn} className="card space-y-4 p-4">
+      <AuthForm kind="signIn" className="space-y-4">
         <input type="hidden" name="next" value={searchParams.next ?? '/'} />
         <div><label className="label" htmlFor="email">{t('auth.email')}</label>
-          <input id="email" name="email" type="email" required autoComplete="email" inputMode="email" className="input" /></div>
-        <div><label className="label" htmlFor="password">{t('auth.password')}</label>
-          <input id="password" name="password" type="password" required autoComplete="current-password" className="input" /></div>
-        <button className="btn btn-primary w-full">{t('auth.submitSignIn')}</button>
-      </form>
-      <p className="mt-4 space-y-2"><Link href="/forgot-password" className="block text-secondary">{t('auth.forgot')}</Link>
-        <Link href="/signup" className="block text-secondary">{t('auth.noAccount')}</Link></p>
-    </main>
+          <div className="input-icon"><Icon name="mail" />
+            <input id="email" name="email" type="email" required autoComplete="email" inputMode="email" className="input" /></div></div>
+        <div>
+          <div className="flex items-baseline justify-between"><label className="label" htmlFor="password">{t('auth.password')}</label>
+            <Link href="/forgot-password" className="text-sm font-semibold text-secondary">{t('auth.forgot')}</Link></div>
+          <div className="input-icon"><Icon name="lock" />
+            <input id="password" name="password" type="password" required autoComplete="current-password" className="input" /></div></div>
+        <button className="btn btn-primary btn-lg w-full"><Icon name="login" />{t('auth.submitSignIn')}</button>
+      </AuthForm>
+      <p className="mt-6 border-t border-border pt-5 text-center"><Link href="/signup" className="link-arrow">{t('auth.noAccount')}<Icon name="arrowRight" size={18} /></Link></p>
+    </AuthShell>
   );
 }

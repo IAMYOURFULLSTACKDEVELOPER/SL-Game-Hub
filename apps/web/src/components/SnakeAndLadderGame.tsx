@@ -7,6 +7,8 @@ import {
 } from '@slgh/shared';
 import SnakeAndLadderRulebook from './SnakeAndLadderRulebook';
 import Die3D from './Die3D';
+import { sfx } from '@/lib/sound';
+import { useEndSfx } from '@/lib/useGameSfx';
 
 const engine = new SnakeAndLadderEngine();
 const SAVE_KEY = 'snake_and_ladder_game_state';
@@ -116,6 +118,7 @@ export default function SnakeAndLadderGame({ onBack }: { onBack: () => void }) {
     const value = rollDie();
     const next = engine.applyMove(game, value);
     const m = next.lastMove!;
+    sfx('dice');
     setBusy(true);
     setDice({ id: Date.now(), value, x: 25 + Math.random() * 50, y: 25 + Math.random() * 50 });
     await sleep(1100);
@@ -151,13 +154,14 @@ export default function SnakeAndLadderGame({ onBack }: { onBack: () => void }) {
   const resize = (n: number) => setSeats((s) => Array.from({ length: n }, (_, i) => s[i] ?? { name: `Player ${i + 1}`, ai: false }));
   const updateSeat = (i: number, patch: Partial<Seat>) => setSeats((s) => s.map((x, j) => (j === i ? { ...x, ...patch } : x)));
 
+  useEndSfx(game?.status === 'finished');
   if (!game) {
     return (
       <Shell onBack={onBack}>
         <div className="flex flex-wrap items-center gap-4">
           <label className="text-sm font-semibold">
             Players:
-            <select value={seats.length} onChange={(e) => resize(Number(e.target.value))} className="ml-2 rounded border px-2 py-1">
+            <select value={seats.length} onChange={(e) => resize(Number(e.target.value))} className="ml-2 field">
               {Array.from({ length: SNAKE_AND_LADDER_MANIFEST.maxPlayers - 1 }, (_, i) => i + 2).map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
           </label>
@@ -168,9 +172,9 @@ export default function SnakeAndLadderGame({ onBack }: { onBack: () => void }) {
             <li key={i} className="flex items-center gap-2">
               <span className="sl-ring h-7 w-7 shrink-0" style={{ backgroundColor: RINGS[i].color }} title={`${RINGS[i].name} ring`} />
               <input value={s.name} maxLength={20} onChange={(e) => updateSeat(i, { name: e.target.value })}
-                className="flex-1 rounded border px-2 py-1" aria-label={`${RINGS[i].name} ring player name`} />
+                className="field min-w-0 flex-1" aria-label={`${RINGS[i].name} ring player name`} />
               <select value={s.ai ? 'ai' : 'human'} onChange={(e) => updateSeat(i, { ai: e.target.value === 'ai' })}
-                className="rounded border px-2 py-1" aria-label={`${RINGS[i].name} ring player type`}>
+                className="field" aria-label={`${RINGS[i].name} ring player type`}>
                 <option value="human">Human</option>
                 <option value="ai">Bot</option>
               </select>
@@ -274,9 +278,9 @@ export default function SnakeAndLadderGame({ onBack }: { onBack: () => void }) {
 
 function Shell({ onBack, children }: { onBack: () => void; children: ReactNode }) {
   return (
-    <main className="mx-auto max-w-2xl space-y-4 p-4">
-      <button onClick={onBack} className="text-secondary">← Back to Snake &amp; Ladder</button>
-      <div className="card space-y-4 p-5">
+    <main className="mx-auto max-w-2xl space-y-3 px-2 py-3 sm:space-y-4 sm:p-4">
+      <button onClick={onBack} className="back-link">← Back to Snake &amp; Ladder</button>
+      <div className="card space-y-4 p-3 sm:p-5">
         <h1>🐍 {SNAKE_AND_LADDER_MANIFEST.name} 🪜</h1>
         {children}
       </div>

@@ -1,383 +1,241 @@
 # SL Game Hub - Complete Setup Guide
 
-This guide will walk you through setting up and running the entire SL Game Hub project, from Supabase to the mobile app.
+This guide walks you through setting up and running the whole project: the Convex backend, the web app and the mobile app.
 
 ## Prerequisites
 
-- Node.js 18+ installed
-- npm or yarn package manager
+- Node.js 18+ and npm
 - Git
-- Supabase account (local or cloud)
-- Expo CLI (for mobile development)
+- A Convex account (free) for a cloud deployment, or nothing at all for a local one
+- Expo Go on a phone (for the mobile app)
 
 ---
 
-## Step 1: Clone the Repository
+## Step 1: Clone and install
 
 ```bash
 git clone <repository-url>
 cd sl-game-hub
-```
-
----
-
-## Step 2: Install Dependencies
-
-Install dependencies for all workspaces:
-
-```bash
 npm install
 ```
 
-This will install dependencies for:
-- Root package
-- `packages/shared` (shared code)
+This installs every workspace:
+- `packages/shared` (game engines, validation, i18n; used everywhere)
+- `packages/backend` (Convex schema and functions)
 - `apps/web` (Next.js web app)
 - `apps/mobile` (Expo mobile app)
 
 ---
 
-## Step 3: Supabase Setup
+## Step 2: Start the Convex backend
 
-### Option A: Supabase Cloud (Recommended for Production)
-
-1. Create a new project at [supabase.com](https://supabase.com)
-2. Go to Project Settings → API
-3. Copy your:
-   - Project URL
-   - Anon Key (public)
-   - Service Role Key (server-side, keep secret!)
-
-### Option B: Supabase Local (Recommended for Development)
-
-1. Install Supabase CLI:
 ```bash
-npm install -g supabase
+npm run dev:backend
 ```
 
-2. Start local Supabase:
-```bash
-supabase start
-```
+On the first run the Convex CLI asks you to log in and create a project. You can also choose a local
+deployment, which runs on your computer and needs no account. It then:
 
-3. This will output your local credentials:
-   - Local API URL
-   - Anon Key
-   - Service Role Key
+- pushes `packages/backend/convex/schema.ts` and all functions (there are no SQL migrations),
+- writes `CONVEX_DEPLOYMENT` and `CONVEX_URL` to `packages/backend/.env.local`,
+- keeps watching `convex/` and redeploys whenever you save.
+
+Leave it running in its own terminal.
 
 ---
 
-## Step 4: Configure Environment Variables
+## Step 3: Configure authentication (once per deployment)
 
-### Root Environment (.env)
+In a second terminal, from the repo root:
 
-Create or edit `.env` in the root directory:
+```bash
+npm run setup:auth
+```
+
+This generates the RS256 key pair Convex Auth uses to sign sessions and stores `JWT_PRIVATE_KEY`, `JWKS`
+and `SITE_URL` (default `http://localhost:3000`) on the deployment.
+
+### Optional: password-reset emails
+
+Password reset sends a 6-digit code by email through [Resend](https://resend.com):
+
+```bash
+cd packages/backend
+npx convex env set AUTH_RESEND_KEY re_your_key
+npx convex env set AUTH_EMAIL_FROM "SL Game Hub <noreply@your-domain>"   # optional
+```
+
+Without a key, reset requests fail quietly, and players still see the usual "code sent" message.
+
+### Optional: wallet (Monime mobile money)
+
+Top-ups by USSD and withdrawals to mobile money go through [Monime](https://monime.io). In the Monime dashboard,
+create an API token, then go to Developer → Webhooks and create a webhook (HMAC-SHA256). Point it at
+`https://<your-deployment>.convex.site/monime/webhook` (the `CONVEX_SITE_URL` in `packages/backend/.env.local`)
+with the events `payment_code.completed`, `payment_code.expired`, `payment_code.cancelled`, `payout.completed` and
+`payout.failed`. Then:
+
+```bash
+cd packages/backend
+npx convex env set MONIME_ACCESS_TOKEN mon_test_...
+npx convex env set MONIME_SPACE_ID spc-...
+npx convex env set MONIME_WEBHOOK_SECRET <webhook secret>
+npx convex env set WALLET_FEE_BPS 0          # optional platform fee, 250 = 2.5%
+```
+
+Without these, the wallet page says top-ups are not switched on. To try money rooms without paying anything, run
+`npx convex env set WALLET_TEST_CREDITS true` on a dev deployment, then
+`npx convex run wallet:testCredit '{"username":"you","amount":5000}'` (5000 = SLE 50). Never set this in production.
+
+---
+
+## Step 4: Seed initial data
+
+```bash
+npm run seed
+```
+
+This adds (and is safe to run again):
+- the 16 districts
+- game categories
+- the 8 planned games (UNO stays "coming soon")
+
+---
+
+## Step 5: Configure the apps
+
+### Web (`apps/web/.env.local`)
+
+```bash
+cp apps/web/.env.example apps/web/.env.local
+```
 
 ```env
-# Supabase Configuration
-NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-
-# Site Configuration
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
+NEXT_PUBLIC_CONVEX_URL=<the CONVEX_URL from packages/backend/.env.local>
 ```
 
-### Web App Environment (apps/web/.env)
+### Mobile (`apps/mobile/.env`)
 
-Create or edit `apps/web/.env`:
+```bash
+cp apps/mobile/.env.example apps/mobile/.env
+```
 
 ```env
-# Supabase Configuration
-NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-
-# Site Configuration
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
+EXPO_PUBLIC_CONVEX_URL=<the same URL>
 ```
 
-### Mobile App Environment (apps/mobile/.env)
-
-Create or edit `apps/mobile/.env`:
-
-```env
-# Supabase Configuration
-EXPO_PUBLIC_SUPABASE_URL=your-supabase-url
-EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-```
-
-**Important:** Replace the placeholder values with your actual Supabase credentials.
+A phone cannot reach `127.0.0.1` on your computer, so use a cloud deployment URL for the mobile app
+(or your computer's LAN address if you run a local deployment).
 
 ---
 
-## Step 5: Run Database Migrations
-
-### For Supabase Cloud:
-
-```bash
-# Link your local project to Supabase cloud
-supabase link --project-ref your-project-ref
-
-# Push migrations
-supabase db push
-```
-
-### For Supabase Local:
-
-```bash
-# Migrations are automatically applied when you start
-# If you need to reset:
-supabase db reset
-```
-
-### Migration Order (Applied Automatically):
-
-1. `0001_schema.sql` - Core schema (users, games, stats)
-2. `0002_rls.sql` - Row Level Security policies
-3. `0003_storage.sql` - Storage buckets (thumbnails, game bundles)
-4. `0004_snake_published.sql` - Mark built-in games as published
-5. `0005_multiplayer.sql` - Multiplayer support
-6. `0006_multiplayer_rls.sql` - Multiplayer RLS policies
-7. `0007_game_versions.sql` - Game versioning for publishing
-8. `0008_leaderboards.sql` - Leaderboard system
-9. `0009_tournaments.sql` - Tournament system
-10. `0010_achievements.sql` - Achievements and badges
-11. `0011_chat.sql` - Chat system
-12. `0012_rewards.sql` - Rewards system
-
----
-
-## Step 6: Seed Initial Data
-
-Run the seed script to populate initial data:
-
-```bash
-# For Supabase Cloud
-supabase db query --file supabase/seed.sql --remote
-
-# For Supabase Local
-supabase db query --file supabase/seed.sql
-```
-
-This will create:
-- Default districts
-- Game categories
-- Built-in games (Snake, Snake & Ladder)
-- Default chat rooms
-
----
-
-## Step 7: Run the Web Application
-
-### Development Mode:
+## Step 6: Run the web application
 
 ```bash
 npm run dev:web
 ```
 
-The web app will be available at: http://localhost:3000
+Open http://localhost:3000. For a production build: `npm run build:web`.
 
-### Production Build:
-
-```bash
-npm run build:web
-```
-
-### Web App Features:
-- Game library
-- Built-in game play (Snake, Snake & Ladder)
-- User authentication
-- Leaderboards
-- Tournaments
-- Achievements
-- Chat
-- Shop
+### Web app features
+- Game library and built-in games (Snake, Snake & Ladder, Checkers, Chess, Word Search, Scrabble, Dice)
+- Accounts (sign up, sign in, password reset by emailed code)
+- Leaderboards, tournaments, achievements, shop
+- Live chat and live online Dice rooms
 - Admin dashboard
 
 ---
 
-## Step 8: Run the Mobile Application
-
-### Install Expo CLI (if not already installed):
-
-```bash
-npm install -g expo-cli
-```
-
-### Start the Expo Development Server:
+## Step 7: Run the mobile application
 
 ```bash
 npm run dev:mobile
 ```
 
-This will start the Expo development server and open Expo DevTools.
+Scan the QR code with Expo Go (or press `i` / `a` for a simulator). If Expo reports version mismatches,
+run `cd apps/mobile && npx expo install --fix`.
 
-### Running on Device:
+---
 
-#### Option A: Expo Go App (Easiest)
+## Step 8: Verify setup
 
-1. Download Expo Go app on your mobile device
-   - iOS: App Store
-   - Android: Google Play Store
+### Web
+1. Open http://localhost:3000 and sign up.
+2. Browse the library, open a game and play it.
+3. Check your profile, the shop and achievements.
+4. Open Dice → Online in two browsers, create a room in one and join it from the other.
 
-2. Scan the QR code shown in the terminal or Expo DevTools
-
-3. The app will load on your device
-
-#### Option B: iOS Simulator (Mac only)
+### Admin
+1. Make your account an admin:
 
 ```bash
-# Press 'i' in the terminal where Expo is running
-# Or use:
-npx expo run:ios
+cd packages/backend
+npx convex run seed:makeAdmin '{"username":"your-username"}'
 ```
 
-#### Option C: Android Emulator
+2. Open /admin to manage games, players, reports, game uploads and chat moderation.
 
+### Looking at the data
+`cd packages/backend && npx convex dashboard` opens the dashboard for the deployment (tables, logs,
+functions, environment variables). Local deployments can be browsed with `npx convex data <table>`.
+
+---
+
+## Common issues
+
+### "Environment variable NEXT_PUBLIC_CONVEX_URL is not set"
+Set it in `apps/web/.env.local` (Step 5) and restart `npm run dev:web`.
+
+### Sign-in fails with a server error
+Run `npm run setup:auth` for this deployment (Step 3). `npx convex env list` (in `packages/backend`)
+should show `JWT_PRIVATE_KEY`, `JWKS` and `SITE_URL`.
+
+### The library is empty
+Run `npm run seed` (Step 4).
+
+### Mobile app can't connect
+Check `EXPO_PUBLIC_CONVEX_URL` in `apps/mobile/.env`, make sure it is reachable from the phone (not
+`127.0.0.1`), and restart Expo with `npx expo start --clear`.
+
+### TypeScript errors about `convex/_generated`
+`npm run dev:backend` regenerates `packages/backend/convex/_generated`. Keep it running while you edit
+the schema or functions.
+
+---
+
+## Development workflow
+
+### Changing the backend
+1. Edit `packages/backend/convex/schema.ts` or a function module.
+2. `npm run dev:backend` pushes it straight away and regenerates the typed `api`.
+3. Call it from the web (`query` / `mutate` in `apps/web/src/lib/convex.ts`, or `useQuery` inside a
+   `<ConvexIsland>` for live data) or from mobile (`useQuery` / `useMutation`).
+
+Every public function must check access itself (`requireUser`, `requireActiveUser` or `requireAdmin`
+from `convex/lib.ts`). There is no Row Level Security behind it.
+
+### Adding a game
+1. Create the engine in `packages/shared/src/games/` and register it in `games/index.ts`.
+2. Add it to the catalog in `packages/backend/convex/seed.ts` and run `npm run seed`.
+
+---
+
+## Production deployment
+
+### Backend
 ```bash
-# Press 'a' in the terminal where Expo is running
-# Or use:
-npx expo run:android
+cd packages/backend
+npx convex deploy
+cd ../..
+npm run setup:auth -- https://your-site.example --prod
+cd packages/backend && npx convex run --prod seed:run
 ```
 
-### Mobile App Features:
-- Game library
-- Built-in game play
-- User authentication
-- Leaderboards
-- Tournaments
-- Achievements
-- Chat
-- Shop
+### Web (Vercel recommended)
+Import the repo, set the root to `apps/web`, and add `NEXT_PUBLIC_CONVEX_URL` (the production
+deployment URL) to the environment variables.
 
----
-
-## Step 10: Verify Setup
-
-### Test Web App:
-
-1. Open http://localhost:3000
-2. Sign up for a new account
-3. Navigate to the games library
-4. Play Snake or Snake & Ladder
-5. Check leaderboards
-6. Explore the shop and achievements
-
-### Test Mobile App:
-
-1. Open the app on your device/emulator
-2. Sign up for a new account
-3. Navigate to the games library
-4. Play a game
-5. Test navigation between features
-
-### Test Admin Features:
-
-1. Create an admin user (you'll need to manually set this in Supabase):
-
-```sql
--- Update a user to admin role
-UPDATE public.profiles
-SET role = 'admin'
-WHERE username = 'your-username';
-```
-
-2. Log in as admin
-3. Navigate to /admin
-4. Test game management, player management, and reports
-5. Test game upload (Phase 4)
-6. Test chat moderation
-
----
-
-## Step 11: Common Issues and Solutions
-
-### Issue: "Supabase connection failed"
-
-**Solution:**
-- Verify your environment variables are set correctly
-- Check that Supabase is running (local) or your project is active (cloud)
-- Ensure the URL includes the protocol (https:// for cloud, http:// for local)
-
-### Issue: "Migration failed"
-
-**Solution:**
-- Ensure you're using the correct Supabase project
-- Check that your migrations are in the correct order
-- Try resetting the database: `supabase db reset` (local) or manually in dashboard (cloud)
-
-### Issue: "Shared package build failed"
-
-**Solution:**
-- Run `npm install` to ensure all dependencies are installed
-- Check that Node.js version is 18+
-- Try building the shared package separately: `npm run build --workspace=@slgh/shared`
-
-### Issue: "Mobile app won't load"
-
-**Solution:**
-- Ensure Expo server is running
-- Check that your mobile device and computer are on the same network
-- Verify environment variables in `apps/mobile/.env`
-- Try clearing Expo cache: `npx expo start --clear`
-
-### Issue: "TypeScript errors"
-
-**Solution:**
-- Run `npm run typecheck` to see all errors
-- Ensure all dependencies are installed
-- Check that you're using the correct Node.js version
-
----
-
-## Step 12: Development Workflow
-
-### Making Changes to Shared Code:
-
-1. Edit files in `packages/shared/src/`
-2. Build the shared package: `npm run build --workspace=@slgh/shared`
-3. Restart web and mobile apps to pick up changes
-
-### Adding New Games:
-
-1. Create game engine in `packages/shared/src/games/`
-2. Register game in `packages/shared/src/games/index.ts`
-3. Add game to database via seed or admin panel
-4. Build shared package
-5. Game will appear in library
-
-### Adding New Features:
-
-1. Update database schema (create new migration)
-2. Apply migration: `supabase db push`
-3. Update types in `packages/shared/src/types.ts`
-4. Implement UI in web or mobile app
-5. Test thoroughly
-
----
-
-## Step 13: Production Deployment
-
-### Web App (Vercel recommended):
-
-1. Push code to GitHub
-2. Import project in Vercel
-3. Add environment variables in Vercel dashboard
-4. Deploy
-
-### Mobile App:
-
-1. Build for production:
-```bash
-# iOS
-npx expo run:ios --configuration Release
-
-# Android
-npx expo run:android --variant release
-```
-
-2. Or use EAS Build:
+### Mobile
 ```bash
 npm install -g eas-cli
 eas build --platform ios
@@ -386,97 +244,22 @@ eas build --platform android
 
 ---
 
-## Step 14: Additional Resources
+## Quick start summary
 
-- **Supabase Docs**: https://supabase.com/docs
-- **Next.js Docs**: https://nextjs.org/docs
-- **Expo Docs**: https://docs.expo.dev
-- **Project Documentation**: Check the `docs/` folder
-  - `GAME_PUBLISHING.md` - Game publishing system
-  - `COMMUNITY_AND_EXPANSION.md` - Phase 5 features
-
----
-
-## Step 15: Troubleshooting Commands
-
-### Check Dependencies:
 ```bash
-npm list
-```
-
-### Clean and Reinstall:
-```bash
-rm -rf node_modules package-lock.json
 npm install
-```
-
-### Check Supabase Status:
-```bash
-supabase status
-```
-
-### View Supabase Logs:
-```bash
-supabase logs
-```
-
-### Reset Local Database:
-```bash
-supabase db reset
-```
-
-### Type Check:
-```bash
-npm run typecheck
-```
-
-### Run Tests:
-```bash
-npm test
-```
-
----
-
-## Quick Start Summary
-
-For experienced developers, here's the quick version:
-
-```bash
-# 1. Install dependencies
-npm install
-
-# 2. Start Supabase (local)
-supabase start
-
-# 3. Configure environment variables
-# Edit .env, apps/web/.env, apps/mobile/.env
-
-# 4. Push migrations
-supabase db push
-
-# 5. Seed data
-supabase db execute --file supabase/seed.sql
-
-# 6. Build shared package
-npm run build --workspace=@slgh/shared
-
-# 7. Start web app
+npm run dev:backend            # terminal 1: Convex (log in / pick a deployment the first time)
+npm run setup:auth             # terminal 2, once per deployment
+npm run seed
+cp apps/web/.env.example apps/web/.env.local   # set NEXT_PUBLIC_CONVEX_URL
 npm run dev:web
-
-# 8. Start mobile app (in new terminal)
-npm run dev:mobile
+npm run dev:mobile             # optional
 ```
 
----
+## Resources
 
-## Support
-
-If you encounter issues not covered in this guide:
-
-1. Check the documentation in the `docs/` folder
-2. Review error messages carefully
-3. Check Supabase logs: `supabase logs`
-4. Ensure all environment variables are set correctly
-5. Verify you're using the correct Node.js version (18+)
-
-Happy gaming! 🎮
+- Convex docs: https://docs.convex.dev
+- Convex Auth: https://labs.convex.dev/auth
+- Next.js docs: https://nextjs.org/docs
+- Expo docs: https://docs.expo.dev
+- Project docs in `docs/`: `GAME_PUBLISHING.md`, `COMMUNITY_AND_EXPANSION.md`

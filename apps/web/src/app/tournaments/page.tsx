@@ -1,19 +1,17 @@
-import { createClient } from '@/lib/supabase/server';
+import { api, query } from '@/lib/convex';
 import Link from 'next/link';
+import { PageHeader } from '@/components/PageHeader';
+
+const STATUSES = ['upcoming', 'registration', 'in_progress', 'completed', 'cancelled'] as const;
 
 export default async function TournamentsPage({ searchParams }: { searchParams: { status?: string } }) {
-  const supabase = createClient();
-  const status = searchParams.status || 'upcoming';
+  const status = STATUSES.find((s) => s === searchParams.status) ?? 'upcoming';
 
-  const { data: tournaments } = await supabase
-    .from('tournaments')
-    .select('*, games!inner(slug,name,icon)')
-    .eq('status', status)
-    .order('starts_at', { ascending: true });
+  const tournaments = await query(api.tournaments.list, { status });
 
   return (
     <main className="mx-auto max-w-5xl space-y-6 p-4">
-      <h1 className="text-3xl font-bold">Tournaments</h1>
+      <PageHeader icon="swords" title="Tournaments" subtitle="Compete for glory and prizes." />
 
       {/* Status Filter */}
       <div className="card p-4">

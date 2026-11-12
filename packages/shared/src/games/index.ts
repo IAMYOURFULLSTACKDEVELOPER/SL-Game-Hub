@@ -6,7 +6,7 @@ import { WordSearchEngine, WORD_SEARCH_MANIFEST } from './word-search';
 import { ChessEngine, CHESS_MANIFEST } from './chess';
 import { ScrabbleEngine, SCRABBLE_MANIFEST } from './scrabble';
 import { UnoEngine, UNO_MANIFEST } from './uno';
-import { MonopolyEngine, MONOPOLY_MANIFEST } from './monopoly';
+import { SalonePolyEngine, SALONE_POLY_MANIFEST } from './salone-poly';
 import { DiceEngine, DICE_MANIFEST } from './dice';
 
 // Register Snake game
@@ -51,10 +51,10 @@ registerGame({
   engine: new UnoEngine(),
 });
 
-// Register Monopoly game
+// Register Salone-Poly
 registerGame({
-  manifest: MONOPOLY_MANIFEST,
-  engine: new MonopolyEngine(),
+  manifest: SALONE_POLY_MANIFEST,
+  engine: new SalonePolyEngine(),
 });
 
 // Register Dice game
