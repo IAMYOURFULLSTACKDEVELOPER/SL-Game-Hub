@@ -2,16 +2,18 @@ import './globals.css';
 import { Suspense } from 'react';
 import Link from 'next/link';
 import type { Metadata, Viewport } from 'next';
-import { Fredoka } from 'next/font/google';
+import localFont from 'next/font/local';
 import { tokens, t } from '@slgh/shared';
 import { Header } from '@/components/Header';
 import { FX } from '@/components/FX';
 import { LogoMark } from '@/components/Art';
 import { PwaManager } from '@/components/PwaManager';
 
-// One display face for headings only (self-hosted by Next, ~30 KB, swaps in so text never waits).
+// One display face for headings only (~30 KB, swaps in so text never waits).
 // Body text stays on the system font so the shell remains light.
-const display = Fredoka({ subsets: ['latin'], weight: ['500', '600', '700'], variable: '--font-display', display: 'swap' });
+// Fredoka (SIL Open Font License), latin subset, variable weight 500–700. The file is in the repo
+// rather than fetched from Google Fonts at build time, which failed on Vercel's build machines.
+const display = localFont({ src: './fonts/fredoka-latin.woff2', weight: '500 700', variable: '--font-display', display: 'swap' });
 
 export const metadata: Metadata = {
   title: { default: t('app.name'), template: `%s | ${t('app.name')}` },
