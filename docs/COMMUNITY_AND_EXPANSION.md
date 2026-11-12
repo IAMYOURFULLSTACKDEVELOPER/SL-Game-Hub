@@ -8,7 +8,7 @@ Phase 5 adds comprehensive community features to SL Game Hub, including leaderbo
 
 ### 1. National Leaderboards
 
-**Database Schema:** `0008_leaderboards.sql`
+**Backend:** `packages/backend/convex/leaderboards.ts`
 
 **Features:**
 - Global leaderboards across all games
@@ -38,7 +38,7 @@ SELECT update_leaderboard_entry(
 
 ### 2. Tournaments
 
-**Database Schema:** `0009_tournaments.sql`
+**Backend:** `packages/backend/convex/tournaments.ts`
 
 **Features:**
 - Multiple tournament formats (single/double elimination, round robin, swiss)
@@ -71,7 +71,7 @@ SELECT update_leaderboard_entry(
 
 ### 3. Achievements and Badges
 
-**Database Schema:** `0010_achievements.sql`
+**Backend:** `packages/backend/convex/achievements.ts`
 
 **Features:**
 - Achievement types: score, wins, games played, streaks, special
@@ -102,7 +102,7 @@ SELECT update_leaderboard_entry(
 
 ### 4. Chat System
 
-**Database Schema:** `0011_chat.sql`
+**Backend:** `packages/backend/convex/chat.ts`
 
 **Features:**
 - Room-based chat (global, game-specific, tournament-specific)
@@ -142,7 +142,7 @@ SELECT update_leaderboard_entry(
 
 ### 5. Rewards System (Non-Gambling)
 
-**Database Schema:** `0012_rewards.sql`
+**Backend:** `packages/backend/convex/rewards.ts`
 
 **Features:**
 - Coin system (earned, not purchased with real money)
@@ -190,6 +190,9 @@ SELECT update_leaderboard_entry(
 - No trading or real-money value
 - Transparent reward structure
 
+Coins stay separate from the real-money **wallet** (see "Wallet and money games" in the README):
+coins can never be bought with, or turned into, wallet money.
+
 ### 6. Roadmap
 
 **UI Page:** `/roadmap`
@@ -206,19 +209,10 @@ SELECT update_leaderboard_entry(
 - Game Features
 - Platform Features
 
-## Database Migrations
+## Database Schema
 
-### Migration Order:
-1. `0008_leaderboards.sql` - Leaderboard system
-2. `0009_tournaments.sql` - Tournament system
-3. `0010_achievements.sql` - Achievements and badges
-4. `0011_chat.sql` - Chat system
-5. `0012_rewards.sql` - Rewards system
-
-Apply migrations in order:
-```bash
-supabase db push
-```
+All tables are declared in `packages/backend/convex/schema.ts`. There are no migration files:
+`npx convex dev` (or `npx convex deploy`) pushes the schema and functions together.
 
 ## Server Actions
 
@@ -245,7 +239,7 @@ Updated `Header.tsx` to include new navigation links:
 ## Security Considerations
 
 ### Leaderboards
-- RLS policies for read access
+- Public read access through Convex queries
 - Admin-only write access
 - Automatic rank calculation prevents manipulation
 - Score validation before submission
@@ -254,13 +248,13 @@ Updated `Header.tsx` to include new navigation links:
 - Registration validation (time windows, max players)
 - Entry fee validation (coin balance check)
 - Admin-only tournament creation
-- RLS for sensitive operations
+- Access checks in every Convex function
 
 ### Achievements
 - Progress validation before awarding
 - Hidden achievements for spoilers
 - Admin-only achievement creation
-- RLS for user data
+- Players only ever read their own progress
 
 ### Chat
 - Profanity filtering on all messages
@@ -268,7 +262,7 @@ Updated `Header.tsx` to include new navigation links:
 - User blocking prevents harassment
 - Admin moderation tools
 - Message flagging for review
-- RLS for private conversations
+- Access checks for private conversations
 
 ### Rewards
 - No real-money transactions
@@ -288,7 +282,7 @@ Updated `Header.tsx` to include new navigation links:
 ### Chat
 - Message pagination (last 50 messages)
 - Indexed queries for room and user lookups
-- Real-time updates (to be implemented with Supabase Realtime)
+- Real-time updates (live Convex query subscription)
 
 ### Achievements
 - Indexed queries for user achievements
@@ -317,7 +311,7 @@ Updated `Header.tsx` to include new navigation links:
 - Achievement sharing
 
 ### Chat
-- Real-time messaging with Supabase Realtime
+- Direct messages UI (`chat:sendDirect` already exists)
 - Voice chat
 - File sharing
 - Emoji reactions
@@ -399,9 +393,9 @@ SELECT purchase_cosmetic('cosmetic-uuid');
 
 Phase 5 adds comprehensive community features to SL Game Hub while maintaining:
 - Safety through moderation tools
-- Fairness through validation and RLS
+- Fairness through server-side validation
 - Engagement through achievements and rewards
 - Non-gambling principles (no real-money transactions)
-- Scalability through proper indexing and RLS
+- Scalability through proper indexing
 
 All features are production-ready and can be extended with additional functionality as needed.

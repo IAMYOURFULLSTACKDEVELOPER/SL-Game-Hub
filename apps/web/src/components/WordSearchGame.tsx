@@ -7,6 +7,8 @@ import {
   type WordSearchState, type WordSearchDifficulty,
 } from '@slgh/shared';
 import Rulebook from './Rulebook';
+import { sfx } from '@/lib/sound';
+import { useEndSfx } from '@/lib/useGameSfx';
 
 const engine = new WordSearchEngine();
 const SAVE_KEY = 'word_search_game_v2';
@@ -113,6 +115,7 @@ export default function WordSearchGame({ onBack }: { onBack: () => void }) {
       const r = next.lastResult!;
       const who = g.players[r.playerIndex].name;
       setFlash({ cells: r.positions, ok: !!r.word });
+      if (next.status !== 'finished') sfx(r.word ? 'success' : 'error');
       if (r.word) {
         setMessage(next.status === 'finished'
           ? `🎉 ${g.players.length > 1 ? `${who} found ${r.word}. ` : ''}Puzzle complete! +${r.points}`
@@ -153,6 +156,7 @@ export default function WordSearchGame({ onBack }: { onBack: () => void }) {
 
   const boards = useMemo(() => getWordSearchBoards(tab, themeFilter || undefined), [tab, themeFilter]);
 
+  useEndSfx(game?.status === 'finished', !!game?.timedOut);
   if (!game) {
     const level = WORD_SEARCH_LEVELS[tab];
     const today = dailyChallenge();
@@ -163,7 +167,7 @@ export default function WordSearchGame({ onBack }: { onBack: () => void }) {
           <h2>Players</h2>
           <div className="flex flex-wrap items-center gap-3">
             <label className="text-sm font-semibold">Players:
-              <select value={seats.length} onChange={(e) => resize(Number(e.target.value))} className="ml-2 rounded border px-2 py-1">
+              <select value={seats.length} onChange={(e) => resize(Number(e.target.value))} className="ml-2 field">
                 {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n === 1 ? '1 (solo)' : n}</option>)}
               </select>
             </label>
@@ -176,8 +180,8 @@ export default function WordSearchGame({ onBack }: { onBack: () => void }) {
               {seats.map((s, i) => (
                 <li key={i} className="flex items-center gap-2">
                   <span className="h-6 w-6 shrink-0 rounded-full border-2 border-black" style={{ background: COLORS[i] }} title={BOT_COLOR_NAMES[i]} />
-                  <input value={s.name} maxLength={20} onChange={(e) => updateSeat(i, { name: e.target.value })} className="flex-1 rounded border px-2 py-1" aria-label={`Player ${i + 1} name`} />
-                  <select value={s.ai ? 'ai' : 'human'} onChange={(e) => updateSeat(i, { ai: e.target.value === 'ai' })} className="rounded border px-2 py-1" aria-label={`Player ${i + 1} type`}>
+                  <input value={s.name} maxLength={20} onChange={(e) => updateSeat(i, { name: e.target.value })} className="field min-w-0 flex-1" aria-label={`Player ${i + 1} name`} />
+                  <select value={s.ai ? 'ai' : 'human'} onChange={(e) => updateSeat(i, { ai: e.target.value === 'ai' })} className="field" aria-label={`Player ${i + 1} type`}>
                     <option value="human">Human</option><option value="ai">Bot</option>
                   </select>
                 </li>
@@ -202,7 +206,7 @@ export default function WordSearchGame({ onBack }: { onBack: () => void }) {
           </div>
           <p className="text-sm text-muted">{level.tagline}: {level.features.join(' · ')}</p>
           <label className="block text-sm font-semibold">Category:
-            <select value={themeFilter} onChange={(e) => setThemeFilter(e.target.value)} className="ml-2 rounded border px-2 py-1">
+            <select value={themeFilter} onChange={(e) => setThemeFilter(e.target.value)} className="ml-2 field">
               <option value="">All categories</option>
               {WORD_SEARCH_THEMES.map((t) => <option key={t.name} value={t.name}>{t.name}</option>)}
             </select>
@@ -230,7 +234,7 @@ export default function WordSearchGame({ onBack }: { onBack: () => void }) {
             <textarea value={customText} onChange={(e) => setCustomText(e.target.value)} rows={3} className="input min-h-[80px] py-2"
               placeholder="Type your words separated by spaces or commas, e.g. APPLE BANANA ORANGE MANGO GRAPES" />
             <div className="flex flex-wrap items-center gap-2">
-              <select value={customDiff} onChange={(e) => setCustomDiff(e.target.value as WordSearchDifficulty)} className="rounded border px-2 py-1" aria-label="Custom puzzle difficulty">
+              <select value={customDiff} onChange={(e) => setCustomDiff(e.target.value as WordSearchDifficulty)} className="field" aria-label="Custom puzzle difficulty">
                 {WORD_SEARCH_DIFFICULTIES.map((d) => <option key={d} value={d}>{WORD_SEARCH_LEVELS[d].label}</option>)}
               </select>
               <button onClick={startCustom} className="btn btn-outline btn-sm">Create puzzle</button>
@@ -416,9 +420,9 @@ function Grid({ game, paused, flash, disabled, onSelect }: {
 
 function Shell({ onBack, children, wide = false }: { onBack: () => void; children: ReactNode; wide?: boolean }) {
   return (
-    <main className={`mx-auto space-y-4 p-4 ${wide ? 'max-w-5xl' : 'max-w-2xl'}`}>
-      <button onClick={onBack} className="text-secondary">← Back to Word Search</button>
-      <div className="card space-y-4 p-5">
+    <main className={`mx-auto space-y-3 px-2 py-3 sm:space-y-4 sm:p-4 ${wide ? 'max-w-5xl' : 'max-w-2xl'}`}>
+      <button onClick={onBack} className="back-link">← Back to Word Search</button>
+      <div className="card space-y-4 p-3 sm:p-5">
         <h1>🔤 Word Search</h1>
         {children}
       </div>

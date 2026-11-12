@@ -1,0 +1,20 @@
+{
+  "name": "@slgh/backend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "convex dev",
+    "deploy": "convex deploy",
+    "seed": "convex run seed:run",
+    "typecheck": "tsc --noEmit -p convex"
+  },
+  "dependencies": {
+    "@auth/core": "0.41.1",
+    "@convex-dev/auth": "^0.0.98",
+    "@slgh/shared": "*",
+    "convex": "^1.49.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}

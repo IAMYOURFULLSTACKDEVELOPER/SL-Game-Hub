@@ -10,6 +10,9 @@
       ],
       "@slgh/shared": [
         "../../packages/shared/src"
+      ],
+      "@slgh/backend/*": [
+        "../../packages/backend/*"
       ]
     }
   },

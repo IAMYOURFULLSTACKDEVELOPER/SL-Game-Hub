@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { api, query } from '@/lib/convex';
 import { requireAdmin } from '@/lib/session';
 
 export async function GET(
@@ -8,36 +8,10 @@ export async function GET(
 ) {
   try {
     await requireAdmin();
-    const supabase = createClient();
-
-    // Get game
-    const { data: game } = await supabase
-      .from('games')
-      .select('id')
-      .eq('slug', params.slug)
-      .single();
-
-    if (!game) {
-      return NextResponse.json({ error: 'Game not found' }, { status: 404 });
-    }
-
-    // Get current version
-    const { data: version } = await supabase
-      .from('game_versions')
-      .select('*')
-      .eq('game_id', game.id)
-      .eq('is_current', true)
-      .single();
-
-    if (!version) {
-      return NextResponse.json({ error: 'No version available' }, { status: 404 });
-    }
-
-    return NextResponse.json({
-      bundleUrl: version.bundle_path,
-      manifest: version.manifest,
-      version: version.version,
-    });
+    // Current build of any game, whatever its status
+    const result = await query(api.gameVersions.current, { slug: params.slug, preview: true });
+    if ('error' in result) return NextResponse.json(result, { status: result.error === 'forbidden' ? 403 : 404 });
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Preview error:', error);
     return NextResponse.json(

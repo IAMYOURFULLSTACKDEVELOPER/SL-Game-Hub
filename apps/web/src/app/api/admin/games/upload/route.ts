@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import type { Id } from '@slgh/backend/convex/_generated/dataModel';
+import { api, errorMessage, mutate } from '@/lib/convex';
 import { requireAdmin } from '@/lib/session';
 import { validateGameUpload, validateManifest } from '@slgh/shared';
 
 export async function POST(request: NextRequest) {
   try {
-    const admin = await requireAdmin();
+    await requireAdmin();
     const formData = await request.formData();
 
     const bundle = formData.get('bundle') as File;
@@ -61,91 +62,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = createClient();
-
-    // Check if game already exists
-    const { data: existingGame } = await supabase
-      .from('games')
-      .select('id')
-      .eq('slug', gameId)
-      .single();
-
-    let gameRecordId: string;
-
-    if (existingGame) {
-      gameRecordId = existingGame.id;
-    } else {
-      // Create new game record
-      const { data: newGame, error: gameError } = await supabase
-        .from('games')
-        .insert({
-          slug: gameId,
-          name,
-          description,
-          icon: '🎮',
-          min_players: minPlayers,
-          max_players: maxPlayers,
-          modes: modes as ('single' | 'multi')[],
-          version,
-          status: 'draft',
-          is_builtin: false,
-        })
-        .select('id')
-        .single();
-
-      if (gameError) {
-        return NextResponse.json({ message: 'Failed to create game' }, { status: 500 });
-      }
-
-      gameRecordId = newGame.id;
-    }
-
-    // Upload bundle to storage
-    const bundlePath = `${gameId}/${version}/bundle.zip`;
-    const { error: bundleError } = await supabase.storage
-      .from('game-bundles')
-      .upload(bundlePath, bundle, { upsert: true });
-
-    if (bundleError) {
+    // Upload the files straight to Convex storage, then record the version (and create the game if new)
+    const store = async (file: File) => {
+      const uploadUrl = await mutate(api.gameVersions.generateUploadUrl, {});
+      const res = await fetch(uploadUrl, { method: 'POST', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file });
+      if (!res.ok) throw new Error(`Failed to upload ${file.name}`);
+      return (await res.json()).storageId as Id<'_storage'>;
+    };
+    const bundleStorageId = await store(bundle).catch(() => null);
+    if (!bundleStorageId) {
       return NextResponse.json({ message: 'Failed to upload bundle' }, { status: 500 });
     }
+    const thumbnailStorageId = thumbnail ? await store(thumbnail).catch(() => undefined) : undefined;
 
-    // Upload thumbnail if provided
-    let thumbnailPath: string | null = null;
-    if (thumbnail) {
-      const ext = thumbnail.name.split('.').pop();
-      const thumbPath = `${gameId}/${version}/thumbnail.${ext}`;
-      const { error: thumbError } = await supabase.storage
-        .from('game-thumbnails')
-        .upload(thumbPath, thumbnail, { upsert: true });
-
-      if (!thumbError) {
-        // Get public URL
-        const { data: thumbUrl } = supabase.storage
-          .from('game-thumbnails')
-          .getPublicUrl(thumbPath);
-        thumbnailPath = thumbUrl.publicUrl;
-      }
-    }
-
-    // Get public URL for bundle (will be signed in production)
-    const { data: bundleUrl } = supabase.storage.from('game-bundles').getPublicUrl(bundlePath);
-
-    // Create game version record
-    const { error: versionError } = await supabase.from('game_versions').insert({
-      game_id: gameRecordId,
-      version,
-      bundle_path: bundleUrl.publicUrl,
-      thumbnail_path: thumbnailPath,
-      manifest: manifest as any,
-      changelog,
-      status: 'draft',
-      is_current: true,
-      created_by: admin.id,
-    });
-
-    if (versionError) {
-      return NextResponse.json({ message: 'Failed to create version' }, { status: 500 });
+    let gameRecordId: string;
+    try {
+      gameRecordId = await mutate(api.gameVersions.create, {
+        slug: gameId, name, description, version,
+        min_players: minPlayers, max_players: maxPlayers, modes: manifest.modes,
+        manifest, changelog: changelog ?? undefined,
+        bundle_storage_id: bundleStorageId, thumbnail_storage_id: thumbnailStorageId,
+      });
+    } catch (e) {
+      return NextResponse.json({ message: `Failed to create version: ${errorMessage(e)}` }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, gameId: gameRecordId });

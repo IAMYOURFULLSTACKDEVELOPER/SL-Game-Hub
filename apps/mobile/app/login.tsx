@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useRouter } from 'expo-router';
+import { useAuthActions } from '@convex-dev/auth/react';
 import { isEmail, t } from '@slgh/shared';
-import { supabase } from '@/supabase';
+import { authErrorKey } from '@/auth';
 import { Banner, Button, Field, Screen } from '@/ui';
 
 export default function Login() {
   const router = useRouter();
+  const { signIn } = useAuthActions();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [err, setErr] = useState('');
@@ -14,10 +16,12 @@ export default function Login() {
   async function submit() {
     if (!isEmail(email.trim()) || !password) { setErr(t('errors.invalidCredentials')); return; }
     setBusy(true); setErr('');
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-    setBusy(false);
-    if (error) setErr(error.message.toLowerCase().includes('fetch') ? t('common.offline') : t('errors.invalidCredentials'));
-    else router.replace('/');
+    try {
+      await signIn('password', { flow: 'signIn', email: email.trim(), password });
+      router.replace('/');
+    } catch (e) {
+      setErr(t(authErrorKey(e)));
+    } finally { setBusy(false); }
   }
   return (
     <Screen>

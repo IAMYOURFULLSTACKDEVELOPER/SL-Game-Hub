@@ -1,12 +1,11 @@
 import { t, avatarEmoji } from '@slgh/shared';
-import { createClient } from '@/lib/supabase/server';
+import { api, query } from '@/lib/convex';
 import { requireAdmin } from '@/lib/session';
 import { setPlayerBanned } from '../../actions';
 
 export default async function AdminPlayers() {
   const me = await requireAdmin();
-  const { data: players } = await createClient().from('profiles')
-    .select('id,username,full_name,avatar,role,age_band,banned,created_at').order('created_at', { ascending: false }).limit(100);
+  const players = await query(api.users.adminList, {});
   return (
     <>
       <h1 className="mb-4">{t('admin.players')}</h1>

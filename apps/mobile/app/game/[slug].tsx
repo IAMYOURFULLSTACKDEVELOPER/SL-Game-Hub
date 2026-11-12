@@ -1,30 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { View } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
+import { useQuery } from 'convex/react';
 import { t } from '@slgh/shared';
-import { supabase } from '@/supabase';
+import { api } from '@/convex';
 import { useAuth } from '@/auth';
-import { GAME_COLS, type GameRow } from '@/games';
 import { playersLabel } from '@/GameCard';
 import { Banner, Button, Card, Loading, Screen, Txt } from '@/ui';
-
-type Stats = { played: number; wins: number; losses: number; draws: number; best_score: number };
 
 export default function GameDetail() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const { me } = useAuth();
-  const [g, setG] = useState<GameRow | null | undefined>(undefined);
-  const [s, setS] = useState<Stats | null>(null);
-
-  useEffect(() => {
-    supabase.from('games').select(`${GAME_COLS}, categories(slug,name)`).eq('slug', slug).eq('status', 'published').maybeSingle()
-      .then((r) => setG((r.data as unknown as GameRow | null) ?? null));
-  }, [slug]);
-  useEffect(() => {
-    if (!me || !g) return;
-    supabase.from('game_stats').select('played,wins,losses,draws,best_score').eq('user_id', me.id).eq('game_id', g.id).maybeSingle()
-      .then((r) => setS(r.data as Stats | null));
-  }, [me, g]);
+  const g = useQuery(api.games.bySlug, { slug });
+  const s = useQuery(api.games.myStats, g ? { gameId: g.id } : 'skip')?.[0];
 
   if (g === undefined) return <Screen><Loading /></Screen>;
   if (g === null) return <Screen><Banner text={t('library.empty')} /></Screen>;

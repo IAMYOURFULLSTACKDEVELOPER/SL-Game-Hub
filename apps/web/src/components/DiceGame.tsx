@@ -1,13 +1,19 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import type { RealtimeChannel } from '@supabase/supabase-js';
 import {
   DiceEngine, DICE_MANIFEST, DICE_TARGETS, rollDice, createPlayer,
   type DiceState,
 } from '@slgh/shared';
-import { createClient } from '@/lib/supabase/browser';
+import Link from 'next/link';
+import { useMutation, useQuery } from 'convex/react';
+import { ConvexError } from 'convex/values';
+import { api } from '@slgh/backend/convex/_generated/api';
+import { formatLeones, parseLeones } from '@slgh/shared/src/wallet';
 import Die3D from './Die3D';
+import { ConvexClientProvider } from './ConvexClientProvider';
+import { sfx } from '@/lib/sound';
+import { useEndSfx } from '@/lib/useGameSfx';
 
 const engine = new DiceEngine();
 const MAX = DICE_MANIFEST.maxPlayers;
@@ -86,6 +92,7 @@ function Board({ state, myId, canRoll, onRoll, rollMode, children }: {
   useEffect(() => {
     if (!state.lastRoll) return;
     setAnimating(true);
+    sfx('dice');
     navigator.vibrate?.(40);
     const t = setTimeout(() => setAnimating(false), ROLL_MS);
     return () => clearTimeout(t);
@@ -94,6 +101,7 @@ function Board({ state, myId, canRoll, onRoll, rollMode, children }: {
   const shown = state.lastRoll?.dice ?? [6, 6];
   const current = state.players[state.currentPlayerIndex];
   const finished = state.status === 'finished' && state.winner !== null;
+  useEndSfx(finished);
   const ready = canRoll && !animating && !finished;
   const { shaking, noSensor } = useShake(rollMode === 'shake' && ready, onRoll);
   const showShakePanel = rollMode === 'shake' && canRoll && !noSensor;
@@ -165,7 +173,7 @@ function TargetSelect({ value, onChange }: { value: number; onChange: (n: number
   return (
     <label className="text-sm font-semibold">
       Target score:
-      <select value={value} onChange={(e) => onChange(Number(e.target.value))} className="ml-2 rounded border px-2 py-1">
+      <select value={value} onChange={(e) => onChange(Number(e.target.value))} className="ml-2 field">
         {DICE_TARGETS.map((t) => <option key={t} value={t}>{t}</option>)}
       </select>
     </label>
@@ -211,7 +219,7 @@ function LocalDice({ rollMode }: { rollMode: RollMode }) {
       <div className="flex flex-wrap gap-4">
         <label className="text-sm font-semibold">
           Players:
-          <select value={seats.length} onChange={(e) => resize(Number(e.target.value))} className="ml-2 rounded border px-2 py-1">
+          <select value={seats.length} onChange={(e) => resize(Number(e.target.value))} className="ml-2 field">
             {Array.from({ length: MAX - 1 }, (_, i) => i + 2).map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
         </label>
@@ -222,9 +230,9 @@ function LocalDice({ rollMode }: { rollMode: RollMode }) {
           <li key={i} className="flex items-center gap-2">
             <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: COLORS[i] }} />
             <input value={s.name} maxLength={20} onChange={(e) => updateSeat(i, { name: e.target.value })}
-              className="flex-1 rounded border px-2 py-1" aria-label={`Seat ${i + 1} name`} />
+              className="field min-w-0 flex-1" aria-label={`Seat ${i + 1} name`} />
             <select value={s.ai ? 'ai' : 'human'} onChange={(e) => updateSeat(i, { ai: e.target.value === 'ai' })}
-              className="rounded border px-2 py-1" aria-label={`Seat ${i + 1} type`}>
+              className="field" aria-label={`Seat ${i + 1} type`}>
               <option value="human">Human</option>
               <option value="ai">Bot</option>
             </select>
@@ -236,134 +244,163 @@ function LocalDice({ rollMode }: { rollMode: RollMode }) {
   );
 }
 
-interface Member { id: string; name: string; host: boolean; joinedAt: number }
+interface Member { id: string; name: string; host: boolean; joinedAt: number; staked: boolean }
+const HEARTBEAT_MS = 10_000; // keep in step with packages/backend/convex/dice.ts
+const money = (minor: number) => formatLeones(minor);
 
+/** Online play talks to Convex as the signed-in player when there is one (money rooms need it; free rooms don't). */
+function OnlineDiceRoom({ rollMode }: { rollMode: RollMode }) {
+  return <ConvexClientProvider><OnlineDice rollMode={rollMode} /></ConvexClientProvider>;
+}
+
+// The room lives in Convex: everyone subscribes to it, and the server makes every roll.
+// Money rooms: everyone stakes the same amount from their wallet; the server holds it and pays the winner.
 function OnlineDice({ rollMode }: { rollMode: RollMode }) {
-  const myId = useRef(newId()).current;
+  const anonId = useRef(newId()).current;
+  const me = useQuery(api.users.me);
+  const wallet = useQuery(api.wallet.summary, me ? {} : 'skip');
   const [name, setName] = useState('');
   const [codeInput, setCodeInput] = useState('');
-  const [room, setRoom] = useState<{ code: string; host: boolean } | null>(null);
-  const [members, setMembers] = useState<Member[]>([]);
-  const [state, setState] = useState<DiceState | null>(null);
+  const [forMoney, setForMoney] = useState(false);
+  const [stakeInput, setStakeInput] = useState('5');
+  const [room, setRoom] = useState<{ code: string; memberId: string } | null>(null);
   const [target, setTarget] = useState<number>(50);
   const [error, setError] = useState('');
-  const [connected, setConnected] = useState(false);
   const [rollSent, setRollSent] = useState(false);
-  const channelRef = useRef<RealtimeChannel | null>(null);
-  const stateRef = useRef<DiceState | null>(null);
-  const hostRef = useRef(false);
+  const live = useQuery(api.dice.room, room ? { code: room.code } : 'skip');
+  const peek = useQuery(api.dice.room, !room && codeInput.length === 6 ? { code: codeInput } : 'skip');
+  const join = useMutation(api.dice.join);
+  const heartbeat = useMutation(api.dice.heartbeat);
+  const leaveRoom = useMutation(api.dice.leave);
+  const startRoom = useMutation(api.dice.start);
+  const rollInRoom = useMutation(api.dice.roll);
+  const stakeMe = useMutation(api.dice.stake);
+  const unstakeMe = useMutation(api.dice.unstakeMe);
+
+  const myId = room?.memberId ?? anonId;
+  const members: Member[] = live?.members ?? [];
+  const state = live?.state ?? null;
+  const stake = live?.stake ?? null;
+  const connected = members.some((m) => m.id === myId);
+  const amHost = members.some((m) => m.id === myId && m.host); // the server hands hosting on if the host leaves
+  const canUseWallet = !!me && !!wallet?.eligible;
 
   useEffect(() => { setName(localStorage.getItem('dice_name') ?? ''); }, []);
+  useEffect(() => { if (me?.username) setName((n) => n || me.username); }, [me?.username]);
 
-  const publish = useCallback((s: DiceState) => {
-    stateRef.current = s;
-    setState(s);
-    channelRef.current?.send({ type: 'broadcast', event: 'state', payload: { state: s } });
-  }, []);
-
-  const hostRoll = useCallback((by: string) => {
-    const s = stateRef.current;
-    if (!s || s.status !== 'playing' || s.players[s.currentPlayerIndex].id !== by) return;
-    publish(engine.applyMove(s, rollDice()));
-  }, [publish]);
+  const fail = useCallback((e: unknown) => setError(e instanceof ConvexError
+    ? (e.data === 'auth required' ? 'Sign in to play for money.' : String(e.data))
+    : 'Could not connect to the game server. Check your connection and try again.'), []);
 
   const leave = useCallback(() => {
-    const ch = channelRef.current;
-    channelRef.current = null;
-    if (ch) createClient().removeChannel(ch);
-    stateRef.current = null;
-    hostRef.current = false;
-    setRoom(null); setMembers([]); setState(null); setConnected(false);
-  }, []);
+    if (stake !== null && state?.status === 'playing' && state.players.some((p) => p.id === myId)
+      && !confirm('The round is still being played. If you leave now you lose your stake. Leave anyway?')) return;
+    setRoom(null);
+  }, [stake, state, myId]);
 
-  useEffect(() => leave, [leave]);
+  // While in a room: send heartbeats so others see us as present, and say goodbye when leaving or closing the tab.
+  useEffect(() => {
+    if (!room) return;
+    const args = { code: room.code, memberId: room.memberId };
+    const bye = () => { void leaveRoom(args).catch(() => {}); };
+    const beat = setInterval(() => {
+      heartbeat(args).catch((e) => { setRoom(null); fail(e); });
+    }, HEARTBEAT_MS);
+    window.addEventListener('pagehide', bye);
+    return () => { clearInterval(beat); window.removeEventListener('pagehide', bye); bye(); };
+  }, [room, heartbeat, leaveRoom, fail]);
 
-  const enter = (code: string, host: boolean) => {
+  // Everyone left and the room was closed (e.g. after a long disconnection)
+  useEffect(() => {
+    if (room && live === null) { setRoom(null); setError(`Room ${room.code} has closed.`); }
+  }, [room, live]);
+
+  const enter = async (code: string, host: boolean, roomStake: number | null) => {
     const display = name.trim() || 'Player';
     localStorage.setItem('dice_name', display);
     setError('');
-    hostRef.current = host;
-    const ch = createClient().channel(`dice:${code}`, { config: { presence: { key: myId }, broadcast: { self: false } } });
-    channelRef.current = ch;
+    if (roomStake !== null) {
+      if (!me) { setError('Sign in to play for money.'); return; }
+      if (!wallet?.eligible) { setError('Playing for money is only for players aged 18 and over.'); return; }
+      if (!confirm(`${host ? 'Create' : 'Join'} a money room? ${money(roomStake)} will be taken from your wallet and held until the round ends. The winner takes the pot.`)) return;
+    }
+    const memberId = roomStake !== null ? me!.id : anonId;
+    try {
+      await join({ code, memberId, name: display, host, ...(host && roomStake !== null ? { stake: roomStake } : {}) });
+      setRoom({ code, memberId });
+    } catch (e) { fail(e); }
+  };
 
-    ch.on('presence', { event: 'sync' }, () => {
-      const list = Object.values(ch.presenceState<Member>()).map((m) => m[0])
-        .sort((a, b) => a.joinedAt - b.joinedAt);
-      setMembers(list);
-      const s = stateRef.current;
-      const inGame = s?.players.some((p) => p.id === myId);
-      if (!host && !inGame && list.findIndex((m) => m.id === myId) >= MAX) {
-        leave();
-        setError(`Room ${code} is full (${MAX} players max).`);
-      }
-    });
-    ch.on('broadcast', { event: 'state' }, ({ payload }) => {
-      if (hostRef.current) return;
-      stateRef.current = payload.state as DiceState;
-      setState(payload.state as DiceState);
-    });
-    ch.on('broadcast', { event: 'roll' }, ({ payload }) => { if (hostRef.current) hostRoll(payload.by as string); });
-    ch.on('broadcast', { event: 'hello' }, () => {
-      if (hostRef.current && stateRef.current) publish(stateRef.current);
-    });
-    ch.subscribe(async (status) => {
-      if (status === 'SUBSCRIBED') {
-        await ch.track({ id: myId, name: display, host, joinedAt: Date.now() } satisfies Member);
-        if (!host) ch.send({ type: 'broadcast', event: 'hello', payload: {} });
-        setConnected(true);
-      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-        leave();
-        setError('Could not connect to the game server. Check your connection and try again.');
-      }
-    });
-    setRoom({ code, host });
+  const createRoom = () => {
+    if (!forMoney) return enter(newCode(), true, null);
+    const minor = parseLeones(stakeInput);
+    if (minor === null) { setError('Enter the stake in leones, e.g. 5.'); return; }
+    return enter(newCode(), true, minor);
   };
 
   const hostPresent = members.some((m) => m.host);
-  const hostLeft = connected && room && !room.host && members.length > 0 && !hostPresent;
-
-  // Host skips the turn of anyone who disconnected mid-game
-  useEffect(() => {
-    const s = stateRef.current;
-    if (!room?.host || !s || s.status !== 'playing' || members.length === 0) return;
-    const online = new Set(members.map((m) => m.id));
-    if (online.has(s.players[s.currentPlayerIndex].id)) return;
-    for (let k = 1; k < s.players.length; k++) {
-      const i = (s.currentPlayerIndex + k) % s.players.length;
-      if (online.has(s.players[i].id)) { publish({ ...s, currentPlayerIndex: i, updatedAt: Date.now() }); return; }
-    }
-  }, [members, state, room?.host, publish]);
+  const players = stake !== null ? members.filter((m) => m.staked) : members.slice(0, MAX);
+  const meStaked = members.some((m) => m.id === myId && m.staked);
+  const potOpen = live?.pot?.status === 'open';
 
   const startGame = () => {
-    const players = members.slice(0, MAX).map((m) => createPlayer(m.id, m.name, false));
-    if (players.length < 2) { setError('Need at least 2 players to start.'); return; }
+    if (!room) return;
+    if (players.length < 2) { setError(stake !== null ? 'At least 2 players must stake first.' : 'Need at least 2 players to start.'); return; }
     setError('');
-    publish(engine.initialize(players, { target }));
+    startRoom({ code: room.code, memberId: myId, target }).catch(fail);
   };
+  const stakeAgain = () => { if (room) { setError(''); stakeMe({ code: room.code, memberId: myId }).catch(fail); } };
+  const takeBack = () => { if (room) { setError(''); unstakeMe({ code: room.code, memberId: myId }).catch(fail); } };
 
-  // A guest waits for the host's next state before it can send another roll
+  // A player waits for the server's next state before it can send another roll
   useEffect(() => { setRollSent(false); }, [state?.turn, state?.currentPlayerIndex, state?.status]);
 
   const roll = () => {
-    if (room?.host) hostRoll(myId);
-    else if (!rollSent) {
-      setRollSent(true);
-      channelRef.current?.send({ type: 'broadcast', event: 'roll', payload: { by: myId } });
-    }
+    if (!room || rollSent) return;
+    setRollSent(true);
+    rollInRoom({ code: room.code, memberId: myId }).catch((e) => { setRollSent(false); fail(e); });
   };
 
   if (!room) {
+    const peekStake = peek?.stake ?? null;
     return (
       <div className="space-y-3">
         <p className="text-sm text-muted">Play live with up to {MAX} friends on their own devices. Create a room and share the code.</p>
         <input value={name} maxLength={20} onChange={(e) => setName(e.target.value)} placeholder="Your name"
-          className="w-full rounded border px-3 py-2" aria-label="Your name" />
-        <button onClick={() => enter(newCode(), true)} className="btn btn-primary w-full">Create Room</button>
+          className="input" aria-label="Your name" />
+        <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Room type">
+          {([false, true] as const).map((m) => (
+            <button key={String(m)} role="radio" aria-checked={forMoney === m} onClick={() => setForMoney(m)}
+              className={`btn btn-sm ${forMoney === m ? 'btn-primary' : 'btn-secondary'}`}>
+              {m ? '💰 For money' : '🎉 Just for fun'}
+            </button>
+          ))}
+        </div>
+        {forMoney && (
+          !me ? <p className="text-sm"><Link href="/login?next=/games/dice/play" className="font-semibold text-primary underline">Sign in</Link> to play for money.</p>
+          : !canUseWallet ? <p className="text-sm text-muted">{wallet === undefined ? 'Checking your wallet…' : 'Playing for money is only for players aged 18 and over.'}</p>
+          : (
+            <div className="space-y-1">
+              <label className="label" htmlFor="dice-stake">Stake per player (SLE)</label>
+              <input id="dice-stake" inputMode="decimal" value={stakeInput} onChange={(e) => setStakeInput(e.target.value)} className="input" />
+              <p className="text-xs text-muted">
+                Wallet: <b>{money(wallet!.balance)}</b> · <Link href="/wallet" className="text-primary underline">Top up</Link>.
+                Stakes are held by SL Game Hub until the round ends; the winner gets the whole pot.
+              </p>
+            </div>
+          )
+        )}
+        <button onClick={createRoom} disabled={forMoney && !canUseWallet} className="btn btn-primary w-full">
+          {forMoney ? 'Create Money Room' : 'Create Room'}
+        </button>
         <div className="flex gap-2">
           <input value={codeInput} maxLength={6} onChange={(e) => setCodeInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
-            placeholder="ROOM CODE" className="flex-1 rounded border px-3 py-2 font-mono tracking-widest" aria-label="Room code" />
-          <button onClick={() => enter(codeInput, false)} disabled={codeInput.length !== 6} className="btn btn-secondary disabled:opacity-50">Join</button>
+            placeholder="ROOM CODE" className="input min-w-0 flex-1 font-mono tracking-widest" aria-label="Room code" />
+          <button onClick={() => enter(codeInput, false, peekStake)} disabled={codeInput.length !== 6} className="btn btn-secondary disabled:opacity-50">
+            {peekStake !== null ? `Join · stake ${money(peekStake)}` : 'Join'}
+          </button>
         </div>
+        {peekStake !== null && <p className="text-sm text-muted">💰 This is a money room: joining puts {money(peekStake)} from your wallet into the pot.</p>}
         {error && <p className="font-semibold text-red-500">{error}</p>}
       </div>
     );
@@ -379,30 +416,48 @@ function OnlineDice({ rollMode }: { rollMode: RollMode }) {
     </div>
   );
 
-  if (hostLeft) {
-    return <div className="space-y-3">{header}<p className="font-semibold">The host left the room. Leave and create a new room to keep playing.</p></div>;
-  }
+  // Money rooms: the pot, and whether I'm in it
+  const potPanel = stake !== null && live?.pot && (
+    <div className="space-y-2 rounded-lg border-2 border-accent/60 p-3">
+      <p className="flex flex-wrap justify-between gap-2 font-semibold">
+        <span>💰 Stake {money(stake)} each</span>
+        <span>Pot: {money(live.pot.total)}{live.pot.feeBps > 0 && <span className="text-xs text-muted"> ({live.pot.feeBps / 100}% fee)</span>}</span>
+      </p>
+      {potOpen && (meStaked ? (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span>✅ Your stake is in for this round.</span>
+          <button onClick={takeBack} className="btn btn-ghost btn-sm">Take it back</button>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <button onClick={stakeAgain} className="btn btn-primary btn-sm">Stake {money(stake)} to play</button>
+          <span className="text-muted">Wallet: {wallet ? money(wallet.balance) : '…'} · <Link href="/wallet" className="text-primary underline">Top up</Link></span>
+        </div>
+      ))}
+    </div>
+  );
 
   if (!state) {
     return (
       <div className="space-y-3">
         {header}
+        {potPanel}
         <h2 className="font-bold">Players ({Math.min(members.length, MAX)}/{MAX})</h2>
         {!connected && <p className="text-muted">Connecting…</p>}
         <ul className="space-y-1">
           {members.slice(0, MAX).map((m, i) => (
             <li key={m.id} className="flex items-center gap-2">
               <span className="h-3 w-3 rounded-full" style={{ backgroundColor: COLORS[i] }} />
-              {m.name}{m.id === myId && ' (you)'}{m.host && ' 👑'}
+              {m.name}{m.id === myId && ' (you)'}{m.host && ' 👑'}{stake !== null && (m.staked ? ' 💰' : ' (not staked)')}
             </li>
           ))}
         </ul>
-        {connected && !room.host && !hostPresent && <p className="text-muted">Waiting for the host… check the room code if this takes long.</p>}
-        {room.host ? (
+        {connected && !hostPresent && <p className="text-muted">Waiting for the host… check the room code if this takes long.</p>}
+        {amHost ? (
           <>
             <TargetSelect value={target} onChange={setTarget} />
-            <button onClick={startGame} disabled={members.length < 2} className="btn btn-primary w-full disabled:opacity-50">
-              {members.length < 2 ? 'Waiting for players…' : `Start Game (${Math.min(members.length, MAX)} players)`}
+            <button onClick={startGame} disabled={players.length < 2} className="btn btn-primary w-full disabled:opacity-50">
+              {players.length < 2 ? (stake !== null ? 'Waiting for 2 players to stake…' : 'Waiting for players…') : `Start Game (${Math.min(players.length, MAX)} players)`}
             </button>
           </>
         ) : hostPresent && <p className="text-muted">Waiting for the host to start the game…</p>}
@@ -413,15 +468,30 @@ function OnlineDice({ rollMode }: { rollMode: RollMode }) {
 
   const myTurn = state.status === 'playing' && state.players[state.currentPlayerIndex].id === myId;
   const spectating = !state.players.some((p) => p.id === myId);
+  const finished = state.status === 'finished';
+  const iWon = finished && state.winner !== null && state.players[state.winner].id === myId;
 
   return (
     <div className="space-y-3">
       {header}
-      {spectating && <p className="text-sm text-muted">A game is in progress — you are watching.</p>}
+      {spectating && !finished && <p className="text-sm text-muted">A game is in progress — you are watching.</p>}
       <Board state={state} myId={myId} canRoll={myTurn && !rollSent} onRoll={roll} rollMode={rollMode}>
-        {room.host && state.status === 'finished' && (
-          <button onClick={startGame} className="btn btn-primary w-full">Play Again</button>
+        {finished && stake !== null && live?.lastPrize != null && (
+          <p className="rounded-lg bg-accent/15 p-3 text-center font-semibold">
+            {iWon ? `🎉 You won ${money(live.lastPrize)}! It is in your wallet: stake again below or leave with it.`
+              : `${state.players[state.winner!].name} won ${money(live.lastPrize)}.`}
+          </p>
         )}
+        {finished && potPanel}
+        {amHost && finished && (
+          <>
+            <TargetSelect value={target} onChange={setTarget} />
+            <button onClick={startGame} disabled={players.length < 2} className="btn btn-primary w-full">
+              {stake !== null ? `Play Again (${players.length} staked)` : 'Play Again'}
+            </button>
+          </>
+        )}
+        {error && <p className="font-semibold text-red-500">{error}</p>}
       </Board>
     </div>
   );
@@ -448,9 +518,9 @@ export default function DiceGame({ onBack }: { onBack: () => void }) {
     localStorage.setItem('dice_roll_mode', m);
   };
   return (
-    <main className="mx-auto max-w-2xl space-y-4 p-4">
-      <button onClick={onBack} className="text-secondary">← Back to Dice</button>
-      <div className="card space-y-4 p-5">
+    <main className="mx-auto max-w-2xl space-y-3 px-2 py-3 sm:space-y-4 sm:p-4">
+      <button onClick={onBack} className="back-link">← Back to Dice</button>
+      <div className="card space-y-4 p-3 sm:p-5">
         <div>
           <h1>🎲 {DICE_MANIFEST.name}</h1>
           <p className="text-sm text-muted">
@@ -477,7 +547,7 @@ export default function DiceGame({ onBack }: { onBack: () => void }) {
           </div>
           {motionError && <p className="text-sm font-semibold text-red-500">{motionError}</p>}
         </div>
-        {mode === 'local' ? <LocalDice rollMode={rollMode} /> : <OnlineDice rollMode={rollMode} />}
+        {mode === 'local' ? <LocalDice rollMode={rollMode} /> : <OnlineDiceRoom rollMode={rollMode} />}
       </div>
     </main>
   );

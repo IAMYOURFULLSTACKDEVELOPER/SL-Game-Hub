@@ -67,24 +67,24 @@ export class AntiCheatSystem {
    * Submit an anti-cheat report
    */
   static async submitReport(report: Omit<AntiCheatReport, 'id' | 'created_at'>): Promise<string> {
-    // TODO: Implement with actual Supabase client
-    throw new Error('Not implemented - requires Supabase client from app context');
+    // TODO: Implement with a Convex function
+    throw new Error('Not implemented - requires a Convex function (packages/backend/convex)');
   }
 
   /**
    * Get anti-cheat reports for a user
    */
   static async getReportsForUser(userId: string): Promise<AntiCheatReport[]> {
-    // TODO: Implement with actual Supabase client
-    throw new Error('Not implemented - requires Supabase client from app context');
+    // TODO: Implement with a Convex function
+    throw new Error('Not implemented - requires a Convex function (packages/backend/convex)');
   }
 
   /**
    * Get anti-cheat reports for a match
    */
   static async getReportsForMatch(matchId: string): Promise<AntiCheatReport[]> {
-    // TODO: Implement with actual Supabase client
-    throw new Error('Not implemented - requires Supabase client from app context');
+    // TODO: Implement with a Convex function
+    throw new Error('Not implemented - requires a Convex function (packages/backend/convex)');
   }
 }
 
@@ -179,32 +179,32 @@ export class AbuseReporter {
     details?: string;
     evidence?: string;
   }): Promise<string> {
-    // TODO: Implement with actual Supabase client
-    throw new Error('Not implemented - requires Supabase client from app context');
+    // TODO: Implement with a Convex function
+    throw new Error('Not implemented - requires a Convex function (packages/backend/convex)');
   }
 
   /**
    * Get abuse reports submitted by user
    */
   static async getSubmittedReports(userId: string): Promise<AntiCheatReport[]> {
-    // TODO: Implement with actual Supabase client
-    throw new Error('Not implemented - requires Supabase client from app context');
+    // TODO: Implement with a Convex function
+    throw new Error('Not implemented - requires a Convex function (packages/backend/convex)');
   }
 
   /**
    * Get abuse reports against user
    */
   static async getReportsAgainstUser(userId: string): Promise<AntiCheatReport[]> {
-    // TODO: Implement with actual Supabase client
-    throw new Error('Not implemented - requires Supabase client from app context');
+    // TODO: Implement with a Convex function
+    throw new Error('Not implemented - requires a Convex function (packages/backend/convex)');
   }
 
   /**
    * Get open abuse reports (admin only)
    */
   static async getOpenReports(): Promise<AntiCheatReport[]> {
-    // TODO: Implement with actual Supabase client
-    throw new Error('Not implemented - requires Supabase client from app context');
+    // TODO: Implement with a Convex function
+    throw new Error('Not implemented - requires a Convex function (packages/backend/convex)');
   }
 
   /**
@@ -216,8 +216,8 @@ export class AbuseReporter {
     resolution: 'resolved' | 'dismissed',
     notes?: string
   ): Promise<void> {
-    // TODO: Implement with actual Supabase client
-    throw new Error('Not implemented - requires Supabase client from app context');
+    // TODO: Implement with a Convex function
+    throw new Error('Not implemented - requires a Convex function (packages/backend/convex)');
   }
 }
 

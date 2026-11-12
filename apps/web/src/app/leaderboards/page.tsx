@@ -1,37 +1,22 @@
-import { createClient } from '@/lib/supabase/server';
+import { api, query } from '@/lib/convex';
 import Link from 'next/link';
+import { PageHeader } from '@/components/PageHeader';
+
+const TYPES = ['global', 'per_game', 'weekly', 'monthly', 'per_district'] as const;
 
 export default async function LeaderboardsPage({ searchParams }: { searchParams: { type?: string; game?: string } }) {
-  const supabase = createClient();
-  const type = searchParams.type || 'global';
+  const type = TYPES.find((x) => x === searchParams.type) ?? 'global';
   const gameSlug = searchParams.game;
 
-  // Get games for filter
-  const { data: games } = await supabase
-    .from('games')
-    .select('id,slug,name')
-    .eq('status', 'published')
-    .order('name');
-
-  // Get leaderboards
-  let query = supabase
-    .from('leaderboards')
-    .select('*, games!inner(slug,name)');
-
-  if (type === 'per_game' && gameSlug) {
-    query = query.eq('games.slug', gameSlug);
-  } else if (type === 'per_district') {
-    // District leaderboards would need user's district
-    query = query.eq('type', 'per_district');
-  } else {
-    query = query.eq('type', type);
-  }
-
-  const { data: leaderboards } = await query.order('created_at', { ascending: false });
+  // Games for the filter, and the leaderboards (each with its top 10)
+  const [games, leaderboards] = await Promise.all([
+    query(api.games.list, {}).then((list) => list.sort((a, b) => a.name.localeCompare(b.name))),
+    query(api.leaderboards.list, { type, gameSlug: gameSlug || undefined }),
+  ]);
 
   return (
     <main className="mx-auto max-w-5xl space-y-6 p-4">
-      <h1 className="text-3xl font-bold">Leaderboards</h1>
+      <PageHeader icon="trophy" tone="gold" title="Leaderboards" subtitle="See who is on top this week." />
 
       {/* Filters */}
       <div className="card p-4">
@@ -86,22 +71,13 @@ function LeaderboardCard({ leaderboard }: { leaderboard: any }) {
           <p className="text-muted">{leaderboard.description}</p>
         )}
       </div>
-      <LeaderboardEntries leaderboardId={leaderboard.id} />
+      <LeaderboardEntries entries={leaderboard.entries} />
     </div>
   );
 }
 
-async function LeaderboardEntries({ leaderboardId }: { leaderboardId: string }) {
-  const supabase = createClient();
-
-  const { data: entries } = await supabase
-    .from('leaderboard_entries')
-    .select('*, profiles!inner(username, avatar)')
-    .eq('leaderboard_id', leaderboardId)
-    .order('score', { ascending: false })
-    .limit(10);
-
-  if (!entries || entries.length === 0) {
+function LeaderboardEntries({ entries }: { entries: { id: string; score: number; rank: number | null; profiles: { username: string; avatar: string } }[] }) {
+  if (entries.length === 0) {
     return <p className="text-muted">No entries yet</p>;
   }
 
@@ -111,10 +87,10 @@ async function LeaderboardEntries({ leaderboardId }: { leaderboardId: string }) 
         <div
           key={entry.id}
           className={`flex items-center justify-between p-3 rounded ${
-            index === 0 ? 'bg-yellow-50 border border-yellow-200' :
-            index === 1 ? 'bg-gray-50 border border-gray-200' :
-            index === 2 ? 'bg-orange-50 border border-orange-200' :
-            'bg-gray-50'
+            index === 0 ? 'bg-accent/10 border border-accent/40' :
+            index === 1 ? 'bg-bg/60 border border-border' :
+            index === 2 ? 'bg-orange-500/10 border border-orange-500/30' :
+            'bg-bg/60'
           }`}
         >
           <div className="flex items-center gap-3">

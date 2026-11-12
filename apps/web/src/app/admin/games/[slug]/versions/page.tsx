@@ -1,29 +1,17 @@
-import { createClient } from '@/lib/supabase/server';
+import { api, query } from '@/lib/convex';
 import { requireAdmin } from '@/lib/session';
 import { rollbackToVersion } from '@/app/actions';
 import Link from 'next/link';
 
 export default async function GameVersionsPage({ params }: { params: { slug: string } }) {
   await requireAdmin();
-  const supabase = createClient();
+  // Game and its versions, newest first
+  const data = await query(api.gameVersions.list, { slug: params.slug });
 
-  // Get game
-  const { data: game } = await supabase
-    .from('games')
-    .select('id,slug,name,version')
-    .eq('slug', params.slug)
-    .single();
-
-  if (!game) {
+  if (!data) {
     return <div className="p-4">Game not found</div>;
   }
-
-  // Get versions
-  const { data: versions } = await supabase
-    .from('game_versions')
-    .select('*')
-    .eq('game_id', game.id)
-    .order('created_at', { ascending: false });
+  const { game, versions } = data;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 p-4">
