@@ -8,7 +8,8 @@ import {
 } from '@slgh/shared';
 import Rulebook from './Rulebook';
 import Die3D from './Die3D';
-import { RoomLobby } from './RoomLobby';
+import { RoomLobby, JoinRequests } from './RoomLobby';
+import { VoiceChat } from './VoiceChat';
 import { ConvexRoomProvider } from './ConvexRoomProvider';
 import { Icon } from './Icon';
 import { Portal } from './Portal';
@@ -42,7 +43,7 @@ type Mode = 'bots' | 'pass' | 'online';
 
 export default function SalonePolyGame({ onBack }: { onBack: () => void }) {
   const [mode, setMode] = useState<Mode>('bots');
-  useEffect(() => { if (new URLSearchParams(location.search).has('room')) setMode('online'); }, []);
+  useEffect(() => { const q = new URLSearchParams(location.search); if (q.has('room') || q.has('online')) setMode('online'); }, []);
   return (
     <Shell onBack={onBack}>
       <div role="tablist" aria-label="How to play" className="grid grid-cols-3 gap-1 rounded-2xl border border-border bg-bg/60 p-1">
@@ -197,6 +198,7 @@ function OnlinePoly() {
 
   return (
     <div className="space-y-4">
+      <VoiceChat room={room} />
       {room.joined && s && (
         <PolyTable s={s} me={me} busy={room.busy} onMove={(m) => { room.move(m as Parameters<typeof room.move>[0]); }} onTrade={trade}
           banner={offer && s.status === 'playing' && (offer.to === me ? (
@@ -216,6 +218,7 @@ function OnlinePoly() {
           ) : null)}
         />
       )}
+      {playing && <JoinRequests room={room} />}
       {room.error && playing && <p role="alert" className="flash rounded-xl border border-danger/40 bg-danger/10 p-3 text-sm font-semibold text-danger">{room.error}</p>}
       {!playing && <RoomLobby room={room} title="Salone-Poly" maxSeats={6} timer />}
       {playing && <button className="btn btn-ghost w-full text-danger" onClick={() => { if (confirm('Leave this game? A bot will take your seat.')) room.leave(); }}><Icon name="logout" size={18} />Leave game</button>}

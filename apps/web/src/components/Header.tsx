@@ -8,6 +8,7 @@ export async function Header() {
   const me = await getMe();
   const primary: NavItem[] = [
     { href: '/games', label: t('nav.games'), icon: 'gamepad' },
+    { href: '/lobby', label: 'Live games', icon: 'globe' },
     { href: '/leaderboards', label: 'Leaderboards', icon: 'trophy' },
     { href: '/tournaments', label: 'Tournaments', icon: 'swords' },
     ...(me ? [{ href: '/chat', label: 'Chat', icon: 'chat' } as NavItem] : []),

@@ -108,6 +108,20 @@ A cron re-checks top-ups and payouts every 5 minutes, in case a webhook is misse
 - **Online Dice** keeps each room in Convex (`convex/dice.ts`). Players need no account: each device picks a random
   member id and sends a heartbeat every 10 s, and a cron removes players who stop. The server makes every roll and
   skips the turn of anyone who has left.
+- **Online rooms for every other game** (`convex/rooms.ts`, one entry per game in `convex/roomGames.ts`): UNO,
+  Salone-Poly, Chess, Checkers, Snake & Ladder and Scrabble take turns; Word Search and Snake are races where everyone
+  plays at once. No account needed: each browser keeps a private room secret. The server checks and applies every move,
+  rolls every die, plays the bots and only sends each player what they may see (UNO hands, Scrabble racks and the
+  positions of unfound words stay hidden). A bot takes over from anyone who leaves a turn-based game.
+  - Scrabble words are checked on the server (`convex/scrabbleNode.ts`, Node runtime). The 270,000-word list is the
+    `word-list` package; the first check on a deployment downloads it from the npm CDN into Convex storage.
+  - Snake races trust each phone's own score (fine for fun, not for prizes).
+- **Live games** (`/lobby`): hosts can list their room; anyone can ask to join and the host lets them in or not.
+  Room codes are never shown in the list.
+- **Voice chat** in every online room (`convex/voice.ts`, `lib/useVoice.ts`): audio goes straight between the players'
+  browsers (WebRTC); Convex only relays the connection set-up. Uses public STUN servers; for players on mobile networks
+  that block direct connections, add a TURN relay with `NEXT_PUBLIC_TURN_URL` / `_USERNAME` / `_CREDENTIAL`
+  (see `apps/web/.env.example`).
 
 ## Mobile app (Expo)
 ```

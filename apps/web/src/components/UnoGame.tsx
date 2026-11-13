@@ -6,7 +6,8 @@ import {
   type UnoState, type UnoMove, type UnoView, type Card, type PlayColor, type Difficulty,
 } from '@slgh/shared';
 import Rulebook from './Rulebook';
-import { RoomLobby } from './RoomLobby';
+import { RoomLobby, JoinRequests } from './RoomLobby';
+import { VoiceChat } from './VoiceChat';
 import { ConvexRoomProvider } from './ConvexRoomProvider';
 import { Icon } from './Icon';
 import { Portal } from './Portal';
@@ -24,7 +25,7 @@ interface Seat { name: string; ai: boolean }
 export default function UnoGame({ onBack }: { onBack: () => void }) {
   const [mode, setMode] = useState<Mode>('bots');
   // A shared room link opens straight into online play.
-  useEffect(() => { if (new URLSearchParams(location.search).has('room')) setMode('online'); }, []);
+  useEffect(() => { const q = new URLSearchParams(location.search); if (q.has('room') || q.has('online')) setMode('online'); }, []);
   return (
     <Shell onBack={onBack}>
       <div role="tablist" aria-label="How to play" className="grid grid-cols-3 gap-1 rounded-2xl border border-border bg-bg/60 p-1">
@@ -156,7 +157,9 @@ function OnlineUno() {
   const playing = room.joined && state?.status === 'playing';
   return (
     <div className="space-y-4">
+      <VoiceChat room={room} />
       {room.joined && state && <UnoTable view={state} busy={room.busy} onMove={(m) => { room.move(m); }} />}
+      {playing && <JoinRequests room={room} />}
       {room.error && playing && <p role="alert" className="flash rounded-xl border border-danger/40 bg-danger/10 p-3 text-sm font-semibold text-danger">{room.error}</p>}
       {!playing && <RoomLobby room={room} title="UNO" maxSeats={4} />}
       {playing && <button className="btn btn-ghost w-full text-danger" onClick={() => { if (confirm('Leave this game? A bot will take your seat.')) room.leave(); }}><Icon name="logout" size={18} />Leave game</button>}

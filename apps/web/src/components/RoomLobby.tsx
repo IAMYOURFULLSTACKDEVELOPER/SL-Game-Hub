@@ -1,5 +1,6 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import type { RoomApi } from '@/lib/useRoom';
 import { savedName, HEARTBEAT_MS } from '@/lib/useRoom';
 import { sfx } from '@/lib/sound';
@@ -7,21 +8,59 @@ import { Icon } from './Icon';
 
 type Difficulty = 'easy' | 'medium' | 'hard';
 
+/** Host only: people asking to join from Live games. Shown in the lobby and during a game. */
+export function JoinRequests({ room }: { room: RoomApi }) {
+  const v = room.view;
+  const requests = v?.me?.host ? v.requests : [];
+  const prev = useRef(0);
+  useEffect(() => { if (requests.length > prev.current) sfx('success'); prev.current = requests.length; }, [requests.length]);
+  if (!requests.length) return null;
+  const playing = (v?.state as { status?: string } | null)?.status === 'playing';
+  return (
+    <div className="flash space-y-2 rounded-2xl border border-accent/50 bg-accent/10 p-3" aria-live="polite">
+      <p className="text-sm font-semibold">
+        {requests.length === 1 ? 'Someone wants' : `${requests.length} people want`} to join from Live games
+        {playing && <span className="font-normal text-muted"> (they can join when this game ends)</span>}
+      </p>
+      <ul className="space-y-2">
+        {requests.map((r) => (
+          <li key={r.id} className="flex flex-wrap items-center gap-2">
+            <span className="avatar-ring h-8 w-8 shrink-0 font-display text-sm font-bold">{r.name[0]?.toUpperCase()}</span>
+            <span className="min-w-0 flex-1 truncate font-semibold">{r.name}</span>
+            <button className="btn btn-sm btn-primary" disabled={room.busy} onClick={() => room.answerRequest(r.id, true)}>Let in</button>
+            <button className="btn btn-sm btn-outline" disabled={room.busy} onClick={() => room.answerRequest(r.id, false)}>No thanks</button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 /** Create or join an online room, then wait in it until the host starts the game. */
-export function RoomLobby({ room, title, maxSeats, timer = false }: { room: RoomApi; title: string; maxSeats: number; timer?: boolean }) {
+export function RoomLobby({ room, title, maxSeats, timer = false, bots: allowBots = true, timerOptions = [20, 40, 60] }: {
+  room: RoomApi; title: string; maxSeats: number; timer?: boolean;
+  /** Races (Word Search, Snake) are people only */
+  bots?: boolean;
+  timerOptions?: number[];
+}) {
   const [name, setName] = useState('');
   const [codeInput, setCodeInput] = useState('');
   const [bots, setBots] = useState(1);
   const [difficulty, setDifficulty] = useState<Difficulty>('medium');
   const [minutes, setMinutes] = useState(0);
   const [copied, setCopied] = useState(false);
+  // The "List in Live games" box flips at once; the server's answer then takes over.
+  const [listedNow, setListedNow] = useState<boolean | null>(null);
+  const serverListed = room.view?.isPublic;
+  useEffect(() => { setListedNow(null); }, [serverListed]);
+  useEffect(() => { if (room.error) setListedNow(null); }, [room.error]); // the change didn't save
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { setName(savedName()); }, []);
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 5000); return () => clearInterval(t); }, []);
 
   const v = room.view;
   const humans = v?.members.length ?? 0;
-  const maxBots = Math.max(0, maxSeats - humans);
+  const maxBots = allowBots ? Math.max(0, maxSeats - humans) : 0;
   useEffect(() => { setBots((b) => Math.min(b, maxBots)); }, [maxBots]);
   const nameOk = name.trim().length >= 1;
   const errorBox = room.error && <p role="alert" className="flash rounded-xl border border-danger/40 bg-danger/10 p-3 text-sm font-semibold text-danger">{room.error}</p>;
@@ -107,18 +146,29 @@ export function RoomLobby({ room, title, maxSeats, timer = false }: { room: Room
             );
           })}
         </ul>
-        {humans < maxSeats && <p className="hint">Waiting for friends? Empty seats can be filled with bots.</p>}
+        {humans < maxSeats && <p className="hint">{allowBots ? 'Waiting for friends? Empty seats can be filled with bots.' : 'This is a race between people: invite at least one friend.'}</p>}
       </div>
 
       {errorBox}
+      {me.host && (
+        <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-border bg-bg/50 p-4">
+          <input type="checkbox" className="mt-1 h-5 w-5 shrink-0 accent-[rgb(var(--c-primary))]" checked={listedNow ?? v!.isPublic} disabled={room.busy}
+            onChange={(e) => { setListedNow(e.target.checked); room.setPublic(e.target.checked); }} />
+          <span>
+            <span className="font-semibold">List in <Link href="/lobby" className="text-primary underline">Live games</Link></span>
+            <span className="block text-sm text-muted">Anyone can ask to join; you choose who gets in. Your room code stays hidden.</span>
+          </span>
+        </label>
+      )}
+      <JoinRequests room={room} />
       {me.host ? (
         <div className="space-y-3 rounded-2xl border border-border bg-bg/50 p-4">
           <div className="flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-2 text-sm font-semibold">Bots
+            {allowBots && <label className="flex items-center gap-2 text-sm font-semibold">Bots
               <select className="field" value={bots} onChange={(e) => setBots(Number(e.target.value))}>
                 {Array.from({ length: maxBots + 1 }, (_, n) => <option key={n} value={n}>{n}</option>)}
               </select>
-            </label>
+            </label>}
             {bots > 0 && (
               <label className="flex items-center gap-2 text-sm font-semibold">Level
                 <select className="field" value={difficulty} onChange={(e) => setDifficulty(e.target.value as Difficulty)}>
@@ -129,7 +179,8 @@ export function RoomLobby({ room, title, maxSeats, timer = false }: { room: Room
             {timer && (
               <label className="flex items-center gap-2 text-sm font-semibold">Time limit
                 <select className="field" value={minutes} onChange={(e) => setMinutes(Number(e.target.value))}>
-                  <option value={0}>None</option><option value={20}>20 min</option><option value={40}>40 min</option><option value={60}>60 min</option>
+                  <option value={0}>None</option>
+                  {timerOptions.map((m) => <option key={m} value={m}>{m} min</option>)}
                 </select>
               </label>
             )}
@@ -137,7 +188,7 @@ export function RoomLobby({ room, title, maxSeats, timer = false }: { room: Room
           <button className="btn btn-primary btn-lg w-full" disabled={room.busy || humans + bots < 2} onClick={() => { sfx('shuffle'); room.start(bots, difficulty, timer ? minutes : undefined); }}>
             <Icon name="play" size={20} />Start game ({humans + bots} players)
           </button>
-          {humans + bots < 2 && <p className="hint text-center">You need at least 2 players. Add a bot or invite a friend.</p>}
+          {humans + bots < 2 && <p className="hint text-center">You need at least 2 players. {allowBots ? 'Add a bot or invite a friend.' : 'Invite a friend.'}</p>}
         </div>
       ) : (
         <p className="flex items-center justify-center gap-2 rounded-2xl bg-bg/60 p-4 text-center font-semibold text-muted">

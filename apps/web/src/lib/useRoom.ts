@@ -1,13 +1,13 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { useMutation, useQuery } from 'convex/react';
+import { useAction, useMutation, useQuery } from 'convex/react';
 import { ConvexError } from 'convex/values';
 import { api } from '@slgh/backend/convex/_generated/api';
 
-// Client side of convex/rooms.ts, shared by UNO and Salone-Poly.
+// Client side of convex/rooms.ts, shared by every online game (see convex/roomGames.ts).
 // This browser's private secret proves which seat is ours; it never leaves this device except to the server.
 
-export type RoomGame = 'uno' | 'salone-poly';
+export type RoomGame = 'uno' | 'salone-poly' | 'chess' | 'checkers' | 'snake-and-ladder' | 'scrabble' | 'word-search' | 'snake';
 export const HEARTBEAT_MS = 10_000;
 const SECRET_KEY = 'slgh-room-secret';
 const NAME_KEY = 'slgh-player-name';
@@ -17,7 +17,7 @@ function load(key: string) { try { return localStorage.getItem(key); } catch { r
 function store(key: string, value: string | null) {
   try { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch { /* private mode */ }
 }
-function mySecret() {
+export function mySecret() {
   let s = load(SECRET_KEY);
   if (!s || !/^[A-Za-z0-9-]{20,64}$/.test(s)) {
     s = `s-${crypto.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`}`;
@@ -50,6 +50,9 @@ export function useRoom(game: RoomGame) {
   const moveM = useMutation(api.rooms.move);
   const offerM = useMutation(api.rooms.offerTrade);
   const respondM = useMutation(api.rooms.respondTrade);
+  const setPublicM = useMutation(api.rooms.setPublic);
+  const answerM = useMutation(api.rooms.answerRequest);
+  const scrabbleM = useAction(api.scrabbleNode.move);
 
   const joined = !!view?.me;
   // The room vanished (everyone left, or a bad link): forget it.
@@ -70,7 +73,7 @@ export function useRoom(game: RoomGame) {
 
   const enter = (c: string) => { setCode(c); store(roomKey(game), c); };
   return {
-    code, view, joined, error, busy, setError,
+    code, secret, view, joined, error, busy, setError,
     create: (name: string) => run(async () => {
       store(NAME_KEY, name);
       const r = await createM({ game, name, secret });
@@ -91,8 +94,14 @@ export function useRoom(game: RoomGame) {
     start: (bots: number, difficulty: 'easy' | 'medium' | 'hard', minutes?: number) =>
       run(() => startM({ code: code!, secret, bots, difficulty, minutes })),
     move: (m: Parameters<typeof moveM>[0]['move']) => run(() => moveM({ code: code!, secret, move: m })),
+    /** Scrabble: every move goes through the server's dictionary check */
+    scrabbleMove: (m: Parameters<typeof scrabbleM>[0]['move']) => run(() => scrabbleM({ code: code!, secret, move: m })),
     offerTrade: (args: Omit<Parameters<typeof offerM>[0], 'code' | 'secret'>) => run(() => offerM({ ...args, code: code!, secret })),
     respondTrade: (accept: boolean) => run(() => respondM({ code: code!, secret, accept })),
+    /** Host: list the room in Live games, or take it off */
+    setPublic: (isPublic: boolean) => run(() => setPublicM({ code: code!, secret, isPublic })),
+    /** Host: let someone from Live games in, or turn them down */
+    answerRequest: (requestId: string, accept: boolean) => run(() => answerM({ code: code!, secret, requestId, accept })),
   };
 }
 export type RoomApi = ReturnType<typeof useRoom>;
