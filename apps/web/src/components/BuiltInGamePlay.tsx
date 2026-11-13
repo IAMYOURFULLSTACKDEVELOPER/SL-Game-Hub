@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { SnakeEngine, type SnakeState, type SnakeMove, SNAKE_MANIFEST } from '@slgh/shared';
 import { createPlayer } from '@slgh/shared';
 import dynamic from 'next/dynamic';
 import { DiceLoader } from './Art';
+import { Icon } from './Icon';
+import { SnakeBoard, SnakePad } from './SnakeBoard';
 
 // Each game is its own download: opening Chess never fetches Scrabble's code.
 const loading = () => <main className="mx-auto max-w-2xl p-4"><DiceLoader label="Setting up the game" /></main>;
@@ -17,6 +19,10 @@ const WordSearchGame = dynamic(() => import('./WordSearchGame'), { loading });
 const ScrabbleGame = dynamic(() => import('./ScrabbleGame'), { loading });
 const UnoGame = dynamic(() => import('./UnoGame'), { loading });
 const SalonePolyGame = dynamic(() => import('./SalonePolyGame'), { loading });
+// The online race (and its Convex connection) only downloads when someone opens it.
+const SnakeRace = dynamic(() => import('./SnakeRace'), {
+  loading: () => <p className="py-8 text-center text-muted"><span className="loading-dots">Connecting</span></p>,
+});
 import { sfx } from '@/lib/sound';
 import { useEndSfx } from '@/lib/useGameSfx';
 
@@ -75,6 +81,35 @@ export default function BuiltInGamePlay({ slug }: { slug: string }) {
 }
 
 function SnakeGame({ router }: { router: ReturnType<typeof useRouter> }) {
+  const [mode, setMode] = useState<'solo' | 'online'>('solo');
+  // A shared room link opens straight into the online race.
+  useEffect(() => { const q = new URLSearchParams(location.search); if (q.has('room') || q.has('online')) setMode('online'); }, []);
+  const tabs = (
+    <div role="tablist" aria-label="How to play" className="grid grid-cols-2 gap-1 rounded-2xl border border-border bg-bg/60 p-1">
+      {([['solo', 'Solo', 'gamepad'], ['online', 'Online', 'globe']] as const).map(([m, label, icon]) => (
+        <button key={m} role="tab" aria-selected={mode === m} onClick={() => setMode(m)}
+          className={`flex min-h-[42px] items-center justify-center gap-1.5 rounded-xl text-sm font-semibold transition-all ${mode === m ? 'bg-surface text-primary shadow-soft' : 'text-muted'}`}>
+          <Icon name={icon} size={16} />{label}
+        </button>
+      ))}
+    </div>
+  );
+  if (mode === 'solo') return <LocalSnake router={router} tabs={tabs} />;
+  return (
+    <main className="mx-auto max-w-2xl space-y-3 px-2 py-3 sm:space-y-4 sm:p-4">
+      <button onClick={() => router.push('/games/snake')} className="back-link">
+        ← Back to Snake
+      </button>
+      <div className="card space-y-4 p-3 sm:p-5">
+        <h1>{SNAKE_MANIFEST.name}</h1>
+        {tabs}
+        <SnakeRace />
+      </div>
+    </main>
+  );
+}
+
+function LocalSnake({ router, tabs }: { router: ReturnType<typeof useRouter>; tabs: ReactNode }) {
   const [state, setState] = useState<SnakeState | null>(null);
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
@@ -145,15 +180,6 @@ function SnakeGame({ router }: { router: ReturnType<typeof useRouter> }) {
     if (move && turn(move)) e.preventDefault();
   }, [turn]);
 
-  const swipe = useRef<{ x: number; y: number } | null>(null);
-  const onSwipeEnd = (e: React.PointerEvent) => {
-    const start = swipe.current; swipe.current = null;
-    if (!start) return;
-    const dx = e.clientX - start.x, dy = e.clientY - start.y;
-    if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
-    turn(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'));
-  };
-
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -200,14 +226,6 @@ function SnakeGame({ router }: { router: ReturnType<typeof useRouter> }) {
     return <div className="p-4">Loading...</div>;
   }
 
-  const boardSize = state.boardSize;
-  const pad = (move: SnakeMove, label: string, d: string, area: string) => (
-    <button type="button" aria-label={label} onClick={() => turn(move)} style={{ gridArea: area }}
-      className="btn btn-outline h-14 min-h-0 w-14 rounded-2xl p-0">
-      <svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
-    </button>
-  );
-
   return (
     <main className="mx-auto max-w-2xl space-y-3 px-2 py-3 sm:space-y-4 sm:p-4">
       <button onClick={() => router.push('/games/snake')} className="back-link">
@@ -219,6 +237,8 @@ function SnakeGame({ router }: { router: ReturnType<typeof useRouter> }) {
           <h1>{SNAKE_MANIFEST.name}</h1>
           <div className="stat-num text-2xl" aria-live="polite">{score}<span className="sr-only"> points</span></div>
         </div>
+
+        {tabs}
 
         <div className="flex flex-wrap items-center gap-3">
           <label className="flex items-center gap-2 text-sm font-semibold">
@@ -235,39 +255,9 @@ function SnakeGame({ router }: { router: ReturnType<typeof useRouter> }) {
           </label>
         </div>
 
-        {/* Scales to the screen; swipe on it to steer */}
-        <div
-          className="mx-auto grid aspect-square w-full max-w-[480px] select-none overflow-hidden rounded-xl border-2 border-border"
-          style={{ gridTemplateColumns: `repeat(${boardSize}, 1fr)`, backgroundColor: '#1a1a2e', touchAction: 'none' }}
-          onPointerDown={(e) => { swipe.current = { x: e.clientX, y: e.clientY }; }}
-          onPointerUp={onSwipeEnd}
-          onPointerCancel={() => { swipe.current = null; }}
-        >
-          {Array.from({ length: boardSize * boardSize }).map((_, i) => {
-            const isSnake = state.snake.includes(i);
-            const isHead = state.snake[0] === i;
-            const isFood = state.food === i;
-            return (
-              <div
-                key={i}
-                style={{
-                  backgroundColor: isHead ? '#4ade80' : isSnake ? '#22c55e' : isFood ? '#ef4444' : 'transparent',
-                  border: isSnake || isFood ? '1px solid #166534' : '1px solid #2d2d44',
-                  borderRadius: isFood ? '50%' : '2px',
-                }}
-              />
-            );
-          })}
-        </div>
+        <SnakeBoard state={state} onTurn={turn} />
 
-        {!isAIPlaying && (
-          <div className="touch-only mx-auto grid w-fit gap-2" style={{ gridTemplateAreas: '". up ." "left . right" ". down ."' }}>
-            {pad('up', 'Up', 'm6 15 6-6 6 6', 'up')}
-            {pad('left', 'Left', 'm15 6-6 6 6 6', 'left')}
-            {pad('right', 'Right', 'm9 6 6 6-6 6', 'right')}
-            {pad('down', 'Down', 'm6 9 6 6 6-6', 'down')}
-          </div>
-        )}
+        {!isAIPlaying && <SnakePad onTurn={turn} />}
 
         <p className="text-sm text-muted">
           {isAIPlaying

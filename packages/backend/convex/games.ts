@@ -1,5 +1,5 @@
 import { ConvexError, v } from 'convex/values';
-import { query, mutation } from './_generated/server';
+import { query, mutation, internalMutation } from './_generated/server';
 import { gameMode, gameStatus } from './schema';
 import { currentUser, requireActiveUser, requireAdmin, requireUser, toGameRow } from './lib';
 
@@ -148,5 +148,17 @@ export const setStatus = mutation({
     await ctx.db.patch(id, {
       status, published_at: status === 'published' ? Date.now() : undefined, updated_at: Date.now(),
     });
+  },
+});
+
+/** Opens a "coming soon" game for play (or closes it again) without re-running the whole seed:
+ *  `npx convex run games:setComingSoon '{"slug":"uno","coming_soon":false}'` */
+export const setComingSoon = internalMutation({
+  args: { slug: v.string(), coming_soon: v.boolean() },
+  handler: async (ctx, { slug, coming_soon }) => {
+    const game = await ctx.db.query('games').withIndex('by_slug', (q) => q.eq('slug', slug)).unique();
+    if (!game) throw new ConvexError(`No game with slug ${slug}. Run seed:run to add the catalogue.`);
+    await ctx.db.patch(game._id, { coming_soon, updated_at: Date.now() });
+    return { slug, coming_soon };
   },
 });

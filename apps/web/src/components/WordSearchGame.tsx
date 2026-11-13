@@ -7,12 +7,18 @@ import {
   type WordSearchState, type WordSearchDifficulty,
 } from '@slgh/shared';
 import Rulebook from './Rulebook';
+import { RoomLobby, JoinRequests } from './RoomLobby';
+import { VoiceChat } from './VoiceChat';
+import { ConvexRoomProvider } from './ConvexRoomProvider';
+import { Icon } from './Icon';
+import { useRoom } from '@/lib/useRoom';
 import { sfx } from '@/lib/sound';
 import { useEndSfx } from '@/lib/useGameSfx';
 
 const engine = new WordSearchEngine();
 const SAVE_KEY = 'word_search_game_v2';
-const COLORS = ['#22c55e', '#3b82f6', '#f59e0b', '#ec4899'];
+// One colour per player (local games use the first four, online races up to six)
+const COLORS = ['#22c55e', '#3b82f6', '#f59e0b', '#ec4899', '#a855f7', '#14b8a6'];
 const BOT_COLOR_NAMES = ['Green', 'Blue', 'Amber', 'Pink'];
 
 interface Seat { name: string; ai: boolean }
@@ -24,7 +30,37 @@ const readJSON = <T,>(key: string, fallback: T): T => {
   try { return JSON.parse(localStorage.getItem(key) ?? '') as T; } catch { return fallback; }
 };
 
+type Mode = 'local' | 'online';
+
 export default function WordSearchGame({ onBack }: { onBack: () => void }) {
+  const [mode, setMode] = useState<Mode>('local');
+  // A shared room link opens straight into the online race.
+  useEffect(() => { const q = new URLSearchParams(location.search); if (q.has('room') || q.has('online')) setMode('online'); }, []);
+  const tabs = (
+    <div role="tablist" aria-label="How to play" className="grid grid-cols-2 gap-1 rounded-2xl border border-border bg-bg/60 p-1">
+      {([['local', 'This device', 'gamepad'], ['online', 'Online', 'globe']] as const).map(([m, label, icon]) => (
+        <button key={m} role="tab" aria-selected={mode === m} onClick={() => setMode(m)}
+          className={`flex min-h-[42px] items-center justify-center gap-1.5 rounded-xl text-sm font-semibold transition-all ${mode === m ? 'bg-surface text-primary shadow-soft' : 'text-muted'}`}>
+          <Icon name={icon} size={16} />{label}
+        </button>
+      ))}
+    </div>
+  );
+  if (mode === 'local') return <LocalWordSearch onBack={onBack} tabs={tabs} />;
+  return (
+    <Shell onBack={onBack}>
+      {tabs}
+      <ConvexRoomProvider><OnlineWordSearch /></ConvexRoomProvider>
+      <Rulebook title="Word Search Rulebook" sections={WORD_SEARCH_RULES} />
+    </Shell>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* On this phone: solo, or friends and bots taking turns                */
+/* ------------------------------------------------------------------ */
+
+function LocalWordSearch({ onBack, tabs }: { onBack: () => void; tabs: ReactNode }) {
   const [seats, setSeats] = useState<Seat[]>([{ name: 'Player 1', ai: false }]);
   const [tab, setTab] = useState<WordSearchDifficulty>('easy');
   const [themeFilter, setThemeFilter] = useState('');
@@ -163,6 +199,7 @@ export default function WordSearchGame({ onBack }: { onBack: () => void }) {
     const preview = getWordSearchBoard(boardNo);
     return (
       <Shell onBack={onBack}>
+        {tabs}
         <section className="space-y-2">
           <h2>Players</h2>
           <div className="flex flex-wrap items-center gap-3">
@@ -338,6 +375,157 @@ export default function WordSearchGame({ onBack }: { onBack: () => void }) {
       </div>
       <Rulebook title="Word Search Rulebook" sections={WORD_SEARCH_RULES} />
     </Shell>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Online race: one grid, everyone hunts at once                        */
+/* ------------------------------------------------------------------ */
+
+function OnlineWordSearch() {
+  const room = useRoom('word-search');
+  const v = room.view;
+  const state = (v?.state ?? null) as WordSearchState | null;
+  const status = state?.status;
+  // A find that was on its way when the last word went is refused; that is not worth an error box.
+  const { setError } = room;
+  useEffect(() => { if (status === 'finished') setError(null); }, [status, setError]);
+
+  if (room.code && v === undefined) return <p className="py-8 text-center text-muted"><span className="loading-dots">Connecting</span></p>;
+  const playing = room.joined && status === 'playing';
+  return (
+    <div className="space-y-4">
+      <VoiceChat room={room} />
+      {room.joined && v && state && (
+        <WordRace key={`${v.code}:${state.createdAt}`} state={state} seat={v.me?.seat ?? -1}
+          onSelect={(start, end) => { void room.move({ type: 'select', start, end }); }} />
+      )}
+      {playing && <JoinRequests room={room} />}
+      {room.error && playing && <p role="alert" className="flash rounded-xl border border-danger/40 bg-danger/10 p-3 text-sm font-semibold text-danger">{room.error}</p>}
+      {!playing && <RoomLobby room={room} title="Word Search" maxSeats={6} bots={false} />}
+      {playing && <button className="btn btn-ghost w-full text-danger" onClick={() => { if (confirm('Leave this race? Your points stay on the scoreboard.')) room.leave(); }}><Icon name="logout" size={18} />Leave race</button>}
+    </div>
+  );
+}
+
+/** One race. Remounted (fresh state) for every new game in the room. */
+function WordRace({ state, seat, onSelect }: { state: WordSearchState; seat: number; onSelect: (start: number, end: number) => void }) {
+  const seated = seat >= 0 && seat < state.players.length;
+  const playing = state.status === 'playing';
+  const finished = state.status === 'finished';
+  const nameOf = (i: number) => state.players[i]?.name ?? `Player ${i + 1}`;
+  const [flash, setFlash] = useState<{ cells: number[]; ok: boolean } | null>(null);
+  const [news, setNews] = useState<{ text: string; who: number } | null>(null);
+
+  // The letters never change during a race, but every server update is a new array:
+  // keep the first one so a half-made selection is not wiped when someone else scores.
+  const [grid] = useState(state.grid);
+  const game = useMemo(() => ({ ...state, grid }), [state, grid]);
+
+  // Every selection anyone makes bumps `selections`: flash finds for all, misses only for whoever missed.
+  const seen = useRef(state.selections);
+  useEffect(() => {
+    if (state.selections === seen.current) return;
+    seen.current = state.selections;
+    const r = state.lastResult;
+    if (!r) return;
+    const mine = r.playerIndex === seat;
+    if (r.word) {
+      setFlash({ cells: r.positions, ok: true });
+      setNews({ text: mine ? `✅ You found ${r.word}! +${r.points}` : `${state.players[r.playerIndex]?.name ?? 'Someone'} found ${r.word} +${r.points}`, who: r.playerIndex });
+      if (state.status === 'playing') sfx(mine ? 'success' : 'pop');
+    } else if (mine) {
+      setFlash({ cells: r.positions, ok: false });
+      setNews({ text: '❌ Not a hidden word. Keep looking!', who: -1 });
+      sfx('error');
+    }
+  }, [state.selections, state.lastResult, state.status, state.players, seat]);
+  useEffect(() => {
+    if (!flash) return;
+    const t = setTimeout(() => setFlash(null), 700);
+    return () => clearTimeout(t);
+  }, [flash]);
+  useEndSfx(finished, seated && state.winner !== seat);
+
+  const select = (start: number, end: number) => {
+    if (!selectionPath(start, end, state.gridSize)) {
+      setNews({ text: 'Selections must be a straight line (across, down or diagonal).', who: -1 });
+      sfx('error');
+      return;
+    }
+    onSelect(start, end);
+  };
+
+  const level = WORD_SEARCH_LEVELS[state.difficulty];
+  const found = state.words.filter((w) => w.found).length;
+  const order = state.players.map((_, i) => i).sort((a, b) => (state.scores[b] ?? 0) - (state.scores[a] ?? 0));
+  const tip = playing
+    ? seated ? 'Find the words before the others do! Drag across a word, or tap its first and last letters.' : 'You are watching this race.'
+    : '';
+
+  return (
+    <div className="space-y-3">
+      <header className="flex flex-wrap items-center justify-between gap-2 rounded-lg border-2 border-border p-3">
+        <div className="min-w-0">
+          <p className="truncate text-lg font-extrabold">{state.boardNumber ? `Board ${state.boardNumber}` : 'Race'} · {state.theme}</p>
+          <p className="text-sm text-muted">{level.label} · {state.gridSize} × {state.gridSize}</p>
+        </div>
+        <span className="text-lg font-bold" aria-label="Words found">{found}/{state.words.length}</span>
+      </header>
+
+      {finished && (
+        <div className="flash space-y-1 rounded-3xl border border-accent/40 bg-accent/10 p-5 text-center">
+          <p className="text-4xl" aria-hidden>{state.winner !== null && state.winner === seat ? '🏆' : '🔤'}</p>
+          <h2>{state.winner === null ? 'It’s a tie!' : state.winner === seat ? 'You win!' : `${nameOf(state.winner)} wins!`}</h2>
+          <p className="text-muted">
+            All {state.words.length} words found.
+            {state.winner !== null && ` ${nameOf(state.winner)} scored ${state.scores[state.winner] ?? 0}.`}
+            {seated && state.winner !== seat && ` You scored ${state.scores[seat] ?? 0}.`}
+          </p>
+        </div>
+      )}
+
+      {/* the latest find (or your miss) */}
+      {playing && (
+        <p aria-live="polite"
+          className={`flash min-h-[2.75rem] rounded-xl border-2 px-3 py-2 text-center font-semibold ${news && news.who < 0 ? 'border-danger/40 bg-danger/10 text-danger' : 'border-border'}`}
+          key={news?.text ?? 'tip'}
+          style={news && news.who >= 0 ? { borderColor: COLORS[news.who % COLORS.length], background: `${COLORS[news.who % COLORS.length]}22` } : undefined}>
+          {news?.text ?? tip}
+        </p>
+      )}
+
+      <Grid game={game} paused={false} flash={flash} disabled={!seated || !playing} onSelect={select} />
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-lg border-2 border-border p-2 text-sm">
+          <h2 className="mb-1 text-base">{finished ? 'Final scores' : 'Scoreboard'}</h2>
+          <ol className="space-y-1">
+            {order.map((i) => (
+              <li key={state.players[i].id} className={`flex items-center justify-between gap-2 rounded px-1 font-bold ${i === seat ? 'ring-2 ring-primary' : ''}`}>
+                <span className="flex min-w-0 items-center gap-1">
+                  <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />
+                  <span className="truncate">{nameOf(i)}{i === seat ? ' (you)' : ''}{finished && state.winner === i ? ' 🏆' : ''}</span>
+                </span>
+                <span className="shrink-0 tabular-nums">{state.scores[i] ?? 0} · {state.wordsFoundBy[i] ?? 0}w</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+        <div className="rounded-lg border-2 border-border p-2">
+          <h2 className="mb-1 text-base">Words ({found}/{state.words.length})</h2>
+          <ul className="flex flex-wrap gap-1">
+            {state.words.map((w) => (
+              <li key={w.word} className={`rounded px-2 py-0.5 text-sm font-bold ${w.found ? 'line-through opacity-70' : ''}`}
+                style={w.found && w.foundBy !== null ? { background: `${COLORS[w.foundBy % COLORS.length]}33` } : undefined}
+                title={w.found && w.foundBy !== null ? `Found by ${nameOf(w.foundBy)}` : undefined}>
+                {w.word}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
   );
 }
 

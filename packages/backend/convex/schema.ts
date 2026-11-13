@@ -1,6 +1,7 @@
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
 import { authTables } from '@convex-dev/auth/server';
+import { roomGameV } from './roomGames';
 
 // Field names stay snake_case so they match the shapes the apps already render.
 // Timestamps are epoch milliseconds; `_creationTime` replaces every `created_at` column.
@@ -547,12 +548,15 @@ export default defineSchema({
   // is theirs; `member_id` is the public id other players see and the id used in the game state.
   play_rooms: defineTable({
     code: v.string(),
-    game: v.union(v.literal('uno'), v.literal('salone-poly')),
+    game: roomGameV,
     state: v.optional(v.any()),
     version: v.number(), // bumps on every game change; scheduled bot moves check it so they never double up
     offer: v.optional(v.any()), // Salone-Poly: a trade waiting for the other player's answer
     created_at: v.number(),
-  }).index('by_code', ['code']),
+    is_public: v.optional(v.boolean()), // listed in Live games, where anyone can ask to join (the code stays hidden)
+  })
+    .index('by_code', ['code'])
+    .index('by_is_public', ['is_public']),
   play_members: defineTable({
     room_id: v.id('play_rooms'),
     member_id: v.string(),
@@ -561,8 +565,35 @@ export default defineSchema({
     host: v.boolean(),
     joined_at: v.number(),
     last_seen: v.number(),
+    voice: v.optional(v.boolean()), // in the room's voice chat
   })
     .index('by_room_id_and_joined_at', ['room_id', 'joined_at'])
     .index('by_room_id_and_secret', ['room_id', 'secret'])
     .index('by_last_seen', ['last_seen']),
+  // Voice chat set-up messages (WebRTC offer/answer/ICE) between two members of a room. The audio itself
+  // goes straight between the players' browsers; these rows are deleted as soon as they are read.
+  voice_signals: defineTable({
+    room_id: v.id('play_rooms'),
+    from: v.string(), // member_id
+    to: v.string(), // member_id
+    kind: v.union(v.literal('offer'), v.literal('answer'), v.literal('ice')),
+    data: v.string(),
+    created_at: v.number(),
+  })
+    .index('by_room_id_and_to', ['room_id', 'to'])
+    .index('by_created_at', ['created_at']),
+  // Large files the server keeps for itself, by name (e.g. the Scrabble dictionary in Convex storage).
+  app_files: defineTable({ key: v.string(), storage_id: v.id('_storage') }).index('by_key', ['key']),
+  // "Can I join?" from the Live games list. The host answers; approval gives the asker the room code.
+  play_requests: defineTable({
+    room_id: v.id('play_rooms'),
+    request_id: v.string(), // public id the host answers by
+    secret: v.string(), // the asker's private room secret, so only they can see the answer
+    name: v.string(),
+    status: v.union(v.literal('pending'), v.literal('approved'), v.literal('declined')),
+    created_at: v.number(),
+  })
+    .index('by_room_id_and_status', ['room_id', 'status'])
+    .index('by_room_id_and_secret', ['room_id', 'secret'])
+    .index('by_created_at', ['created_at']),
 });
