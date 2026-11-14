@@ -20,7 +20,7 @@ const NAV_TIMEOUT_MS = 6000; // on a slow connection, show the saved copy rather
 const MAX_PAGES = 40;
 const MAX_ASSETS = 80;
 
-const CACHEABLE_PAGE = /^\/($|games(\/|$)|leaderboards$|tournaments(\/|$)|roadmap$|offline$)/;
+const CACHEABLE_PAGE = /^\/($|games(\/|$)|leaderboards$|tournaments(\/|$)|offline$)/;
 // Pages whose HTML carries the player's Convex auth token (Dice, for money rooms): never stored.
 const TOKEN_PAGE = /^\/games\/dice\/play\/?$/;
 const isCacheablePage = (path) => CACHEABLE_PAGE.test(path) && !TOKEN_PAGE.test(path);

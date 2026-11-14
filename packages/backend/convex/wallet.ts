@@ -149,26 +149,51 @@ export const adminOverview = query({
   args: {},
   handler: async (ctx) => {
     await requireAdmin(ctx);
+    const names = new Map<string, string>();
+    const nameOf = async (id: Id<'users'> | undefined) => {
+      if (!id) return '?';
+      if (!names.has(id)) names.set(id, (await ctx.db.get(id))?.username ?? '?');
+      return names.get(id)!;
+    };
     const wallets = await ctx.db.query('wallets').collect();
     const settled = await ctx.db.query('pots').withIndex('by_status', (q) => q.eq('status', 'settled')).collect();
-    const queue = async (status: Doc<'withdrawals'>['status']) => {
-      const rows = await ctx.db.query('withdrawals').withIndex('by_status', (q) => q.eq('status', status)).order('desc').take(50);
-      return Promise.all(rows.map(async (w) => {
-        const u = await ctx.db.get(w.user_id);
-        return {
-          id: w._id, amount: w.amount, phone: w.phone, provider: w.provider, status: w.status,
-          error: w.error ?? null, has_payout: !!w.monime_id, created_at: w._creationTime,
-          username: u?.username ?? '?', banned: u?.banned ?? false,
-        };
-      }));
+    const proPayments = await ctx.db.query('pro_payments').collect();
+    const withdrawalRow = async (w: Doc<'withdrawals'>) => {
+      const u = await ctx.db.get(w.user_id);
+      return {
+        id: w._id, amount: w.amount, phone: w.phone, provider: w.provider, status: w.status,
+        error: w.error ?? null, has_payout: !!w.monime_id, created_at: w._creationTime, updated_at: w.updated_at,
+        username: u?.username ?? '?', banned: u?.banned ?? false,
+      };
     };
+    const queue = async (status: Doc<'withdrawals'>['status']) => Promise.all(
+      (await ctx.db.query('withdrawals').withIndex('by_status', (q) => q.eq('status', status)).order('desc').take(50)).map(withdrawalRow));
+    const recentDeposits = await ctx.db.query('deposits').order('desc').take(30);
+    const recentWithdrawals = (await ctx.db.query('withdrawals').order('desc').take(40))
+      .filter((w) => w.status !== 'requested' && w.status !== 'processing').slice(0, 20);
+    const recentPots = settled.sort((a, b) => (b.settled_at ?? 0) - (a.settled_at ?? 0)).slice(0, 20);
     return {
       configured: monimeConfigured(),
+      webhook: !!process.env.MONIME_WEBHOOK_SECRET,
       balances: wallets.reduce((s, w) => s + w.balance, 0),
       held: wallets.reduce((s, w) => s + w.held, 0),
       fees: settled.reduce((s, p) => s + (p.fee ?? 0), 0),
+      proRevenue: proPayments.reduce((s, p) => s + p.amount, 0),
+      proActive: (await ctx.db.query('users').collect()).filter((u) => (u.pro_until ?? 0) > Date.now()).length,
       requested: await queue('requested'),
       processing: await queue('processing'),
+      withdrawalHistory: await Promise.all(recentWithdrawals.map(withdrawalRow)),
+      deposits: await Promise.all(recentDeposits.map(async (d) => ({
+        id: d._id, amount: d.amount, status: d.status, purpose: d.purpose === 'pro' ? 'Pro (USSD)' : 'Top-up',
+        created_at: d._creationTime, username: await nameOf(d.user_id), error: d.error ?? null,
+      }))),
+      pro: await Promise.all(proPayments.sort((a, b) => b._creationTime - a._creationTime).slice(0, 20).map(async (p) => ({
+        id: p._id, amount: p.amount, method: p.method, until: p.pro_until, created_at: p._creationTime, username: await nameOf(p.user_id),
+      }))),
+      pots: await Promise.all(recentPots.map(async (p) => ({
+        id: p._id, game: p.game, room: p.room, total: p.total, fee: p.fee ?? 0, settled_at: p.settled_at ?? p._creationTime,
+        winner: await nameOf(p.winner_id),
+      }))),
     };
   },
 });

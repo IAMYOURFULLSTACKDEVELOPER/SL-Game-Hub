@@ -19,16 +19,15 @@ export async function Header() {
       { href: '/leaderboards', label: 'Leaderboards', icon: 'trophy' },
       { href: '/tournaments', label: 'Tournaments', icon: 'swords' },
     ] },
-    { title: 'Community', items: [
-      ...(me ? [{ href: '/chat', label: 'chat', icon: 'hash' } as NavItem] : []),
-      { href: '/roadmap', label: 'roadmap', icon: 'hash' },
-    ] },
+    ...(me ? [{ title: 'Community', items: [
+      { href: '/chat', label: 'chat', icon: 'hash' },
+      { href: '/groups', label: 'Groups', icon: 'users' },
+    ] as NavItem[] }] : []),
     ...(me ? [{ title: 'You', items: [
       { href: '/profile', label: t('nav.profile'), icon: 'user' },
       { href: '/achievements', label: 'Achievements', icon: 'medal' },
       { href: '/wallet', label: 'Wallet', icon: 'wallet' },
       { href: '/shop', label: 'Shop', icon: 'bag' },
-      { href: '/groups', label: 'Groups', icon: 'users' },
       { href: '/pro', label: 'Pro', icon: 'star' },
       ...(me.role === 'admin' ? [{ href: '/admin', label: t('nav.admin'), icon: 'shield' } as NavItem] : []),
     ] as NavItem[] }] : []),
