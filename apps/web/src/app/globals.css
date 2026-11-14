@@ -458,7 +458,8 @@ body:has(.tabbar.is-hidden) .toast-stack { bottom: calc(12px + env(safe-area-ins
 @keyframes sl-ring-pulse { 50% { box-shadow: 0 0 0 4px rgb(255 255 255 / 0.9), 0 0 12px 4px rgb(0 0 0 / 0.5); } }
 .sl-die-scene { perspective: 600px; }
 .sl-die { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transform: rotateX(var(--rx)) rotateY(var(--ry)); animation: sl-die-tumble 1s cubic-bezier(.2,.7,.3,1) both; }
-.sl-die-face { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); border-radius: 18%; background: radial-gradient(circle at 30% 30%, #ff4d4d, #d10000 70%, #9b0000); border: 1px solid #7a0000; backface-visibility: hidden; }
+.sl-die-face { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); border-radius: 14%; background: radial-gradient(circle at 30% 30%, #ff4d4d, #d10000 70%, #9b0000); border: 1px solid #7a0000; backface-visibility: hidden; }
+.sl-die-core { position: absolute; inset: 2%; border-radius: 10%; background: #a30000; }
 .sl-die-drop { animation: sl-die-drop 1s cubic-bezier(.3,.6,.4,1) both; filter: drop-shadow(0 6px 6px rgb(0 0 0 / 0.45)); }
 @keyframes sl-die-tumble { from { transform: rotateX(calc(var(--rx) - 900deg)) rotateY(calc(var(--ry) - 1260deg)); } }
 @keyframes sl-die-drop {

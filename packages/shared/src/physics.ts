@@ -120,7 +120,7 @@ export function throwDice(opts: { values: number[]; size: number; width: number;
   const bodies = values.map((_, i) => {
     const lane = (i + 0.5) / n;
     const p: Vec3 = [fromLeft ? h * 1.3 + rnd() * W * 0.12 : W - h * 1.3 - rnd() * W * 0.12, H * (0.25 + 0.5 * lane) + (rnd() - 0.5) * h, h + size * (1 + rnd() * 1.2)];
-    const speed = W * (2.2 + rnd() * 0.7);
+    const speed = W * (1.05 + rnd() * 0.45); // crosses part of the tray and settles on the felt, not against the far wall
     const v: Vec3 = [fromLeft ? speed : -speed, (rnd() - 0.5) * H * 1.2, size * (2 + rnd() * 3)];
     const q = normQ(quatAxisAngle([rnd() - 0.5, rnd() - 0.5, rnd() - 0.5], rnd() * Math.PI * 2));
     const w: Vec3 = [(rnd() - 0.5) * 50, (rnd() - 0.5) * 50, (rnd() - 0.5) * 30];

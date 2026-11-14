@@ -7,11 +7,16 @@ const FACE_TF: Record<number, string> = {
   1: 'rotateY(0deg)', 6: 'rotateY(180deg)', 2: 'rotateY(90deg)', 5: 'rotateY(-90deg)', 3: 'rotateX(90deg)', 4: 'rotateX(-90deg)',
 };
 
+// Three planes through the centre. The faces have rounded corners, so at an angle you'd see through the
+// corners of the cube; the core fills them with solid red, like the rounded edge of a real die.
+const CORE_TF = ['none', 'rotateY(90deg)', 'rotateX(90deg)'];
+
 /** The six red faces of a die with edge `size` px, laid out around the centre (same frame as DIE_FACE_NORMALS). */
 export function DieFaces({ size }: { size: number }) {
   const half = size / 2;
   return (
     <>
+      {CORE_TF.map((tf) => <div key={tf} className="sl-die-core" style={{ transform: tf }} />)}
       {[1, 2, 3, 4, 5, 6].map((f) => (
         <div key={f} className="sl-die-face" style={{ transform: `${FACE_TF[f]} translateZ(${half}px)`, padding: size * 0.12, gap: size * 0.04 }}>
           {Array.from({ length: 9 }, (_, i) => (

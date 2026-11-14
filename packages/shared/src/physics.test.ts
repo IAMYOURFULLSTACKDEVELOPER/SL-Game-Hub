@@ -23,6 +23,7 @@ describe('dice physics', () => {
 
   it('thrown dice land showing exactly the rolled values, flat, inside the tray, on time', () => {
     const rnd = seededRandom(42);
+    let dice = 0, againstWall = 0, travelled = 0;
     for (let k = 0; k < 300; k++) {
       const count = 1 + (k % 3);
       const values = Array.from({ length: count }, () => 1 + Math.floor(rnd() * 6));
@@ -36,14 +37,20 @@ describe('dice physics', () => {
         assert.ok(Math.abs(d.p[2] - size / 2) < 1e-6, 'touching the felt');
         assert.ok(d.p[0] >= size / 2 - 1e-6 && d.p[0] <= width - size / 2 + 1e-6, 'inside the tray (x)');
         assert.ok(d.p[1] >= size / 2 - 1e-6 && d.p[1] <= height - size / 2 + 1e-6, 'inside the tray (y)');
+        dice++;
+        if (d.p[0] < size * 0.75 || d.p[0] > width - size * 0.75) againstWall++;
       });
       assert.ok(t.duration <= 1.05 + 10 / 60, `settles in time (${t.duration.toFixed(2)}s)`);
-      // Dice really move: they start in the air and travel across the tray.
+      // Dice really move: they start in the air and travel a good way over the felt.
       const start = t.frames[0][0];
       assert.ok(start.p[2] > size, 'starts in the air');
       const path = t.frames.slice(1).reduce((sum, fr, j) => sum + Math.hypot(fr[0].p[0] - t.frames[j][0].p[0], fr[0].p[1] - t.frames[j][0].p[1]), 0);
-      assert.ok(path > width * 0.5, `travels across the tray (${path.toFixed(0)}px)`);
+      assert.ok(path > width * 0.2, `travels over the tray (${path.toFixed(0)}px)`); // even when it bumps another die at once
+      travelled += path / width;
     }
+    assert.ok(travelled / 300 > 0.45, `a throw travels ${(travelled / 3).toFixed(0)}% of the tray on average`);
+    // ...but they come to rest on the felt, not piled against a side wall (where they look cut off).
+    assert.ok(againstWall / dice <= 0.2, `${againstWall} of ${dice} dice ended against a side wall`);
   });
 
   it('the same seed replays the same throw', () => {
