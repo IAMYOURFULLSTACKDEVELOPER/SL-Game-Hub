@@ -470,6 +470,22 @@ body:has(.tabbar.is-hidden) .toast-stack { bottom: calc(12px + env(safe-area-ins
   93% { transform: translateY(-10%); }
   100% { transform: translateY(0); }
 }
+/* Voice chat: who is in the call, who is speaking */
+.vc-person { display: flex; align-items: center; gap: .5rem; border-radius: 9999px; border: 1px solid rgb(var(--c-border)); background: rgb(var(--c-surface)); padding: .3rem .8rem .3rem .3rem; text-align: left; transition: border-color .2s, box-shadow .2s; }
+button.vc-person:hover { border-color: rgb(var(--c-primary) / .5); }
+button.vc-person[aria-pressed="true"] { opacity: .6; }
+.vc-avatar { position: relative; display: grid; place-items: center; width: 2.25rem; height: 2.25rem; flex-shrink: 0; border-radius: 9999px; font-family: var(--font-display), system-ui, sans-serif; font-weight: 700;
+  background: linear-gradient(135deg, rgb(var(--c-primary) / .25), rgb(var(--c-secondary) / .25)); box-shadow: inset 0 0 0 2px rgb(var(--c-surface)), 0 0 0 2px rgb(var(--c-border)); transition: box-shadow .15s; }
+.vc-avatar.is-talking { box-shadow: inset 0 0 0 2px rgb(var(--c-surface)), 0 0 0 3px #22c55e, 0 0 14px 3px rgb(34 197 94 / .55); animation: vc-pulse 1s ease-in-out infinite; }
+@keyframes vc-pulse { 50% { box-shadow: inset 0 0 0 2px rgb(var(--c-surface)), 0 0 0 4px #22c55e, 0 0 20px 6px rgb(34 197 94 / .45); } }
+.vc-dot { position: absolute; right: -1px; bottom: -1px; width: .65rem; height: .65rem; border-radius: 9999px; box-shadow: 0 0 0 2px rgb(var(--c-surface)); }
+.vc-bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 16px; }
+.vc-bars i { display: block; width: 3px; min-height: 4px; border-radius: 2px; background: rgb(var(--c-muted) / .5); transition: height .1s linear; }
+.vc-bars.is-on i { background: #22c55e; }
+.vc-floating { position: fixed; z-index: 65; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; align-items: center; gap: .9rem;
+  padding: .45rem .9rem .45rem .45rem; border-radius: 9999px; background: rgb(var(--c-surface) / .95); border: 1px solid rgb(34 197 94 / .5); box-shadow: 0 12px 30px -10px rgb(0 0 0 / .45); backdrop-filter: blur(12px); animation: toast-in .35s var(--ease-spring) both; }
+@media (max-width: 1023px) { body:not(:has(.tabbar.is-hidden)) .vc-floating { bottom: calc(5.75rem + env(safe-area-inset-bottom)); } }
+
 /* Physics dice (DiceTray): a 3D floor seen through a camera; positions are set every frame from the simulation */
 .dice-physics { position: relative; width: 100%; perspective: 820px; perspective-origin: 50% 30%; }
 .dice-physics-floor { position: absolute; left: 0; top: 0; width: 100%; transform-style: preserve-3d; transform-origin: 50% 60%; }
