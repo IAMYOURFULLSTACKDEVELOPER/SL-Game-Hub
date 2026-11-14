@@ -30,6 +30,9 @@ export function useVoice(room: RoomApi) {
   const meInVoiceOnServer = members.some((m) => m.id === me && m.voice);
   // Who else is in voice, as a stable string so effects only re-run when it really changes
   const othersKey = members.filter((m) => m.voice && m.id !== me).map((m) => m.id).sort().join(',');
+  // Talking is a Pro feature; everyone else listens. Audio from anyone the server hasn't allowed to talk stays muted.
+  const canTalk = !!room.view?.me?.pro;
+  const talkersKey = members.filter((m) => m.voice && m.talk).map((m) => m.id).sort().join(',');
 
   const [on, setOn] = useState(false);
   const [joining, setJoining] = useState(false);
@@ -94,6 +97,7 @@ export function useVoice(room: RoomApi) {
     audio.muted = !!silenced[id];
     audioBox.current?.appendChild(audio);
     stream.current?.getTracks().forEach((t) => pc.addTrack(t, stream.current!));
+    if (!stream.current) pc.addTransceiver('audio', { direction: 'recvonly' }); // listening only: receive, never send
     const p: Peer = { pc, audio, pendingIce: [], since: Date.now(), lostAt: null, analyser: null };
     pc.onicecandidate = (e) => { if (e.candidate) send(id, 'ice', e.candidate.toJSON()).catch(() => {}); };
     pc.ontrack = (e) => {
@@ -219,22 +223,24 @@ export function useVoice(room: RoomApi) {
     setError(null);
     setJoining(true);
     try {
-      try {
-        stream.current = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false,
-        });
-      } catch (e) {
-        setError((e as DOMException).name === 'NotAllowedError'
-          ? 'Microphone access was refused. Allow it in your browser settings to talk.'
-          : 'Your microphone could not be started.');
-        return;
+      if (canTalk) {
+        try {
+          stream.current = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false,
+          });
+        } catch (e) {
+          setError((e as DOMException).name === 'NotAllowedError'
+            ? 'Microphone access was refused. Allow it in your browser settings to talk.'
+            : 'Your microphone could not be started.');
+          return;
+        }
       }
       // Created inside the tap, so phones allow it to run; it measures voices for the speaking lights.
       try {
         const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
         ctx.current = new AC();
         void ctx.current.resume();
-        localAnalyser.current = analyse(stream.current);
+        localAnalyser.current = stream.current ? analyse(stream.current) : null;
       } catch { ctx.current = null; }
       if (!audioBox.current) {
         audioBox.current = document.createElement('div');
@@ -250,7 +256,7 @@ export function useVoice(room: RoomApi) {
       try {
         await setVoiceM({ code, secret, on: true }); // the server must know before anyone calls us or we call them
       } catch {
-        stream.current.getTracks().forEach((t) => t.stop());
+        stream.current?.getTracks().forEach((t) => t.stop());
         stream.current = null;
         setError('Could not join voice chat. Check your connection.');
         return;
@@ -261,7 +267,13 @@ export function useVoice(room: RoomApi) {
     } finally {
       setJoining(false);
     }
-  }, [code, secret, joining, setVoiceM, iceServersA]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [code, secret, joining, canTalk, setVoiceM, iceServersA]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Only members allowed to talk are heard (and anyone you muted for yourself stays muted).
+  useEffect(() => {
+    const talkers = new Set(talkersKey ? talkersKey.split(',') : []);
+    for (const [id, p] of pcs.current) p.audio.muted = !!silenced[id] || !talkers.has(id);
+  }, [talkersKey, silenced, peers]);
 
   const leave = useCallback(() => {
     for (const id of [...pcs.current.keys()]) drop(id);
@@ -314,7 +326,7 @@ export function useVoice(room: RoomApi) {
 
   const supported = typeof window !== 'undefined' && !!navigator.mediaDevices?.getUserMedia && typeof RTCPeerConnection !== 'undefined';
   return {
-    supported, on, joining, muted, error, peers, levels, speaking, silenced, audioBlocked, relay,
+    supported, on, joining, muted, error, peers, levels, speaking, silenced, audioBlocked, relay, canTalk,
     join, leave, toggleMute, toggleSilence, unblockAudio,
   };
 }

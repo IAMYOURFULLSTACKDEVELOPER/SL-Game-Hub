@@ -2,11 +2,14 @@ import { ConvexError, v } from 'convex/values';
 import { query, mutation, action, internalQuery } from './_generated/server';
 import { internal } from './_generated/api';
 import { memberBySecret, membersOf, requireMember, roomByCode } from './rooms';
+import { isPro } from './pro';
 
 // Voice chat for online rooms. The audio travels directly between the players' browsers (WebRTC);
 // the server only passes along the short set-up messages (offer, answer, network candidates)
 // from one member to another. Only members of the room can join, and each member can read only
 // the messages addressed to them (their private room secret proves who they are).
+// Talking is a Pro feature: other players join to listen only (their browsers never open the microphone,
+// and everyone's browser ignores audio from members who aren't allowed to talk).
 //
 // Many mobile networks hide phones behind shared addresses, so a direct connection can't be made.
 // A TURN relay fixes that. Set either:
@@ -18,12 +21,14 @@ const MAX_SIGNAL_BYTES = 16_000; // an SDP offer is a few KB; anything bigger is
 const MAX_INBOX = 50; // waiting messages per member, so one member can't flood another
 const TURN_TTL_SECONDS = 4 * 3600; // long enough for a game night, short enough to be useless if leaked
 
-/** Join or leave the room's voice chat. */
+/** Join or leave the room's voice chat. Pro players may talk; everyone else joins to listen. */
 export const setVoice = mutation({
   args: { code: v.string(), secret: v.string(), on: v.boolean() },
   handler: async (ctx, { code, secret, on }) => {
     const { me } = await requireMember(ctx, code, secret);
-    await ctx.db.patch(me._id, { voice: on });
+    const user = me.user_id ? await ctx.db.get(me.user_id) : null;
+    await ctx.db.patch(me._id, { voice: on, voice_talk: on && isPro(user) });
+    return { talk: on && isPro(user) };
   },
 });
 

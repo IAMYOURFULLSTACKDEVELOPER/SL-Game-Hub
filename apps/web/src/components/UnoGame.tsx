@@ -2,12 +2,15 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import {
-  UnoEngine, unoViewFor, UNO_COLORS, UNO_RULES, cardLabel, createPlayer, stepSpring,
-  type UnoState, type UnoMove, type UnoView, type Card, type PlayColor, type Difficulty,
+  UnoEngine, unoViewFor, UNO_COLORS, UNO_RULES, UNO_VARIANTS, cardLabel, createPlayer, stepSpring,
+  type UnoState, type UnoMove, type UnoView, type Card, type PlayColor, type Difficulty, type UnoVariant,
 } from '@slgh/shared';
+import { VariantPicker, variantName } from './VariantPicker';
 import Rulebook from './Rulebook';
 import { RoomLobby, JoinRequests } from './RoomLobby';
 import { VoiceChat } from './VoiceChat';
+import { ProBar } from './ProBar';
+import { MoneyBar } from './MoneyBar';
 import { ConvexRoomProvider } from './ConvexRoomProvider';
 import { Icon } from './Icon';
 import { Portal } from './Portal';
@@ -28,10 +31,10 @@ export default function UnoGame({ onBack }: { onBack: () => void }) {
   useEffect(() => { const q = new URLSearchParams(location.search); if (q.has('room') || q.has('online')) setMode('online'); }, []);
   return (
     <Shell onBack={onBack}>
-      <div role="tablist" aria-label="How to play" className="grid grid-cols-3 gap-1 rounded-2xl border border-border bg-bg/60 p-1">
+      <div role="tablist" aria-label="How to play" className="grid grid-cols-3 gap-1 rounded-lg bg-input p-1">
         {([['bots', 'vs Bots', 'gamepad'], ['pass', 'Pass & play', 'users'], ['online', 'Online', 'globe']] as const).map(([m, label, icon]) => (
           <button key={m} role="tab" aria-selected={mode === m} onClick={() => setMode(m)}
-            className={`flex min-h-[42px] items-center justify-center gap-1.5 rounded-xl text-sm font-semibold transition-all ${mode === m ? 'bg-surface text-primary shadow-soft' : 'text-muted'}`}>
+            className={`flex min-h-[42px] items-center justify-center gap-1.5 rounded-md text-sm font-semibold transition-colors ${mode === m ? 'bg-selected text-heading' : 'text-muted hover:text-text'}`}>
             <Icon name={icon} size={16} />{label}
           </button>
         ))}
@@ -53,6 +56,7 @@ function LocalUno({ pass }: { pass: boolean }) {
     ? [{ name: 'Player 1', ai: false }, { name: 'Player 2', ai: false }]
     : [{ name: 'You', ai: false }, { name: 'Bot 1', ai: true }]);
   const [difficulty, setDifficulty] = useState<Difficulty>('medium');
+  const [variant, setVariant] = useState<UnoVariant>('classic');
   const [shownTo, setShownTo] = useState<number | null>(null);
 
   useEffect(() => {
@@ -75,7 +79,7 @@ function LocalUno({ pass }: { pass: boolean }) {
 
   const start = () => {
     sfx('shuffle');
-    setState(engine.initialize(seats.map((s, i) => createPlayer(`seat${i}`, s.name.trim() || `Player ${i + 1}`, s.ai, s.ai ? difficulty : undefined))));
+    setState(engine.initialize(seats.map((s, i) => createPlayer(`seat${i}`, s.name.trim() || `Player ${i + 1}`, s.ai, s.ai ? difficulty : undefined)), { variant }));
     setShownTo(null);
   };
 
@@ -84,6 +88,7 @@ function LocalUno({ pass }: { pass: boolean }) {
     return (
       <div className="space-y-4">
         <UnoHero />
+        <VariantPicker variants={UNO_VARIANTS} value={variant} onChange={(id) => setVariant(id as UnoVariant)} />
         <div className="flex flex-wrap items-center gap-3">
           <label className="flex items-center gap-2 text-sm font-semibold">Players
             <select className="field" value={seats.length} onChange={(e) => resize(Number(e.target.value))}>
@@ -128,7 +133,7 @@ function LocalUno({ pass }: { pass: boolean }) {
   return (
     <div className="space-y-3">
       {needsHandover ? (
-        <div className="flash grid place-items-center gap-4 rounded-3xl border border-border bg-gradient-to-br from-primary/15 to-secondary/15 p-8 text-center">
+        <div className="flash grid place-items-center gap-4 card p-8 text-center">
           <UnoBack size="lg" />
           <p className="font-display text-2xl font-bold">Pass the phone to {state.players[seat].name}</p>
           <p className="text-muted">Only {state.players[seat].name} should look at the screen.</p>
@@ -158,10 +163,12 @@ function OnlineUno() {
   return (
     <div className="space-y-4">
       <VoiceChat room={room} />
+      <MoneyBar room={room} />
+      <ProBar room={room} />
       {room.joined && state && <UnoTable view={state} busy={room.busy} onMove={(m) => { room.move(m); }} />}
       {playing && <JoinRequests room={room} />}
       {room.error && playing && <p role="alert" className="flash rounded-xl border border-danger/40 bg-danger/10 p-3 text-sm font-semibold text-danger">{room.error}</p>}
-      {!playing && <RoomLobby room={room} title="UNO" maxSeats={4} />}
+      {!playing && <RoomLobby room={room} title="UNO" maxSeats={4} variants={UNO_VARIANTS} />}
       {playing && <button className="btn btn-ghost w-full text-danger" onClick={() => { if (confirm('Leave this game? A bot will take your seat.')) room.leave(); }}><Icon name="logout" size={18} />Leave game</button>}
     </div>
   );
@@ -200,7 +207,8 @@ function UnoTable({ view: v, onMove, busy = false }: { view: UnoView; onMove: (m
   const status = over
     ? `${v.players[v.winner!].name} wins!`
     : myTurn
-      ? v.drawnCardId ? 'You drew a card you can play. Play it, or keep it.' : v.playable.length ? `Your turn: match ${COLOR_NAME[v.currentColor].toLowerCase()} or ${v.top.type === 'number' ? v.top.value : cardLabel(v.top).replace(/^\w+ /, '')}` : 'No match: draw a card.'
+      ? v.pendingDraw ? (v.playable.length ? `Stack a Draw card, or draw ${v.pendingDraw}.` : `Nothing to stack: draw ${v.pendingDraw}.`)
+      : v.drawnCardId ? 'You drew a card you can play. Play it, or keep it.' : v.playable.length ? `Your turn: match ${COLOR_NAME[v.currentColor].toLowerCase()} or ${v.top.type === 'number' ? v.top.value : cardLabel(v.top).replace(/^\w+ /, '')}` : 'No match: draw a card.'
       : `${v.players[v.currentPlayerIndex].name} is playing…`;
 
   // Opponents in seat order, starting after you.
@@ -231,9 +239,10 @@ function UnoTable({ view: v, onMove, busy = false }: { view: UnoView; onMove: (m
       {/* table */}
       <div className="uno-felt relative grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-3xl p-4 sm:p-6">
         <div className="flex flex-col items-center gap-1">
-          <button type="button" aria-label={v.canDraw ? 'Draw a card' : `Draw pile, ${v.deckCount} cards`} disabled={!v.canDraw || !myTurn}
-            onClick={() => onMove({ type: 'draw' })} className={`uno-deck ${v.canDraw && myTurn ? 'is-live' : ''}`}>
+          <button type="button" aria-label={v.canDraw ? (v.pendingDraw ? `Draw ${v.pendingDraw} cards` : 'Draw a card') : `Draw pile, ${v.deckCount} cards`} disabled={!v.canDraw || !myTurn}
+            onClick={() => onMove({ type: 'draw' })} className={`uno-deck relative ${v.canDraw && myTurn ? 'is-live' : ''}`}>
             <UnoBack size="md" /><UnoBack size="md" /><UnoBack size="md" />
+            {v.pendingDraw > 0 && <span key={v.pendingDraw} className="uno-pending" aria-hidden>+{v.pendingDraw}</span>}
           </button>
           <span className="text-xs font-semibold text-white/80">{v.deckCount} left</span>
         </div>
@@ -261,7 +270,10 @@ function UnoTable({ view: v, onMove, busy = false }: { view: UnoView; onMove: (m
         </div>
       </div>
 
-      <p className="min-h-[1.5rem] text-center font-semibold" aria-live="polite">{status}</p>
+      <p className="flex min-h-[1.5rem] flex-wrap items-center justify-center gap-2 text-center font-semibold" aria-live="polite">
+        {variantName(UNO_VARIANTS, v.variant) && <span className="chip chip-primary">{variantName(UNO_VARIANTS, v.variant)}</span>}
+        {status}
+      </p>
       {v.log.length > 0 && !over && <p className="-mt-2 text-center text-sm text-muted">{v.log[v.log.length - 1]}</p>}
 
       {/* actions */}

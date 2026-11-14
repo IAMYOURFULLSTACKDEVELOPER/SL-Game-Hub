@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useMutation, useQuery } from 'convex/react';
-import { ConvexError } from 'convex/values';
+import { playerMessage } from '@slgh/shared/src/errors';
 import { api } from '@slgh/backend/convex/_generated/api';
 import type { Id } from '@slgh/backend/convex/_generated/dataModel';
 import { PageHeader } from '@/components/PageHeader';
@@ -34,7 +34,7 @@ export default function ChatClient() {
       await send({ roomId: selectedRoom.id, content: newMessage.trim() });
       setNewMessage('');
     } catch (error) {
-      alert(error instanceof ConvexError ? String(error.data) : 'Failed to send message');
+      alert(playerMessage(error));
     }
   };
 

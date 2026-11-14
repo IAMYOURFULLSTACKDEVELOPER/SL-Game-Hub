@@ -10,8 +10,8 @@ export const create = mutation({
   handler: async (ctx, a) => {
     const me = await requireActiveUser(ctx);
     const reason = a.reason.trim();
-    if (reason.length < 3 || reason.length > 60) throw new ConvexError('bad reason');
-    if (a.details && a.details.length > 1000) throw new ConvexError('details too long');
+    if (reason.length < 3 || reason.length > 60) throw new ConvexError('errors.reportReason');
+    if (a.details && a.details.length > 1000) throw new ConvexError('errors.reportTooLong');
     return ctx.db.insert('reports', { ...a, reason, reporter_id: me._id, status: 'open' });
   },
 });

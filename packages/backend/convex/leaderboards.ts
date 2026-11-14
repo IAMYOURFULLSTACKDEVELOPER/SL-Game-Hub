@@ -49,7 +49,7 @@ export const submitScore = mutation({
   args: { leaderboardId: v.id('leaderboards'), userId: v.id('users'), score: v.number(), metadata: v.optional(v.any()) },
   handler: async (ctx, { leaderboardId, userId, score, metadata }) => {
     const me = await requireUser(ctx);
-    if (me.banned || (me._id !== userId && !isAdmin(me))) throw new ConvexError('forbidden');
+    if (me.banned || (me._id !== userId && !isAdmin(me))) throw new ConvexError('errors.forbidden');
     const existing = await ctx.db.query('leaderboard_entries')
       .withIndex('by_leaderboard_user', (q) => q.eq('leaderboard_id', leaderboardId).eq('user_id', userId)).unique();
     if (!existing) {

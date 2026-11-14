@@ -9,11 +9,13 @@ module.exports = {
     extend: {
       colors,
       fontFamily: { display: ['var(--font-display)', 'system-ui', 'sans-serif'] },
+      // Discord-style: flat surfaces, tight radii, shadows only on things that float.
       boxShadow: {
-        soft: '0 1px 2px rgb(12 27 51 / 0.04), 0 8px 24px -8px rgb(12 27 51 / 0.12)',
-        lift: '0 2px 4px rgb(12 27 51 / 0.06), 0 22px 40px -14px rgb(12 27 51 / 0.28)',
-        glow: '0 10px 30px -8px rgb(var(--c-primary) / 0.55)',
+        soft: '0 1px 2px rgb(0 0 0 / 0.12)',
+        lift: '0 8px 16px rgb(0 0 0 / 0.24)',
+        glow: '0 0 0 2px rgb(var(--c-primary) / 0.5)',
       },
+      borderRadius: { '2xl': '0.75rem', '3xl': '1rem' },
     },
   },
   plugins: [],

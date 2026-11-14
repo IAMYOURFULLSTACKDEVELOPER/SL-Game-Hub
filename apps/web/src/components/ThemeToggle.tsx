@@ -25,8 +25,8 @@ export function ThemeToggle({ label }: { label: string }) {
             { duration: 550, easing: 'cubic-bezier(.4,0,.2,1)', pseudoElement: '::view-transition-new(root)' });
         });
       }}>
-      <span className="theme-icon theme-sun"><Icon name="sun" /></span>
-      <span className="theme-icon theme-moon"><Icon name="moon" /></span>
+      <span className="theme-icon theme-sun"><Icon name="sun" size={20} /></span>
+      <span className="theme-icon theme-moon"><Icon name="moon" size={20} /></span>
     </button>
   );
 }

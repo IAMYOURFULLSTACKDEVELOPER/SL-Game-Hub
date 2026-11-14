@@ -4,6 +4,7 @@ import { useVoice, type VoiceApi } from '@/lib/useVoice';
 import { sfx } from '@/lib/sound';
 import { Icon } from './Icon';
 import { Portal } from './Portal';
+import Link from 'next/link';
 
 const MicIcon = ({ off = false, size = 18 }: { off?: boolean; size?: number }) => (
   <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -41,6 +42,7 @@ export function VoiceChat({ room }: { room: RoomApi }) {
         </button>
         <span className="min-w-0 flex-1 text-sm text-muted">
           {inVoice.length ? `${inVoice.map((m) => m.name).join(', ')} ${inVoice.length === 1 ? 'is' : 'are'} in voice chat.` : 'Talk with the other players while you play.'}
+          {!voice.canTalk && <> You can listen; <Link href="/pro" className="font-semibold text-secondary">Pro</Link> players can talk.</>}
         </span>
         {voice.error && <p role="alert" className="w-full text-sm font-semibold text-danger">{voice.error}</p>}
       </div>
@@ -52,12 +54,17 @@ export function VoiceChat({ room }: { room: RoomApi }) {
   return (
     <div className="space-y-3 rounded-2xl border border-primary/40 bg-primary/5 p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" aria-pressed={voice.muted} onClick={() => { voice.toggleMute(); sfx(voice.muted ? 'toggleOn' : 'toggleOff'); }}
-          className={`btn btn-sm ${voice.muted ? 'btn-outline text-danger' : 'btn-primary'}`}>
-          <MicIcon off={voice.muted} />{voice.muted ? 'Unmute' : 'Mute'}
-        </button>
+        {voice.canTalk && (
+          <button type="button" aria-pressed={voice.muted} onClick={() => { voice.toggleMute(); sfx(voice.muted ? 'toggleOn' : 'toggleOff'); }}
+            className={`btn btn-sm ${voice.muted ? 'btn-outline text-danger' : 'btn-primary'}`}>
+            <MicIcon off={voice.muted} />{voice.muted ? 'Unmute' : 'Mute'}
+          </button>
+        )}
         <button type="button" className="btn btn-sm btn-ghost" onClick={voice.leave}><Icon name="logout" size={16} />Leave voice</button>
-        <span className="text-xs font-semibold text-muted">{voice.muted ? 'You are muted' : alone ? 'Waiting for others to join voice' : 'Your microphone is on'}</span>
+        <span className="text-xs font-semibold text-muted">
+          {!voice.canTalk ? <>🎧 Listening only · <Link href="/pro" className="font-semibold text-secondary">Go Pro to talk</Link></>
+            : voice.muted ? 'You are muted' : alone ? 'Waiting for others to join voice' : 'Your microphone is on'}
+        </span>
       </div>
 
       {voice.audioBlocked && (
@@ -85,6 +92,7 @@ export function VoiceChat({ room }: { room: RoomApi }) {
                 <span className="flex items-center gap-1 text-xs text-muted">
                   {mine && voice.muted ? <><MicIcon off size={12} />muted</>
                     : silenced ? <><SpeakerOff />muted by you</>
+                      : !m.talk ? '🎧 listening'
                       : status === 'connected' ? <><Bars level={level} on={talking} />{talking ? 'speaking' : 'quiet'}</>
                         : status === 'failed' ? 'can’t connect' : 'connecting…'}
                 </span>

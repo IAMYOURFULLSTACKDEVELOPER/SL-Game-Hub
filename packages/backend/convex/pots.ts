@@ -53,23 +53,35 @@ export async function unstake(ctx: MutationCtx, potId: Id<'pots'>, userId: Id<'u
 export const lockPot = (ctx: MutationCtx, potId: Id<'pots'>) => ctx.db.patch(potId, { status: 'locked' });
 
 /** Pays the whole pot (minus the fee) to the winner. Voids the pot if the winner had no stake in it. */
-export async function settlePot(ctx: MutationCtx, potId: Id<'pots'>, winnerId: Id<'users'> | null, label: string) {
+export const settlePot = (ctx: MutationCtx, potId: Id<'pots'>, winnerId: Id<'users'> | null, label: string) =>
+  settleShared(ctx, potId, winnerId ? [winnerId] : [], label);
+
+/**
+ * Splits the pot (minus the fee) equally between `winnerIds` (a draw or tie shares it; one winner takes it all).
+ * Returns what each winner received, or undefined if the pot was voided because none of them had a stake.
+ */
+export async function settleShared(ctx: MutationCtx, potId: Id<'pots'>, winnerIds: Id<'users'>[], label: string) {
   const pot = await ctx.db.get(potId);
   if (!pot || pot.status !== 'locked') return;
   const entries = await heldEntries(ctx, potId);
-  if (!winnerId || !entries.some((e) => e.user_id === winnerId)) return voidPot(ctx, potId, label);
+  const winners = [...new Set(winnerIds)].filter((w) => entries.some((e) => e.user_id === w));
+  if (!winners.length) return voidPot(ctx, potId, label);
   const total = entries.reduce((s, e) => s + e.amount, 0);
   const { fee, prize } = splitPot(total, pot.fee_bps);
+  const each = Math.floor(prize / winners.length);
+  const houseExtra = prize - each * winners.length; // cents that don't divide evenly
   for (const e of entries) {
-    if (e.user_id === winnerId) {
-      await post(ctx, e.user_id, 'winnings', { amount: prize, held: -e.amount }, `Won ${formatLeones(prize)} in ${label}`, potId);
+    const won = winners.includes(e.user_id);
+    if (won) {
+      const how = winners.length > 1 ? `Shared pot: ${formatLeones(each)} in ${label}` : `Won ${formatLeones(each)} in ${label}`;
+      await post(ctx, e.user_id, 'winnings', { amount: each, held: -e.amount }, how, potId);
     } else {
       await post(ctx, e.user_id, 'stake_lost', { held: -e.amount }, `Lost ${formatLeones(e.amount)} stake in ${label}`, potId);
     }
-    await ctx.db.patch(e._id, { status: e.user_id === winnerId ? 'won' : 'lost' });
+    await ctx.db.patch(e._id, { status: won ? 'won' : 'lost' });
   }
-  await ctx.db.patch(potId, { status: 'settled', total, fee, winner_id: winnerId, settled_at: Date.now() });
-  return prize;
+  await ctx.db.patch(potId, { status: 'settled', total, fee: fee + houseExtra, winner_id: winners[0], settled_at: Date.now() });
+  return each;
 }
 
 /** Returns every stake still held. */

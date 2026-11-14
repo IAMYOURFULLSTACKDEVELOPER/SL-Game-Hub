@@ -31,6 +31,8 @@ export * from './history';
 export * from './anticheat';
 export * from './wallet';
 export { t } from './i18n';
+export * from './errors';
+export * from './pro';
 export { default as tokens } from './tokens.json';
 
 // Register all games

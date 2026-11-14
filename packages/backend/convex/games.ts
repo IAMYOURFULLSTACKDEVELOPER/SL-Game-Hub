@@ -87,7 +87,7 @@ export const recordPlay = mutation({
   handler: async (ctx, { gameId }) => {
     const me = await requireActiveUser(ctx);
     const g = await ctx.db.get(gameId);
-    if (!g || g.status !== 'published' || g.coming_soon) throw new ConvexError('game unavailable');
+    if (!g || g.status !== 'published' || g.coming_soon) throw new ConvexError('errors.gameUnavailable');
     const s = await ctx.db.query('game_stats').withIndex('by_user_game', (x) => x.eq('user_id', me._id).eq('game_id', gameId)).unique();
     if (s) await ctx.db.patch(s._id, { played: s.played + 1, last_played_at: Date.now() });
     else await ctx.db.insert('game_stats', {

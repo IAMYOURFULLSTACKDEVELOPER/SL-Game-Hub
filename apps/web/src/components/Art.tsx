@@ -1,165 +1,106 @@
-// Animated vector art. Pure SVG + CSS keyframes (see globals.css "art-*"), so it costs no JS and
-// stops automatically for players who ask for reduced motion.
+// Flat vector art in one consistent style: solid fills, a few brand colours, no glows or gradients.
+// Motion is CSS only (globals.css "art-*"), so it costs no JS and stops for reduced-motion players.
+//
+// The mascot is Dado, a friendly die. He shows up wherever the page has nothing else to say:
+// loading, empty lists, 404, offline.
 
-export function LogoMark({ size = 36 }: { size?: number }) {
+const INK = '#1e1f22';
+const BRAND = '#5865f2';
+const GREEN = '#23a55a';
+const YELLOW = '#f0b232';
+const PINK = '#eb459e';
+const RED = '#f23f43';
+
+/** App logo: a die on a brand-coloured squircle, with the green pip of the Sierra Leone flag. */
+export function LogoMark({ size = 36, flat = false }: { size?: number; flat?: boolean }) {
   return (
     <svg aria-hidden="true" width={size} height={size} viewBox="0 0 40 40" className="logo-mark shrink-0">
-      <defs>
-        <linearGradient id="lm-g" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#1EB53A" /><stop offset=".55" stopColor="#0aa37a" /><stop offset="1" stopColor="#0072C6" />
-        </linearGradient>
-      </defs>
-      <rect x="1" y="1" width="38" height="38" rx="11" fill="url(#lm-g)" />
-      <rect x="1" y="1" width="38" height="19" rx="11" fill="#fff" opacity=".12" />
+      {!flat && <rect width="40" height="40" rx="12" fill={BRAND} />}
       <g className="logo-die">
-        <rect x="10" y="10" width="20" height="20" rx="5" fill="#fff" />
-        <circle cx="15.5" cy="15.5" r="2" fill="#0c1b33" />
-        <circle cx="20" cy="20" r="2" fill="#1EB53A" />
-        <circle cx="24.5" cy="24.5" r="2" fill="#0c1b33" />
+        <rect x="9.5" y="9.5" width="21" height="21" rx="5.5" fill="#fff" />
+        <circle cx="15" cy="15" r="2.1" fill={INK} />
+        <circle cx="20" cy="20" r="2.1" fill={GREEN} />
+        <circle cx="25" cy="25" r="2.1" fill={INK} />
       </g>
-      <path className="art-twinkle" d="M33 4l1 2.6 2.6 1-2.6 1L33 11.2l-1-2.6-2.6-1 2.6-1z" fill="#FCC440" />
     </svg>
   );
 }
 
-function Sparkle({ x, y, s = 1, delay = 0, color = '#FCC440' }: { x: number; y: number; s?: number; delay?: number; color?: string }) {
+/** Dado the die. `mood` changes his face; he bobs and blinks unless reduced motion is on. */
+export function Mascot({ size = 120, mood = 'happy', className = '' }: { size?: number; mood?: 'happy' | 'lost' | 'sleepy' | 'cheer'; className?: string }) {
   return (
-    <path className="art-twinkle" style={{ animationDelay: `${delay}s`, fill: color }}
-      transform={`translate(${x} ${y}) scale(${s})`} d="M0-12 3-3 12 0 3 3 0 12-3 3-12 0-3-3z" />
+    <svg aria-hidden="true" width={size} height={size * 1.05} viewBox="0 0 120 126" className={`mascot ${className}`}>
+      <ellipse cx="60" cy="118" rx="34" ry="6" fill={INK} opacity=".22" className="art-shadow" />
+      <g className="art-bob">
+        {mood === 'cheer' && <path d="M22 52 8 38M98 52l14-14" stroke="#fff" strokeWidth="9" strokeLinecap="round" />}
+        {mood !== 'cheer' && <path d="M22 70c-8 2-12 8-12 14M98 70c8 2 12 8 12 14" stroke="#fff" strokeWidth="9" strokeLinecap="round" fill="none" />}
+        <rect x="18" y="20" width="84" height="84" rx="24" fill="#fff" />
+        <rect x="18" y="80" width="84" height="24" rx="12" fill="#e3e5e8" />
+        <rect x="18" y="20" width="84" height="84" rx="24" fill="none" stroke={INK} strokeOpacity=".08" strokeWidth="2" />
+        {/* pips on top become his "hair" */}
+        <circle cx="44" cy="34" r="4.5" fill={BRAND} /><circle cx="60" cy="30" r="4.5" fill={GREEN} /><circle cx="76" cy="34" r="4.5" fill={BRAND} />
+        {/* face */}
+        {mood === 'sleepy'
+          ? <><path d="M40 60c4 3 8 3 12 0M68 60c4 3 8 3 12 0" stroke={INK} strokeWidth="4" strokeLinecap="round" fill="none" /></>
+          : <g className="art-blink"><ellipse cx="46" cy="58" rx="5.5" ry="7" fill={INK} /><ellipse cx="74" cy="58" rx="5.5" ry="7" fill={INK} />
+            <circle cx="48" cy="55.5" r="2" fill="#fff" /><circle cx="76" cy="55.5" r="2" fill="#fff" /></g>}
+        <ellipse cx="36" cy="70" rx="5" ry="3" fill={PINK} opacity=".45" /><ellipse cx="84" cy="70" rx="5" ry="3" fill={PINK} opacity=".45" />
+        {mood === 'lost'
+          ? <path d="M50 78c6-4 14-4 20 0" stroke={INK} strokeWidth="4" strokeLinecap="round" fill="none" />
+          : <path d="M48 72c6 7 18 7 24 0" stroke={INK} strokeWidth="4" strokeLinecap="round" fill={mood === 'cheer' ? INK : 'none'} />}
+      </g>
+      {mood === 'lost' && <text x="104" y="22" fontSize="28" fontWeight="800" fill={YELLOW} className="art-float-b" fontFamily="system-ui, sans-serif">?</text>}
+      {mood === 'sleepy' && <text x="98" y="26" fontSize="18" fontWeight="800" fill={BRAND} className="art-float-b" fontFamily="system-ui, sans-serif">z</text>}
+    </svg>
   );
 }
 
+const Star = ({ x, y, s = 1, c = '#fff', d = 0 }: { x: number; y: number; s?: number; c?: string; d?: number }) => (
+  <path className="art-twinkle" style={{ animationDelay: `${d}s` }} fill={c} transform={`translate(${x} ${y}) scale(${s})`}
+    d="M0-10C1-3 3-1 10 0 3 1 1 3 0 10-1 3-3 1-10 0-3-1-1-3 0-10z" />
+);
+
+/** The home banner scene: Dado with a card, surrounded by floating game pieces. Sits on a brand-coloured banner. */
 export function HeroArt({ className = '' }: { className?: string }) {
   return (
-    <svg viewBox="0 0 480 420" className={`hero-art ${className}`} role="img" aria-label="Floating dice, chess, checkers, cards and a snake">
-      <defs>
-        <radialGradient id="ha-glow" cx=".5" cy=".5" r=".5">
-          <stop style={{ stopColor: "rgb(var(--c-primary))" }} offset="0" stopOpacity=".35" />
-          <stop style={{ stopColor: "rgb(var(--c-secondary))" }} offset=".6" stopOpacity=".12" />
-          <stop style={{ stopColor: "rgb(var(--c-secondary))" }} offset="1" stopOpacity="0" />
-        </radialGradient>
-        <linearGradient id="ha-gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#ffe08a" /><stop offset=".5" stopColor="#f2b52a" /><stop offset="1" stopColor="#b97a0b" /></linearGradient>
-        <linearGradient id="ha-card" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#3d9bff" /><stop offset="1" stopColor="#0052a3" /></linearGradient>
-        <linearGradient id="ha-snake" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#0f8a3c" /><stop offset=".5" stopColor="#34d385" /><stop offset="1" stopColor="#1EB53A" /></linearGradient>
-        <radialGradient id="ha-red" cx=".35" cy=".3" r=".8"><stop offset="0" stopColor="#ff7b7b" /><stop offset=".6" stopColor="#d11a1a" /><stop offset="1" stopColor="#7d0909" /></radialGradient>
-      </defs>
-
-      <circle cx="240" cy="210" r="200" fill="url(#ha-glow)" />
-      <g className="art-spin" style={{ transformOrigin: '240px 210px' }}>
-        <circle style={{ stroke: "rgb(var(--c-border))" }} cx="240" cy="210" r="168" fill="none" strokeWidth="2" strokeDasharray="4 12" />
-        <circle style={{ fill: "rgb(var(--c-accent))" }} cx="408" cy="210" r="6" />
-        <circle style={{ fill: "rgb(var(--c-secondary))" }} cx="72" cy="210" r="4" />
-        <circle style={{ fill: "rgb(var(--c-primary))" }} cx="240" cy="42" r="5" />
+    <svg viewBox="0 0 420 300" className={`hero-art ${className}`} role="img" aria-label="Dado the dice mascot with chess, checkers and card pieces">
+      {/* soft hills behind */}
+      <path d="M0 250c60-40 120-50 190-30s150 10 230-30v110H0z" fill="#fff" opacity=".1" />
+      <path d="M0 270c80-30 160-20 230 0s130 0 190-20v50H0z" fill="#fff" opacity=".12" />
+      {/* checkers disc */}
+      <g className="art-float-a" style={{ animationDelay: '-1s' }}>
+        <ellipse cx="70" cy="200" rx="34" ry="12" fill="#8f1d1d" /><rect x="36" y="186" width="68" height="14" fill="#8f1d1d" />
+        <ellipse cx="70" cy="186" rx="34" ry="12" fill={RED} /><ellipse cx="70" cy="186" rx="20" ry="7" fill="none" stroke="#fff" strokeOpacity=".5" strokeWidth="3" />
       </g>
-
-      {/* Playing card */}
-      <g className="art-float-b" style={{ animationDelay: '-1.2s' }}>
-        <g transform="translate(352 64) rotate(14)">
-          <rect width="74" height="104" rx="12" fill="url(#ha-card)" />
-          <rect x="6" y="6" width="62" height="92" rx="8" fill="none" stroke="#fff" strokeOpacity=".5" strokeWidth="2" />
-          <ellipse cx="37" cy="52" rx="22" ry="34" transform="rotate(28 37 52)" fill="#fff" />
-          <path d="m37 36 4.5 10 10.5 1.2-7.8 7 2.2 10.4L37 59.4l-9.4 5.2 2.2-10.4-7.8-7 10.5-1.2z" fill="#0066cc" />
-        </g>
+      {/* chess knight */}
+      <g className="art-float-b" style={{ animationDelay: '-2s' }} transform="translate(300 70)">
+        <path d="M6 84h52l-4-10H10zM12 74h40c-2-12 1-22 6-32 3-7 2-17-5-24-6-6-14-9-22-8L27 4l-5 8C15 16 10 21 7 28c-2 5-3 10-1 13l5 3c4-3 7-4 11-4-2 4-5 8-9 12-4 3-4 7-4 10 1 4 3 8 7 12z" fill={YELLOW} />
+        <circle cx="26" cy="25" r="3" fill={INK} />
       </g>
-
-      {/* Chess knight */}
-      <g className="art-float-a" style={{ animationDelay: '-.6s' }}>
-        <g transform="translate(56 54)">
-          <ellipse cx="38" cy="104" rx="34" ry="7" fill="#000" opacity=".12" />
-          <path fill="url(#ha-gold)" stroke="#8a5a00" strokeWidth="2.5" strokeLinejoin="round"
-            d="M8 98h60l-4-12H12zM16 86h44c-2-14 2-26 8-38 4-8 2-20-6-28C54 12 44 8 34 9l-4-7-6 10c-8 4-14 10-18 18-3 6-4 12-2 16l6 4c4-3 8-4 13-5-2 5-6 9-11 14-4 4-5 8-4 12 1 5 4 9 8 15z" />
-          <circle cx="30" cy="27" r="3" fill="#5a3a00" />
-          <path d="M44 20c6 4 10 11 10 19" fill="none" stroke="#fff6cf" strokeWidth="3" strokeLinecap="round" opacity=".7" />
-        </g>
+      {/* card */}
+      <g className="art-float-a" style={{ animationDelay: '-2.6s' }} transform="translate(330 180) rotate(14)">
+        <rect width="54" height="76" rx="9" fill="#fff" /><rect x="6" y="6" width="42" height="64" rx="6" fill={PINK} />
+        <circle cx="27" cy="38" r="13" fill="#fff" /><text x="27" y="44" textAnchor="middle" fontSize="16" fontWeight="800" fill={PINK} fontFamily="system-ui, sans-serif">7</text>
       </g>
-
-      {/* Isometric die */}
-      <g className="art-float-a">
-        <ellipse cx="240" cy="306" rx="70" ry="14" fill="#000" opacity=".14" className="art-shadow" />
-        <g className="art-wobble" style={{ transformOrigin: '240px 200px' }}>
-          <path d="M240 112 314 154 240 196 166 154z" fill="#ffffff" />
-          <path d="M166 154 240 196v86l-74-42z" fill="#dfe9f1" />
-          <path d="M240 196 314 154v86l-74 42z" fill="#c4d4e2" />
-          <path d="M240 112 314 154 240 196 166 154z M166 154 240 196v86l-74-42z M240 196 314 154v86l-74 42z" fill="none" stroke="#0c1b33" strokeOpacity=".12" strokeWidth="2" strokeLinejoin="round" />
-          <ellipse cx="240" cy="154" rx="12" ry="7" fill="#d62828" />
-          <ellipse cx="187" cy="188" rx="7" ry="8.5" fill="#0c1b33" />
-          <ellipse cx="219" cy="248" rx="7" ry="8.5" fill="#0c1b33" />
-          <ellipse cx="258" cy="203" rx="7" ry="8.5" fill="#0c1b33" />
-          <ellipse cx="277" cy="218" rx="7" ry="8.5" fill="#0c1b33" />
-          <ellipse cx="296" cy="233" rx="7" ry="8.5" fill="#0c1b33" />
-        </g>
-      </g>
-
-      {/* Checkers disc */}
-      <g className="art-float-b" style={{ animationDelay: '-2.4s' }}>
-        <g transform="translate(96 296)">
-          <ellipse cx="0" cy="10" rx="40" ry="15" fill="#5c0606" />
-          <ellipse cx="0" cy="0" rx="40" ry="15" fill="url(#ha-red)" />
-          <ellipse cx="0" cy="0" rx="28" ry="10" fill="none" stroke="#fff" strokeOpacity=".3" strokeWidth="2.5" />
-          <ellipse cx="0" cy="0" rx="16" ry="5.5" fill="none" stroke="#000" strokeOpacity=".25" strokeWidth="2" />
-        </g>
-      </g>
-
-      {/* Scrabble tile */}
-      <g className="art-float-a" style={{ animationDelay: '-3s' }}>
-        <g transform="translate(360 262) rotate(-10)">
-          <rect y="6" width="60" height="60" rx="10" fill="#b8894b" />
-          <rect width="60" height="60" rx="10" fill="#f4dcae" />
-          <text x="30" y="42" textAnchor="middle" fontSize="34" fontWeight="800" fill="#3b2a12" fontFamily="var(--font-display), system-ui, sans-serif">S</text>
-          <text x="50" y="53" textAnchor="middle" fontSize="11" fontWeight="700" fill="#3b2a12">1</text>
-        </g>
-      </g>
-
-      {/* Snake */}
-      <g transform="translate(0 6)">
-        <path d="M150 382c30-28 60 18 96-6s52-36 86-12c22 16 36 8 50-6" fill="none" stroke="url(#ha-snake)" strokeWidth="16" strokeLinecap="round" />
-        <path className="art-dash" d="M150 382c30-28 60 18 96-6s52-36 86-12c22 16 36 8 50-6" fill="none" stroke="#c9ffe0" strokeOpacity=".7" strokeWidth="4" strokeLinecap="round" strokeDasharray="2 16" />
-        <g transform="translate(386 356)">
-          <path className="art-tongue" d="M10 0h10l4-4M20 0l4 4" stroke="#e11d48" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-          <ellipse cx="0" cy="0" rx="14" ry="11" fill="#1EB53A" />
-          <circle cx="3" cy="-4" r="3" fill="#fff" /><circle cx="4" cy="-4" r="1.5" fill="#0c1b33" />
-        </g>
-      </g>
-
-      <Sparkle x={330} y={46} s={1.1} />
-      <Sparkle x={176} y={78} s={0.7} delay={0.8} color="rgb(var(--c-primary))" />
-      <Sparkle x={440} y={232} s={0.8} delay={1.6} />
-      <Sparkle x={44} y={210} s={0.6} delay={2.2} color="rgb(var(--c-secondary))" />
-      <Sparkle x={300} y={330} s={0.55} delay={1.1} color="rgb(var(--c-primary))" />
+      {/* Dado in the middle */}
+      <g transform="translate(140 60) scale(1.15)"><Mascot size={120} mood="cheer" /></g>
+      <Star x={110} y={60} s={1.1} d={0} /><Star x={260} y={40} s={0.7} c={YELLOW} d={0.9} /><Star x={390} y={140} s={0.8} d={1.6} /><Star x={36} y={120} s={0.6} c={YELLOW} d={2.1} />
+      <circle cx="240" cy="250" r="5" fill="#fff" opacity=".5" className="art-float-b" /><circle cx="30" cy="40" r="4" fill="#fff" opacity=".4" />
     </svg>
   );
 }
 
-/** A tumbling die used for loading states. */
+/** Loading: Dado bouncing, with a short line of text. */
 export function DiceLoader({ label = 'Loading' }: { label?: string }) {
   return (
-    <div role="status" className="flex flex-col items-center gap-4 py-16">
-      <svg aria-hidden="true" width="72" height="88" viewBox="0 0 72 88">
-        <ellipse cx="36" cy="82" rx="22" ry="4" fill="currentColor" className="art-loader-shadow text-text/20" />
-        <g className="art-loader-die">
-          <rect style={{ fill: "rgb(var(--c-surface))", stroke: "rgb(var(--c-primary))" }} x="8" y="8" width="56" height="56" rx="14" strokeWidth="4" />
-          <circle style={{ fill: "rgb(var(--c-primary))" }} cx="24" cy="24" r="5" />
-          <circle style={{ fill: "rgb(var(--c-accent))" }} cx="36" cy="36" r="5" />
-          <circle style={{ fill: "rgb(var(--c-secondary))" }} cx="48" cy="48" r="5" />
-        </g>
-      </svg>
-      <p className="font-display text-lg font-semibold text-muted">{label}<span className="loading-dots" /></p>
+    <div role="status" className="flex flex-col items-center gap-3 py-16">
+      <Mascot size={92} mood="happy" className="mascot-hop" />
+      <p className="text-sm font-semibold text-muted">{label}<span className="loading-dots" /></p>
     </div>
   );
 }
 
-/** A lost, swaying die for the 404 page. */
+/** Nothing here (404, empty search, offline): a puzzled Dado. */
 export function LostArt() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 200 180" className="mx-auto w-48">
-      <ellipse cx="100" cy="166" rx="54" ry="8" fill="currentColor" className="text-text/10 art-shadow" />
-      <g className="art-sway" style={{ transformOrigin: '100px 150px' }}>
-        <rect style={{ fill: "rgb(var(--c-surface))", stroke: "rgb(var(--c-primary))" }} x="46" y="40" width="108" height="108" rx="26" strokeWidth="6" />
-        <circle style={{ fill: "rgb(var(--c-text))" }} cx="78" cy="82" r="8" className="art-blink" />
-        <circle style={{ fill: "rgb(var(--c-text))" }} cx="122" cy="82" r="8" className="art-blink" />
-        <path style={{ stroke: "rgb(var(--c-text))" }} d="M80 122c12-8 28-8 40 0" fill="none" strokeWidth="6" strokeLinecap="round" />
-      </g>
-      <text style={{ fill: "rgb(var(--c-accent))" }} x="164" y="40" fontSize="34" fontWeight="800" className="art-float-b font-display">?</text>
-    </svg>
-  );
+  return <div className="mx-auto w-fit"><Mascot size={140} mood="lost" /></div>;
 }

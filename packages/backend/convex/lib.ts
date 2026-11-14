@@ -13,12 +13,12 @@ export async function currentUser(ctx: QueryCtx): Promise<Doc<'users'> | null> {
 
 export async function requireUser(ctx: QueryCtx) {
   const me = await currentUser(ctx);
-  if (!me) throw new ConvexError('auth required');
+  if (!me) throw new ConvexError('errors.signInRequired');
   return me;
 }
 
 /** Signed in and not suspended. */
-export async function requireActiveUser(ctx: QueryCtx, bannedMessage = 'forbidden') {
+export async function requireActiveUser(ctx: QueryCtx, bannedMessage = 'errors.suspended') {
   const me = await requireUser(ctx);
   if (me.banned) throw new ConvexError(bannedMessage);
   return me;
@@ -28,7 +28,7 @@ export const isAdmin = (u: Doc<'users'> | null) => !!u && u.role === 'admin' && 
 
 export async function requireAdmin(ctx: QueryCtx) {
   const me = await requireUser(ctx);
-  if (!isAdmin(me)) throw new ConvexError('forbidden');
+  if (!isAdmin(me)) throw new ConvexError('errors.forbidden');
   return me;
 }
 

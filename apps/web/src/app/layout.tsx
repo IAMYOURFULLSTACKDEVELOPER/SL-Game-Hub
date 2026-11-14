@@ -1,20 +1,14 @@
 import './globals.css';
 import { Suspense } from 'react';
-import Link from 'next/link';
 import type { Metadata, Viewport } from 'next';
-import localFont from 'next/font/local';
 import { tokens, t } from '@slgh/shared';
 import { Header } from '@/components/Header';
 import { FX } from '@/components/FX';
-import { LogoMark } from '@/components/Art';
 import { PwaManager } from '@/components/PwaManager';
 import { PhysicsFX } from '@/components/PhysicsFX';
+import { MusicDock } from '@/components/MusicDock';
 
-// One display face for headings only (~30 KB, swaps in so text never waits).
-// Body text stays on the system font so the shell remains light.
-// Fredoka (SIL Open Font License), latin subset, variable weight 500–700. The file is in the repo
-// rather than fetched from Google Fonts at build time, which failed on Vercel's build machines.
-const display = localFont({ src: './fonts/fredoka-latin.woff2', weight: '500 700', variable: '--font-display', display: 'swap' });
+// Type is the system UI stack (no font download): crisp at small sizes and instant on slow networks.
 
 export const metadata: Metadata = {
   title: { default: t('app.name'), template: `%s | ${t('app.name')}` },
@@ -27,42 +21,29 @@ export const metadata: Metadata = {
 };
 export const viewport: Viewport = {
   width: 'device-width', initialScale: 1, viewportFit: 'cover',
-  themeColor: [{ media: '(prefers-color-scheme: light)', color: '#f2f7f5' }, { media: '(prefers-color-scheme: dark)', color: '#060d1b' }],
+  themeColor: [{ media: '(prefers-color-scheme: light)', color: '#ffffff' }, { media: '(prefers-color-scheme: dark)', color: '#1e1f22' }],
 };
 
 const vars = (o: Record<string, string>) => Object.entries(o).map(([k, v]) => `--c-${k}:${v};`).join('');
 const css = `:root{${vars(tokens.light)}color-scheme:light}[data-theme=dark]{${vars(tokens.dark)}color-scheme:dark}`;
-// Runs before first paint so there is no light/dark flash.
-const themeScript = `try{var t=localStorage.getItem('theme');if(!t)t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t}catch(e){}`;
+// Runs before first paint so there is no light/dark flash. Dark unless the player chose light.
+const themeScript = `try{var t=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=t}catch(e){document.documentElement.dataset.theme='dark'}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning className={display.variable}>
+    <html lang="en" suppressHydrationWarning data-theme="dark">
       <head>
         <style dangerouslySetInnerHTML={{ __html: css }} />
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body>
-        <div className="app-bg" aria-hidden="true"><span className="orb orb-a" /><span className="orb orb-b" /><span className="orb orb-c" /></div>
         <a href="#main" className="skip-link">Skip to content</a>
         <Header />
         <Suspense fallback={null}><FX /></Suspense>
         <PwaManager />
         <PhysicsFX />
         <div id="main" className="app-main">{children}</div>
-        <footer className="mx-auto mt-16 max-w-6xl px-4 pb-28 pt-8 lg:pb-10">
-          <div className="flag-rule mb-6" aria-hidden="true" />
-          <div className="flex flex-col items-center justify-between gap-4 text-sm text-muted sm:flex-row">
-            <div className="flex items-center gap-2"><LogoMark size={28} /><span className="font-display font-semibold text-text">{t('app.name')}</span>
-              <span>· Made in Salone</span></div>
-            <nav className="flex flex-wrap justify-center gap-x-5 gap-y-2" aria-label="Footer">
-              <Link href="/games" className="footer-link">{t('nav.games')}</Link>
-              <Link href="/leaderboards" className="footer-link">Leaderboards</Link>
-              <Link href="/tournaments" className="footer-link">Tournaments</Link>
-              <Link href="/roadmap" className="footer-link">Roadmap</Link>
-            </nav>
-          </div>
-        </footer>
+        <MusicDock />
       </body>
     </html>
   );

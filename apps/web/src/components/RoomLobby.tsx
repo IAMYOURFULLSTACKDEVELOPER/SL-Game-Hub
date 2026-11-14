@@ -1,10 +1,15 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useQuery } from 'convex/react';
+import { api } from '@slgh/backend/convex/_generated/api';
+import { WALLET_LIMITS, formatLeones, parseLeones } from '@slgh/shared/src/wallet';
 import type { RoomApi } from '@/lib/useRoom';
 import { savedName, HEARTBEAT_MS } from '@/lib/useRoom';
 import { sfx } from '@/lib/sound';
+import type { GameVariant } from '@slgh/shared';
 import { Icon } from './Icon';
+import { VariantPicker } from './VariantPicker';
 
 type Difficulty = 'easy' | 'medium' | 'hard';
 
@@ -17,7 +22,7 @@ export function JoinRequests({ room }: { room: RoomApi }) {
   if (!requests.length) return null;
   const playing = (v?.state as { status?: string } | null)?.status === 'playing';
   return (
-    <div className="flash space-y-2 rounded-2xl border border-accent/50 bg-accent/10 p-3" aria-live="polite">
+    <div className="flash space-y-2 rounded-lg border-l-4 border-accent bg-accent/10 p-3" aria-live="polite">
       <p className="text-sm font-semibold">
         {requests.length === 1 ? 'Someone wants' : `${requests.length} people want`} to join from Live games
         {playing && <span className="font-normal text-muted"> (they can join when this game ends)</span>}
@@ -37,18 +42,27 @@ export function JoinRequests({ room }: { room: RoomApi }) {
 }
 
 /** Create or join an online room, then wait in it until the host starts the game. */
-export function RoomLobby({ room, title, maxSeats, timer = false, bots: allowBots = true, timerOptions = [20, 40, 60] }: {
+export function RoomLobby({ room, title, maxSeats, timer = false, bots: allowBots = true, timerOptions = [20, 40, 60], variants }: {
   room: RoomApi; title: string; maxSeats: number; timer?: boolean;
   /** Races (Word Search, Snake) are people only */
   bots?: boolean;
   timerOptions?: number[];
+  /** Ways to play this game; the host picks one before each game */
+  variants?: readonly GameVariant[];
 }) {
   const [name, setName] = useState('');
   const [codeInput, setCodeInput] = useState('');
   const [bots, setBots] = useState(1);
   const [difficulty, setDifficulty] = useState<Difficulty>('medium');
   const [minutes, setMinutes] = useState(0);
+  const [variant, setVariant] = useState(variants?.[0]?.id ?? '');
   const [copied, setCopied] = useState(false);
+  // Money rooms: needs a signed-in player aged 18+ with money in their wallet (Snake can't be played for money).
+  const [forMoney, setForMoney] = useState(false);
+  const [stakeInput, setStakeInput] = useState('5');
+  const canPlayForMoney = room.game !== 'snake';
+  const account = useQuery(api.users.me); // online play needs an account (free is fine): daily games are counted per player
+  const wallet = useQuery(api.wallet.summary, canPlayForMoney && account ? {} : 'skip');
   // The "List in Live games" box flips at once; the server's answer then takes over.
   const [listedNow, setListedNow] = useState<boolean | null>(null);
   const serverListed = room.view?.isPublic;
@@ -63,7 +77,10 @@ export function RoomLobby({ room, title, maxSeats, timer = false, bots: allowBot
   const maxBots = allowBots ? Math.max(0, maxSeats - humans) : 0;
   useEffect(() => { setBots((b) => Math.min(b, maxBots)); }, [maxBots]);
   const nameOk = name.trim().length >= 1;
-  const errorBox = room.error && <p role="alert" className="flash rounded-xl border border-danger/40 bg-danger/10 p-3 text-sm font-semibold text-danger">{room.error}</p>;
+  const money = v?.money ?? null;
+  const stakers = v?.members.filter((m) => m.staked).length ?? 0;
+  const moneyBlock = !account ? 'signin' : wallet && !wallet.eligible ? 'age' : null;
+  const errorBox = room.error && <p role="alert" className="flash rounded-lg border-l-4 border-danger bg-danger/10 p-3 text-sm font-medium text-heading">{room.error}</p>;
 
   // Not in a room yet (or a link to a room we haven't joined)
   if (!room.joined) {
@@ -74,30 +91,72 @@ export function RoomLobby({ room, title, maxSeats, timer = false, bots: allowBot
           <label className="label" htmlFor="room-name">Your name</label>
           <input id="room-name" className="input" maxLength={20} value={name} onChange={(e) => setName(e.target.value)} placeholder="What should friends call you?" autoComplete="nickname" />
         </div>
+        {account === null && (
+          <p className="rounded-2xl border border-primary/30 bg-primary/5 p-3 text-sm">
+            <Link href={`/login?next=${encodeURIComponent(typeof window === 'undefined' ? '/games' : location.pathname + location.search)}`} className="font-semibold text-secondary">Sign in</Link>
+            {' '}or <Link href="/signup" className="font-semibold text-secondary">create a free account</Link> to play online. Free accounts get 10 online games a day; games against bots on this device are unlimited.
+          </p>
+        )}
         {errorBox}
         {linked ? (
-          <div className="space-y-2 rounded-2xl border border-primary/30 bg-primary/5 p-4">
+          <div className="card space-y-3 p-4">
             <p className="font-semibold">You were invited to {title} room <span className="font-mono tracking-widest">{linked}</span> ({humans} {humans === 1 ? 'player' : 'players'} waiting).</p>
+            {money && (moneyBlock === 'signin' ? (
+              <p className="text-sm">💰 This room is played for money. <Link href={`/login?next=${encodeURIComponent(typeof window === 'undefined' ? '/games' : `${location.pathname}?room=${linked}`)}`} className="font-semibold text-primary underline">Sign in</Link> to join.</p>
+            ) : moneyBlock === 'age' ? (
+              <p className="text-sm text-muted">💰 This room is played for money, which is only for players aged 18 and over.</p>
+            ) : (
+              <p className="text-sm">💰 Played for money: joining puts <b>{formatLeones(money.stake)}</b> from your wallet into the pot (you have {wallet ? formatLeones(wallet.balance) : '…'}).</p>
+            ))}
             <div className="flex flex-wrap gap-2">
-              <button className="btn btn-primary flex-1" disabled={!nameOk || room.busy} onClick={() => room.join(linked, name.trim())}><Icon name="users" size={18} />Join room</button>
-              <button className="btn btn-outline" onClick={room.forget}>Not now</button>
+              <button className="btn btn-primary flex-1" disabled={!nameOk || room.busy || (!!money && !!moneyBlock)} onClick={() => {
+                if (money && !confirm(`Join and put ${formatLeones(money.stake)} into the pot? The winner takes the pot; leaving mid-game forfeits your stake.`)) return;
+                room.join(linked, name.trim());
+              }}><Icon name="users" size={18} />Join room</button>
+              <button className="btn btn-secondary" onClick={room.forget}>Not now</button>
             </div>
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-2xl border border-border bg-bg/50 p-4">
-              <p className="font-display text-lg font-semibold">Start a room</p>
+            <div className="card flex flex-col p-4">
+              <p className="flex items-center gap-2 text-base font-bold text-heading"><span className="icon-badge icon-badge-blue h-8 w-8"><Icon name="plus" size={16} /></span>Start a room</p>
               <p className="mb-3 text-sm text-muted">Get a code to share with friends.</p>
-              <button className="btn btn-primary w-full" disabled={!nameOk || room.busy} onClick={() => room.create(name.trim())}><Icon name="sparkles" size={18} />Create room</button>
+              {canPlayForMoney && (
+                <div className="mb-3 space-y-2">
+                  <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Play for">
+                    {([false, true] as const).map((m) => (
+                      <button key={String(m)} type="button" role="radio" aria-checked={forMoney === m} onClick={() => setForMoney(m)}
+                        className={`btn btn-sm ${forMoney === m ? 'btn-primary' : 'btn-secondary'}`}>{m ? '💰 For money' : '🎉 Free'}</button>
+                    ))}
+                  </div>
+                  {forMoney && (moneyBlock === 'signin' ? (
+                    <p className="text-sm"><Link href={`/login?next=${encodeURIComponent(typeof window === 'undefined' ? '/games' : location.pathname)}`} className="font-semibold text-primary underline">Sign in</Link> to play for money.</p>
+                  ) : moneyBlock === 'age' ? (
+                    <p className="text-sm text-muted">Playing for money is only for players aged 18 and over.</p>
+                  ) : (
+                    <div>
+                      <label className="label" htmlFor="room-stake">Stake per player (SLE)</label>
+                      <input id="room-stake" className="input" inputMode="decimal" value={stakeInput} onChange={(e) => setStakeInput(e.target.value)} />
+                      <p className="hint">Wallet: <b>{wallet ? formatLeones(wallet.balance) : '…'}</b> · <Link href="/wallet" className="text-primary underline">Top up</Link>. No bots in money rooms.</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button className="btn btn-primary mt-auto w-full" disabled={!nameOk || room.busy || (forMoney && !!moneyBlock)} onClick={() => {
+                if (!forMoney) { room.create(name.trim()); return; }
+                const stake = parseLeones(stakeInput);
+                if (stake === null || stake < WALLET_LIMITS.minStake) { room.setError(`Enter a stake of at least ${formatLeones(WALLET_LIMITS.minStake)}.`); return; }
+                if (confirm(`Create a money room? ${formatLeones(stake)} goes from your wallet into the pot until the game ends. The winner takes the pot.`)) room.create(name.trim(), { stake });
+              }}><Icon name="plus" size={18} />{forMoney ? 'Create money room' : 'Create room'}</button>
             </div>
-            <form className="rounded-2xl border border-border bg-bg/50 p-4" onSubmit={(e) => { e.preventDefault(); room.join(codeInput, name.trim()); }}>
-              <p className="font-display text-lg font-semibold">Join a room</p>
+            <form className="card p-4" onSubmit={(e) => { e.preventDefault(); room.join(codeInput, name.trim()); }}>
+              <p className="flex items-center gap-2 text-base font-bold text-heading"><span className="icon-badge h-8 w-8 bg-success text-white"><Icon name="users" size={16} /></span>Join a room</p>
               <p className="mb-3 text-sm text-muted">Type the 6-letter code a friend sent you.</p>
               <div className="flex gap-2">
                 <label className="sr-only" htmlFor="room-code">Room code</label>
                 <input id="room-code" className="input min-w-0 flex-1 text-center font-mono uppercase tracking-[0.3em]" maxLength={6} value={codeInput}
                   onChange={(e) => setCodeInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))} placeholder="ABC234" autoCapitalize="characters" />
-                <button className="btn btn-outline" disabled={!nameOk || codeInput.length !== 6 || room.busy}>Join</button>
+                <button className="btn btn-success" disabled={!nameOk || codeInput.length !== 6 || room.busy}>Join</button>
               </div>
             </form>
           </div>
@@ -113,14 +172,17 @@ export function RoomLobby({ room, title, maxSeats, timer = false, bots: allowBot
   const invite = `Come and play ${title} with me on SL Game Hub! Room code ${v!.code}: ${link}`;
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 to-secondary/10 p-4 text-center">
-        <p className="text-sm font-semibold text-muted">Room code</p>
-        <p className="font-mono text-4xl font-bold tracking-[0.25em] text-primary">{v!.code}</p>
-        <div className="mt-3 flex flex-wrap justify-center gap-2">
-          <a className="btn btn-sm btn-primary" href={`https://wa.me/?text=${encodeURIComponent(invite)}`} target="_blank" rel="noopener noreferrer">
+      <div className="card p-4">
+        <p className="label">Room code</p>
+        <div className="flex items-center gap-3 rounded-lg bg-input p-2 pl-4">
+          <p className="min-w-0 flex-1 font-mono text-3xl font-bold tracking-[0.25em] text-heading">{v!.code}</p>
+          <span className="online-dot" aria-hidden />
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <a className="btn btn-sm btn-success" href={`https://wa.me/?text=${encodeURIComponent(invite)}`} target="_blank" rel="noopener noreferrer">
             <Icon name="chat" size={16} />Invite on WhatsApp
           </a>
-          <button type="button" className="btn btn-sm btn-outline" onClick={async () => {
+          <button type="button" className="btn btn-sm btn-primary" onClick={async () => {
             try {
               if (navigator.share) await navigator.share({ title, text: invite, url: link });
               else { await navigator.clipboard.writeText(invite); setCopied(true); sfx('success'); setTimeout(() => setCopied(false), 2000); }
@@ -133,15 +195,15 @@ export function RoomLobby({ room, title, maxSeats, timer = false, bots: allowBot
 
       <div>
         <p className="label">Players ({humans}/{maxSeats})</p>
-        <ul className="grid gap-2 sm:grid-cols-2">
+        <ul className="grid gap-0.5 sm:grid-cols-2">
           {v!.members.map((m, i) => {
             const online = now - m.lastSeen < HEARTBEAT_MS * 2.5;
             return (
-              <li key={m.id} className="pop-in flex items-center gap-3 rounded-xl border border-border bg-surface p-2.5" style={{ ['--i' as string]: i }}>
-                <span className="avatar-ring h-9 w-9 font-display font-bold">{m.name[0]?.toUpperCase()}</span>
+              <li key={m.id} className="pop-in flex items-center gap-3 rounded-md p-2 transition-colors hover:bg-hover" style={{ ['--i' as string]: i }}>
+                <span className="user-avatar text-sm font-bold text-heading">{m.name[0]?.toUpperCase()}<span className="status-dot" style={online ? undefined : { background: 'rgb(var(--c-muted))' }} /></span>
                 <span className="min-w-0 flex-1 truncate font-semibold">{m.name}{m.id === me.id ? ' (you)' : ''}</span>
-                {m.host && <span className="chip chip-accent">Host</span>}
-                <span className={`h-2.5 w-2.5 rounded-full ${online ? 'bg-primary' : 'bg-border'}`} title={online ? 'Online' : 'Reconnecting'} />
+                {m.host && <span className="chip chip-accent" title="Host">👑 Host</span>}
+                <span className="sr-only">{online ? 'Online' : 'Reconnecting'}</span>
               </li>
             );
           })}
@@ -151,7 +213,7 @@ export function RoomLobby({ room, title, maxSeats, timer = false, bots: allowBot
 
       {errorBox}
       {me.host && (
-        <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-border bg-bg/50 p-4">
+        <label className="card flex cursor-pointer items-start gap-3 p-4">
           <input type="checkbox" className="mt-1 h-5 w-5 shrink-0 accent-[rgb(var(--c-primary))]" checked={listedNow ?? v!.isPublic} disabled={room.busy}
             onChange={(e) => { setListedNow(e.target.checked); room.setPublic(e.target.checked); }} />
           <span>
@@ -162,14 +224,15 @@ export function RoomLobby({ room, title, maxSeats, timer = false, bots: allowBot
       )}
       <JoinRequests room={room} />
       {me.host ? (
-        <div className="space-y-3 rounded-2xl border border-border bg-bg/50 p-4">
+        <div className="card space-y-3 p-4">
+          {variants && variants.length > 1 && <VariantPicker variants={variants} value={variant} onChange={setVariant} disabled={room.busy} />}
           <div className="flex flex-wrap items-center gap-3">
-            {allowBots && <label className="flex items-center gap-2 text-sm font-semibold">Bots
+            {allowBots && !money && <label className="flex items-center gap-2 text-sm font-semibold">Bots
               <select className="field" value={bots} onChange={(e) => setBots(Number(e.target.value))}>
                 {Array.from({ length: maxBots + 1 }, (_, n) => <option key={n} value={n}>{n}</option>)}
               </select>
             </label>}
-            {bots > 0 && (
+            {bots > 0 && !money && (
               <label className="flex items-center gap-2 text-sm font-semibold">Level
                 <select className="field" value={difficulty} onChange={(e) => setDifficulty(e.target.value as Difficulty)}>
                   <option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option>
@@ -185,13 +248,24 @@ export function RoomLobby({ room, title, maxSeats, timer = false, bots: allowBot
               </label>
             )}
           </div>
-          <button className="btn btn-primary btn-lg w-full" disabled={room.busy || humans + bots < 2} onClick={() => { sfx('shuffle'); room.start(bots, difficulty, timer ? minutes : undefined); }}>
-            <Icon name="play" size={20} />Start game ({humans + bots} players)
-          </button>
-          {humans + bots < 2 && <p className="hint text-center">You need at least 2 players. {allowBots ? 'Add a bot or invite a friend.' : 'Invite a friend.'}</p>}
+          {money ? (
+            <>
+              <button className="btn btn-success btn-lg w-full" disabled={room.busy || stakers < 2} onClick={() => { sfx('shuffle'); room.start(0, difficulty, timer ? minutes : undefined, variant && variant !== variants?.[0]?.id ? variant : undefined); }}>
+                <Icon name="play" size={20} />Start game ({stakers} staked)
+              </button>
+              {stakers < 2 && <p className="hint text-center">At least 2 players must put their stake in.</p>}
+            </>
+          ) : (
+            <>
+              <button className="btn btn-success btn-lg w-full" disabled={room.busy || humans + bots < 2} onClick={() => { sfx('shuffle'); room.start(bots, difficulty, timer ? minutes : undefined, variant && variant !== variants?.[0]?.id ? variant : undefined); }}>
+                <Icon name="play" size={20} />Start game ({humans + bots} players)
+              </button>
+              {humans + bots < 2 && <p className="hint text-center">You need at least 2 players. {allowBots ? 'Add a bot or invite a friend.' : 'Invite a friend.'}</p>}
+            </>
+          )}
         </div>
       ) : (
-        <p className="flex items-center justify-center gap-2 rounded-2xl bg-bg/60 p-4 text-center font-semibold text-muted">
+        <p className="card flex items-center justify-center gap-2 p-4 text-center font-semibold text-muted">
           <span className="loading-dots">Waiting for the host to start</span>
         </p>
       )}

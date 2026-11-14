@@ -2,13 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
-  SnakeAndLadderEngine, SNAKE_AND_LADDER_MANIFEST, SNAKE_AND_LADDER_FINISH, createPlayer, rollDie,
-  type SnakeAndLadderState, type SnakeAndLadderLastMove,
+  SnakeAndLadderEngine, SNAKE_AND_LADDER_MANIFEST, SNAKE_AND_LADDER_FINISH, SNAKE_AND_LADDER_VARIANTS, createPlayer, rollDie,
+  type SnakeAndLadderState, type SnakeAndLadderLastMove, type SnakeAndLadderVariant,
 } from '@slgh/shared';
+import { VariantPicker } from './VariantPicker';
 import SnakeAndLadderRulebook from './SnakeAndLadderRulebook';
 import DiceTray from './DiceTray';
 import { RoomLobby, JoinRequests } from './RoomLobby';
 import { VoiceChat } from './VoiceChat';
+import { ProBar } from './ProBar';
+import { MoneyBar } from './MoneyBar';
 import { ConvexRoomProvider } from './ConvexRoomProvider';
 import { Icon } from './Icon';
 import { useRoom } from '@/lib/useRoom';
@@ -79,10 +82,10 @@ export default function SnakeAndLadderGame({ onBack }: { onBack: () => void }) {
   useEffect(() => { const q = new URLSearchParams(location.search); if (q.has('room') || q.has('online')) setMode('online'); }, []);
   return (
     <Shell onBack={onBack}>
-      <div role="tablist" aria-label="How to play" className="grid grid-cols-2 gap-1 rounded-2xl border border-border bg-bg/60 p-1">
+      <div role="tablist" aria-label="How to play" className="grid grid-cols-2 gap-1 rounded-lg bg-input p-1">
         {([['local', 'This device', 'users'], ['online', 'Online', 'globe']] as const).map(([m, label, icon]) => (
           <button key={m} role="tab" aria-selected={mode === m} onClick={() => setMode(m)}
-            className={`flex min-h-[42px] items-center justify-center gap-1.5 rounded-xl text-sm font-semibold transition-all ${mode === m ? 'bg-surface text-primary shadow-soft' : 'text-muted'}`}>
+            className={`flex min-h-[42px] items-center justify-center gap-1.5 rounded-md text-sm font-semibold transition-colors ${mode === m ? 'bg-selected text-heading' : 'text-muted hover:text-text'}`}>
             <Icon name={icon} size={16} />{label}
           </button>
         ))}
@@ -151,6 +154,7 @@ function LocalLadder() {
   const [busy, setBusy] = useState(false);
   const [log, setLog] = useState<string[]>([]);
   const [showRules, setShowRules] = useState(false);
+  const [variant, setVariant] = useState<SnakeAndLadderVariant>('classic');
   const { display, sliding, dice, cancel, snap, animate } = useRollAnimation();
 
   useEffect(() => {
@@ -171,6 +175,7 @@ function LocalLadder() {
 
   const start = () => begin(engine.initialize(
     seats.map((s, i) => createPlayer(`seat${i}`, s.name.trim() || RINGS[i].name, s.ai, s.ai ? 'medium' : undefined)),
+    { variant },
   ));
 
   const play = useCallback(async () => {
@@ -199,6 +204,7 @@ function LocalLadder() {
   if (!game) {
     return (
       <>
+        <VariantPicker variants={SNAKE_AND_LADDER_VARIANTS} value={variant} onChange={(id) => setVariant(id as SnakeAndLadderVariant)} />
         <div className="flex flex-wrap items-center gap-4">
           <label className="text-sm font-semibold">
             Players:
@@ -342,6 +348,8 @@ function OnlineLadder() {
   return (
     <div className="space-y-4">
       <VoiceChat room={room} />
+      <MoneyBar room={room} />
+      <ProBar room={room} />
       {room.joined && board && (
         <>
           <LadderBoard players={board.players} display={display} sliding={sliding} dice={dice} current={ringNow} />
@@ -370,7 +378,7 @@ function OnlineLadder() {
       )}
       {playing && <JoinRequests room={room} />}
       {room.error && playing && <p role="alert" className="flash rounded-xl border border-danger/40 bg-danger/10 p-3 text-sm font-semibold text-danger">{room.error}</p>}
-      {!playing && <RoomLobby room={room} title={SNAKE_AND_LADDER_MANIFEST.name} maxSeats={SNAKE_AND_LADDER_MANIFEST.maxPlayers} />}
+      {!playing && <RoomLobby room={room} title={SNAKE_AND_LADDER_MANIFEST.name} maxSeats={SNAKE_AND_LADDER_MANIFEST.maxPlayers} variants={SNAKE_AND_LADDER_VARIANTS} />}
       {playing && <button className="btn btn-ghost w-full text-danger" onClick={() => { if (confirm(seat >= 0 ? 'Leave this game? A bot will take your seat.' : 'Stop watching this game?')) room.leave(); }}><Icon name="logout" size={18} />Leave game</button>}
       <SnakeAndLadderRulebook />
     </div>

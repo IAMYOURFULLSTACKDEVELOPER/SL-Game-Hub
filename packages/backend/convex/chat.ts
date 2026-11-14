@@ -5,14 +5,14 @@ import { publicProfile, requireActiveUser, requireAdmin, requireUser } from './l
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-async function containsProfanity(ctx: QueryCtx, text: string) {
+export async function containsProfanity(ctx: QueryCtx, text: string) {
   const words = await ctx.db.query('profanity_words').collect();
   return words.some((w) => new RegExp(`\\b${escapeRe(w.word)}\\b`, 'i').test(text));
 }
 
-function cleanContent(content: string) {
+export function cleanContent(content: string) {
   const c = content.trim();
-  if (c.length < 1 || c.length > 500) throw new ConvexError('message must be 1-500 characters');
+  if (c.length < 1 || c.length > 500) throw new ConvexError('errors.messageLength');
   return c;
 }
 
@@ -43,13 +43,13 @@ export const messages = query({
 export const send = mutation({
   args: { roomId: v.id('chat_rooms'), content: v.string() },
   handler: async (ctx, { roomId, content }) => {
-    const me = await requireActiveUser(ctx, 'account banned');
+    const me = await requireActiveUser(ctx, 'errors.suspended');
     const text = cleanContent(content);
     const room = await ctx.db.get(roomId);
-    if (!room?.is_active || room.type === 'direct') throw new ConvexError('room not found');
+    if (!room?.is_active || room.type === 'direct') throw new ConvexError('errors.notFound');
     const p = await ctx.db.query('chat_participants').withIndex('by_room_user', (q) => q.eq('room_id', roomId).eq('user_id', me._id)).unique();
-    if (p?.is_muted && (p.muted_until === undefined || p.muted_until > Date.now())) throw new ConvexError('you are muted in this room');
-    if (await containsProfanity(ctx, text)) throw new ConvexError('message contains inappropriate language');
+    if (p?.is_muted && (p.muted_until === undefined || p.muted_until > Date.now())) throw new ConvexError('errors.muted');
+    if (await containsProfanity(ctx, text)) throw new ConvexError('errors.inappropriateLanguage');
     if (!p) await ctx.db.insert('chat_participants', { room_id: roomId, user_id: me._id, joined_at: Date.now(), is_muted: false });
     return ctx.db.insert('chat_messages', { room_id: roomId, user_id: me._id, content: text, is_deleted: false, is_flagged: false });
   },
@@ -59,13 +59,13 @@ export const send = mutation({
 export const sendDirect = mutation({
   args: { recipientId: v.id('users'), content: v.string() },
   handler: async (ctx, { recipientId, content }) => {
-    const me = await requireActiveUser(ctx, 'account banned');
+    const me = await requireActiveUser(ctx, 'errors.suspended');
     const text = cleanContent(content);
-    if (recipientId === me._id || !(await ctx.db.get(recipientId))) throw new ConvexError('user not found');
+    if (recipientId === me._id || !(await ctx.db.get(recipientId))) throw new ConvexError('errors.notFound');
     const blocked = await ctx.db.query('user_blocks').withIndex('by_pair', (q) => q.eq('blocker_id', recipientId).eq('blocked_id', me._id)).unique()
       ?? await ctx.db.query('user_blocks').withIndex('by_pair', (q) => q.eq('blocker_id', me._id).eq('blocked_id', recipientId)).unique();
-    if (blocked) throw new ConvexError('cannot send message to blocked user');
-    if (await containsProfanity(ctx, text)) throw new ConvexError('message contains inappropriate language');
+    if (blocked) throw new ConvexError('errors.blockedUser');
+    if (await containsProfanity(ctx, text)) throw new ConvexError('errors.inappropriateLanguage');
 
     const [user1_id, user2_id] = me._id < recipientId ? [me._id, recipientId] : [recipientId, me._id];
     const convo = await ctx.db.query('conversations').withIndex('by_pair', (q) => q.eq('user1_id', user1_id).eq('user2_id', user2_id)).unique();
@@ -78,7 +78,7 @@ export const block = mutation({
   args: { blockedId: v.id('users') },
   handler: async (ctx, { blockedId }) => {
     const me = await requireUser(ctx);
-    if (blockedId === me._id) throw new ConvexError('cannot block yourself');
+    if (blockedId === me._id) throw new ConvexError("You can't block yourself.");
     const existing = await ctx.db.query('user_blocks').withIndex('by_pair', (q) => q.eq('blocker_id', me._id).eq('blocked_id', blockedId)).unique();
     if (!existing) await ctx.db.insert('user_blocks', { blocker_id: me._id, blocked_id: blockedId, blocked_at: Date.now() });
   },

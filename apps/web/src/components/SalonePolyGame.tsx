@@ -10,6 +10,8 @@ import Rulebook from './Rulebook';
 import DiceTray from './DiceTray';
 import { RoomLobby, JoinRequests } from './RoomLobby';
 import { VoiceChat } from './VoiceChat';
+import { ProBar } from './ProBar';
+import { MoneyBar } from './MoneyBar';
 import { ConvexRoomProvider } from './ConvexRoomProvider';
 import { Icon } from './Icon';
 import { Portal } from './Portal';
@@ -47,10 +49,10 @@ export default function SalonePolyGame({ onBack }: { onBack: () => void }) {
   useEffect(() => { const q = new URLSearchParams(location.search); if (q.has('room') || q.has('online')) setMode('online'); }, []);
   return (
     <Shell onBack={onBack}>
-      <div role="tablist" aria-label="How to play" className="grid grid-cols-3 gap-1 rounded-2xl border border-border bg-bg/60 p-1">
+      <div role="tablist" aria-label="How to play" className="grid grid-cols-3 gap-1 rounded-lg bg-input p-1">
         {([['bots', 'vs Bots', 'gamepad'], ['pass', 'Pass & play', 'users'], ['online', 'Online', 'globe']] as const).map(([m, label, icon]) => (
           <button key={m} role="tab" aria-selected={mode === m} onClick={() => setMode(m)}
-            className={`flex min-h-[42px] items-center justify-center gap-1.5 rounded-xl text-sm font-semibold transition-all ${mode === m ? 'bg-surface text-primary shadow-soft' : 'text-muted'}`}>
+            className={`flex min-h-[42px] items-center justify-center gap-1.5 rounded-md text-sm font-semibold transition-colors ${mode === m ? 'bg-selected text-heading' : 'text-muted hover:text-text'}`}>
             <Icon name={icon} size={16} />{label}
           </button>
         ))}
@@ -200,6 +202,8 @@ function OnlinePoly() {
   return (
     <div className="space-y-4">
       <VoiceChat room={room} />
+      <MoneyBar room={room} />
+      <ProBar room={room} />
       {room.joined && s && (
         <PolyTable s={s} me={me} busy={room.busy} onMove={(m) => { room.move(m as Parameters<typeof room.move>[0]); }} onTrade={trade}
           banner={offer && s.status === 'playing' && (offer.to === me ? (

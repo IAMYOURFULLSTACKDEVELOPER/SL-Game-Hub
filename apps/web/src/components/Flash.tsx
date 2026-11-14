@@ -10,11 +10,9 @@ export function Flash({ error, notice }: { error?: string; notice?: string }) {
   if (!e && !n) return null;
   return (
     <p role={e ? 'alert' : 'status'}
-      className={`flash mb-4 flex items-start gap-3 rounded-2xl border p-3.5 font-semibold ${e ? 'border-danger/40 bg-danger/10 text-danger' : 'border-primary/40 bg-primary/10 text-primary'}`}>
-      <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full ${e ? 'bg-danger/15' : 'bg-primary/15'}`}>
-        <Icon name={e ? 'close' : 'check'} size={16} strokeWidth={3} />
-      </span>
-      <span className="pt-0.5">{t((e ?? n)!)}</span>
+      className={`flash mb-4 flex items-start gap-2.5 rounded-lg border-l-4 p-3 text-sm font-medium text-heading ${e ? 'border-danger bg-danger/10' : 'border-success bg-success/10'}`}>
+      <Icon name={e ? 'close' : 'check'} size={18} strokeWidth={2.75} className={`mt-px shrink-0 ${e ? 'text-danger' : 'text-success'}`} />
+      <span>{t((e ?? n)!)}</span>
     </p>
   );
 }

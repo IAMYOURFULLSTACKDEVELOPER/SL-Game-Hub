@@ -1,7 +1,7 @@
 import { convexAuthNextjsMiddleware, createRouteMatcher } from '@convex-dev/auth/nextjs/server';
 import { NextResponse } from 'next/server';
 
-const isPrivate = createRouteMatcher(['/admin(.*)', '/profile(.*)', '/wallet(.*)']);
+const isPrivate = createRouteMatcher(['/admin(.*)', '/profile(.*)', '/wallet(.*)', '/pro(.*)', '/groups(.*)']);
 
 // Serves /api/auth (sign in/out), refreshes the auth cookie, and gates private routes.
 // Admin ROLE is re-checked in the admin layout, and enforced for data by the Convex functions.

@@ -8,6 +8,8 @@ import {
 import Rulebook from './Rulebook';
 import { RoomLobby, JoinRequests } from './RoomLobby';
 import { VoiceChat } from './VoiceChat';
+import { ProBar } from './ProBar';
+import { MoneyBar } from './MoneyBar';
 import { ConvexRoomProvider } from './ConvexRoomProvider';
 import { Icon } from './Icon';
 import { useRoom } from '@/lib/useRoom';
@@ -46,10 +48,10 @@ export default function ScrabbleGame({ onBack }: { onBack: () => void }) {
   // A shared room link opens straight into online play.
   useEffect(() => { const q = new URLSearchParams(location.search); setMode(q.has('room') || q.has('online') ? 'online' : 'local'); }, []);
   const tabs = (
-    <div role="tablist" aria-label="How to play" className="grid grid-cols-2 gap-1 rounded-2xl border border-border bg-bg/60 p-1">
+    <div role="tablist" aria-label="How to play" className="grid grid-cols-2 gap-1 rounded-lg bg-input p-1">
       {([['local', 'This device', 'gamepad'], ['online', 'Online', 'globe']] as const).map(([m, label, icon]) => (
         <button key={m} role="tab" aria-selected={mode === m} onClick={() => setMode(m)}
-          className={`flex min-h-[42px] items-center justify-center gap-1.5 rounded-xl text-sm font-semibold transition-all ${mode === m ? 'bg-surface text-primary shadow-soft' : 'text-muted'}`}>
+          className={`flex min-h-[42px] items-center justify-center gap-1.5 rounded-md text-sm font-semibold transition-colors ${mode === m ? 'bg-selected text-heading' : 'text-muted hover:text-text'}`}>
           <Icon name={icon} size={16} />{label}
         </button>
       ))}
@@ -219,6 +221,8 @@ function OnlineScrabble() {
   return (
     <div className="space-y-4">
       <VoiceChat room={room} />
+      <MoneyBar room={room} />
+      <ProBar room={room} />
       {room.joined && state && current && (
         <ScrabbleTable
           game={state}

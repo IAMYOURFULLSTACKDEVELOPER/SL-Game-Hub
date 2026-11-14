@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { SnakeEngine, createPlayer, type SnakeState, type SnakeMove } from '@slgh/shared';
 import { RoomLobby, JoinRequests } from './RoomLobby';
 import { VoiceChat } from './VoiceChat';
+import { ProBar } from './ProBar';
 import { ConvexRoomProvider } from './ConvexRoomProvider';
 import { Icon } from './Icon';
 import { SnakeBoard, SnakePad, useSnakeKeys } from './SnakeBoard';
@@ -55,6 +56,7 @@ function OnlineSnake() {
   return (
     <div className="space-y-4">
       <VoiceChat room={room} />
+      <ProBar room={room} />
       {room.joined && v && state && <Race key={`${v.code}:${state.createdAt}`} race={`${v.code}:${state.createdAt}`} state={state} seat={v.me?.seat ?? -1} room={room} />}
       {playing && <JoinRequests room={room} />}
       {room.error && playing && <p role="alert" className="flash rounded-xl border border-danger/40 bg-danger/10 p-3 text-sm font-semibold text-danger">{room.error}</p>}

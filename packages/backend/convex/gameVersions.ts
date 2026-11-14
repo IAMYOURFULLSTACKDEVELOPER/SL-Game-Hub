@@ -73,7 +73,7 @@ export const rollback = mutation({
   handler: async (ctx, { versionId }) => {
     await requireAdmin(ctx);
     const version = await ctx.db.get(versionId);
-    if (!version) throw new ConvexError('version not found');
+    if (!version) throw new ConvexError('errors.notFound');
     await makeCurrentVersion(ctx, version);
     return (await ctx.db.get(version.game_id))?.slug ?? null;
   },

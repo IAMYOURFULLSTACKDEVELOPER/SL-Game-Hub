@@ -7,6 +7,7 @@ import {
   WALLET_LIMITS, formatLeones, isMomoProvider, normalizeSlPhone, providerName, CURRENCY,
 } from '@slgh/shared/src/wallet';
 import { currentUser, requireActiveUser, requireAdmin } from './lib';
+import { grantPro } from './pro';
 import type { walletTxType } from './schema';
 
 // Real-money wallet. Amounts are minor units (100 = SLE 1). Money only enters through a Monime
@@ -20,7 +21,7 @@ export const walletAllowed = (u: Doc<'users'>) => u.age_band === '18_plus' && !u
 
 /** Signed in, not suspended, and 18 or over. */
 export async function requireWalletUser(ctx: QueryCtx) {
-  const me = await requireActiveUser(ctx, 'Your account is suspended.');
+  const me = await requireActiveUser(ctx, 'errors.suspended');
   if (me.age_band !== '18_plus') throw new ConvexError('The wallet is only for players aged 18 and over.');
   return me;
 }
@@ -68,7 +69,7 @@ export const summary = query({
       configured: monimeConfigured(),
       balance: w?.balance ?? 0,
       held: w?.held ?? 0,
-      deposits: deposits.map((d) => ({
+      deposits: deposits.filter((d) => d.purpose !== 'pro').map((d) => ({
         id: d._id, amount: d.amount, status: d.status, ussd_code: d.ussd_code ?? null,
         expires_at: d.expires_at ?? null, error: d.error ?? null, created_at: d._creationTime,
       })),
@@ -251,7 +252,8 @@ export const applyDepositStatus = internalMutation({
         return;
       }
       await ctx.db.patch(d._id, { status: 'completed', completed_at: Date.now(), error: undefined, updated_at: Date.now() });
-      await post(ctx, d.user_id, 'deposit', { amount: d.amount }, 'Mobile money top-up', d._id);
+      if (d.purpose === 'pro') await grantPro(ctx, d.user_id, 'ussd', d.amount, d._id); // paid for Pro, not a top-up
+      else await post(ctx, d.user_id, 'deposit', { amount: d.amount }, 'Mobile money top-up', d._id);
     } else if ((status === 'expired' || status === 'cancelled') && (d.status === 'pending' || d.status === 'creating')) {
       await ctx.db.patch(d._id, { status, updated_at: Date.now() });
     }

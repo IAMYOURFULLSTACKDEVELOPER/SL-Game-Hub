@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { SnakeAndLadderEngine, SNAKE_AND_LADDER_MANIFEST } from './snake-and-ladder';
+import { SnakeAndLadderEngine, SNAKE_AND_LADDER_MANIFEST, walkRoll } from './snake-and-ladder';
 import { createPlayer } from '../games';
 
 describe('Snake & Ladder Game', () => {
@@ -268,5 +268,26 @@ describe('Snake & Ladder Game', () => {
       assert.strictEqual(deserialized.status, state.status);
       assert.deepStrictEqual(deserialized.playerPositions, state.playerPositions);
     });
+  });
+});
+
+describe('Snake & Ladder variants', () => {
+  const engine = new SnakeAndLadderEngine();
+  const two = () => [createPlayer('a', 'A'), createPlayer('b', 'B')];
+
+  it('Classic bounces back off 100; Quick finish wins on any roll that reaches it', () => {
+    assert.deepStrictEqual(walkRoll(98, 5), { landed: 97, bounced: true });
+    assert.deepStrictEqual(walkRoll(98, 5, false), { landed: 100, bounced: false });
+
+    const classic = engine.initialize(two());
+    assert.strictEqual(classic.variant, 'classic');
+    const c = engine.applyMove({ ...classic, playerPositions: [98, 0] }, 5);
+    assert.strictEqual(c.status, 'playing');
+    assert.strictEqual(c.lastMove?.bounced, true);
+
+    const quick = engine.initialize(two(), { variant: 'quick-finish' });
+    const q = engine.applyMove({ ...quick, playerPositions: [98, 0] }, 5);
+    assert.strictEqual(q.status, 'finished');
+    assert.strictEqual(q.winner, 0);
   });
 });

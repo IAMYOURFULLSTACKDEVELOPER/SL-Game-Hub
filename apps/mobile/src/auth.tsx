@@ -1,4 +1,5 @@
 import React from 'react';
+import { errorKeyFor } from '@slgh/shared/src/errors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ConvexAuthProvider } from '@convex-dev/auth/react';
 import { useQuery } from 'convex/react';
@@ -19,11 +20,8 @@ export function useAuth() {
 }
 
 /** Turns an auth error into an i18n key: our backend throws keys such as errors.usernameTaken. */
+/** The i18n key to show for an auth or Convex error (see @slgh/shared errors.ts). */
 export function authErrorKey(e: unknown) {
-  const m = e instanceof Error ? e.message : String(e);
-  const key = m.match(/errors\.\w+/)?.[0];
-  if (key) return key;
-  if (/InvalidSecret|InvalidAccountId|Invalid credentials/i.test(m)) return 'errors.invalidCredentials'; // same for both: no account enumeration
-  if (/Could not verify code|Invalid code/i.test(m)) return 'errors.codeInvalid';
-  return /fetch|network/i.test(m) ? 'common.offline' : 'errors.generic';
+  const data = (e as { data?: unknown } | null)?.data;
+  return errorKeyFor(typeof data === 'string' ? data : e instanceof Error ? e.message : String(e));
 }

@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { UnoEngine, UNO_MANIFEST, createUnoDeck, unoViewFor, cardPoints, type UnoState, type Card } from './uno';
+import { UnoEngine, UNO_MANIFEST, UNO_VARIANTS, createUnoDeck, unoViewFor, cardPoints, type UnoState, type Card } from './uno';
 import { createPlayer } from '../games';
 
 const engine = new UnoEngine();
@@ -164,5 +164,66 @@ describe('UnoEngine', () => {
   it('serializes and deserializes', () => {
     const s = engine.initialize(players(2));
     assert.deepStrictEqual(engine.deserialize(engine.serialize(s)), JSON.parse(JSON.stringify(s)));
+  });
+});
+
+describe('UNO variants', () => {
+  const withVariant = (s: UnoState, variant: UnoState['variant']): UnoState => ({ ...s, variant, pendingDraw: 0 });
+
+  it('Express deals 5 cards; an unknown variant falls back to Classic', () => {
+    const s = engine.initialize(players(3), { variant: 'express' });
+    assert.strictEqual(s.variant, 'express');
+    assert.strictEqual(s.playersHands[1].length, 5);
+    assert.strictEqual(s.playersHands[2].length, 5);
+    assert.strictEqual(engine.initialize(players(2), { variant: 'nope' }).variant, 'classic');
+    assert.strictEqual(UNO_VARIANTS[0].id, 'classic');
+  });
+
+  it('Stacking passes Draw cards on until someone draws the whole pile', () => {
+    const d2a = c('red', 'draw_two'), d2b = c('blue', 'draw_two'), g3 = c('green', 'number', 3);
+    let s = withVariant(rig([[d2a, c('red', 'number', 1), c('red', 'number', 2)], [d2b, g3, c('green', 'number', 4)], [c('yellow', 'number', 1), c('yellow', 'number', 2)]], c('red', 'number', 5)), 'stacking');
+    s = engine.applyMove(s, { type: 'play', cardId: d2a.id });
+    assert.strictEqual(s.pendingDraw, 2);
+    assert.strictEqual(s.currentPlayerIndex, 1);
+    assert.strictEqual(s.playersHands[1].length, 3, 'nobody draws yet');
+    assert.ok(!engine.isValidMove(s, { type: 'play', cardId: g3.id }, 1), 'only a Draw card may answer');
+    assert.deepStrictEqual(unoViewFor(s, 1).playable, [d2b.id]);
+    s = engine.applyMove(s, { type: 'play', cardId: d2b.id });
+    assert.strictEqual(s.pendingDraw, 4);
+    assert.strictEqual(s.currentPlayerIndex, 2);
+    s = engine.applyMove(s, { type: 'draw' });
+    assert.strictEqual(s.playersHands[2].length, 6);
+    assert.strictEqual(s.pendingDraw, 0);
+    assert.strictEqual(s.currentPlayerIndex, 0, 'the drawing player is skipped');
+  });
+
+  it('Stacking lets a Draw Four answer a Draw Two even when holding the colour', () => {
+    const d2 = c('red', 'draw_two'), d4 = c('wild', 'wild_draw_four');
+    let s = withVariant(rig([[d2, c('red', 'number', 1), c('red', 'number', 2)], [d4, c('red', 'number', 3), c('red', 'number', 4)]], c('red', 'number', 5)), 'stacking');
+    s = engine.applyMove(s, { type: 'play', cardId: d2.id });
+    assert.ok(engine.isValidMove(s, { type: 'play', cardId: d4.id, color: 'blue' }, 1));
+    s = engine.applyMove(s, { type: 'play', cardId: d4.id, color: 'blue' });
+    assert.strictEqual(s.pendingDraw, 6);
+    assert.strictEqual(s.currentColor, 'blue');
+  });
+
+  it('Classic still makes the next player draw straight away', () => {
+    const d2 = c('red', 'draw_two');
+    let s = rig([[d2, c('red', 'number', 1), c('red', 'number', 2)], [c('green', 'number', 3)], [c('green', 'number', 4)]], c('red', 'number', 5));
+    s = engine.applyMove(s, { type: 'play', cardId: d2.id });
+    assert.strictEqual(s.playersHands[1].length, 3);
+    assert.strictEqual(s.currentPlayerIndex, 2);
+    assert.ok(!s.pendingDraw);
+  });
+
+  it('Draw till you play keeps drawing until a card fits', () => {
+    const red9 = c('red', 'number', 9);
+    const deck = [red9, c('green', 'number', 1), c('green', 'number', 2)]; // drawn from the end
+    let s = withVariant(rig([[c('blue', 'number', 3), c('yellow', 'number', 4)], [c('green', 'number', 6)]], c('red', 'number', 5), deck), 'draw-till-play');
+    s = engine.applyMove(s, { type: 'draw' });
+    assert.strictEqual(s.playersHands[0].length, 5);
+    assert.strictEqual(s.lastEvent?.count, 3);
+    assert.strictEqual(s.drawnCardId, red9.id);
+    assert.strictEqual(s.currentPlayerIndex, 0, 'they may now play the card they found');
   });
 });

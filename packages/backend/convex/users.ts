@@ -70,7 +70,7 @@ export const setBanned = mutation({
   args: { id: v.id('users'), banned: v.boolean() },
   handler: async (ctx, { id, banned }) => {
     const admin = await requireAdmin(ctx);
-    if (id === admin._id) throw new ConvexError('cannot suspend yourself');
+    if (id === admin._id) throw new ConvexError("You can't suspend your own account.");
     await ctx.db.patch(id, { banned, updated_at: Date.now() });
   },
 });

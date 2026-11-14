@@ -57,7 +57,7 @@ export const createPaymentCode = internalAction({
     if (!d || d.status !== 'creating') return;
     try {
       const code = await monime<PaymentCode>('POST', '/v1/payment-codes', {
-        name: 'SL Game Hub wallet top-up',
+        name: d.purpose === 'pro' ? 'SL Game Hub Pro (30 days)' : 'SL Game Hub wallet top-up',
         mode: 'one_time',
         amount: { currency: CURRENCY, value: d.amount },
         duration: CODE_DURATION,

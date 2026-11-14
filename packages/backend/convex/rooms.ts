@@ -5,13 +5,24 @@ import type { Doc, Id } from './_generated/dataModel';
 import { internal } from './_generated/api';
 import { SalonePolyEngine, type SalonePolyState } from '@slgh/shared/src/games/salone-poly';
 import type { GameState, Player } from '@slgh/shared/src/types';
-import { SPECS, moveV, roomGameV, type RoomMove } from './roomGames';
+import { SPECS, ROOM_GAME_NAMES, moveV, roomGameV, type RoomMove } from './roomGames';
+import { WALLET_LIMITS, formatLeones } from '@slgh/shared/src/wallet';
+import { requireWalletUser } from './wallet';
+import { currentUser } from './lib';
+import { countGame, gamesLeft, isPro } from './pro';
+import { FREE_DAILY_ONLINE_GAMES } from '@slgh/shared/src/pro';
+import { lockPot, openPot, heldEntries, settleShared, stakeIn, unstake, voidPot } from './pots';
 
-// Online rooms for every multiplayer game (see roomGames.ts). Anonymous like free Dice rooms: no account needed.
-// Each browser makes a private `secret` and sends it with every call; it proves which seat is theirs.
+// Online rooms for every multiplayer game (see roomGames.ts). Players must be signed in (a free account is
+// fine): each member is tied to their account so free players' daily online games can be counted (pro.ts).
+// Each browser also makes a private `secret` and sends it with every call; it proves which seat is theirs.
 // Other players only ever see the public `member_id`, so nobody can act or peek as someone else.
 // The server owns the game: it validates and applies every move, makes every roll and shuffle,
 // plays the bots, and sends each player only what they may see (UNO hands, Scrabble racks stay secret).
+// Money rooms (`stake` set) are for signed-in players aged 18+: each member is tied to their account,
+// joining puts the stake into the round's pot (pots.ts), there are no bots, and when the game ends the
+// server pays the winner (a draw or tie shares the pot). Leaving before the start returns your stake;
+// leaving during a game forfeits it.
 
 const poly = new SalonePolyEngine(); // trades
 type Room = Doc<'play_rooms'>;
@@ -53,7 +64,40 @@ const seatOf = (s: State | undefined, memberId: string) => (s ? s.players.findIn
 async function save(ctx: MutationCtx, room: Room, state: State, extra: Partial<Room> = {}) {
   const version = room.version + 1;
   await ctx.db.patch(room._id, { ...extra, state, version, offer: undefined });
+  const wasPlaying = (room.state as State | undefined)?.status === 'playing';
+  if (room.pot_id && wasPlaying && state.status === 'finished') await settleRound(ctx, room, state);
   await scheduleBot(ctx, { ...room, state, version });
+}
+
+const roomLabel = (room: Room) => `${ROOM_GAME_NAMES[room.game]} room ${room.code}`;
+
+/** Money rooms: the game just ended, so pay the pot out and open a fresh one for the next round. */
+async function settleRound(ctx: MutationCtx, room: Room, s: State) {
+  const members = await membersOf(ctx, room._id);
+  const accountAt = (seat: number) => {
+    const p = s.players[seat];
+    return p && !p.isAI ? members.find((m) => m.member_id === p.id)?.user_id ?? null : null;
+  };
+  const stillHere = s.players.map((_, i) => i).filter((i) => accountAt(i));
+  let winning: number[] = [];
+  if (typeof s.winner === 'number' && accountAt(s.winner)) winning = [s.winner];
+  else {
+    // A draw or a tie: share between the tied leaders (by score where the game keeps one), else everyone still playing.
+    const scores = (s as State & { scores?: number[] }).scores;
+    const tied = (s as State & { tiedPlayers?: number[] }).tiedPlayers;
+    if (tied?.length) winning = tied;
+    else if (s.winner === null && Array.isArray(scores) && scores.length === s.players.length && stillHere.length) {
+      const best = Math.max(...stillHere.map((i) => scores[i]));
+      winning = stillHere.filter((i) => scores[i] === best);
+    }
+    winning = winning.filter((i) => accountAt(i));
+    if (!winning.length) winning = stillHere; // e.g. a bot that took over someone who left came first
+  }
+  const each = await settleShared(ctx, room.pot_id!, winning.map((i) => accountAt(i)!), roomLabel(room));
+  await ctx.db.patch(room._id, {
+    pot_id: await openPot(ctx, room.game, room.code, room.stake!),
+    last_prize: each ? { names: winning.map((i) => s.players[i].name), each } : undefined,
+  });
 }
 
 async function scheduleBot(ctx: MutationCtx, room: Room) {
@@ -72,8 +116,10 @@ const pendingRequests = (ctx: QueryCtx, roomId: Id<'play_rooms'>) =>
 /** Someone left: free their seat. Mid-game a bot takes over (or, in races, they drop out) so the others can finish. */
 async function removeMember(ctx: MutationCtx, room: Room, member: Doc<'play_members'>) {
   await ctx.db.delete(member._id);
+  if (room.pot_id && member.user_id) await unstake(ctx, room.pot_id, member.user_id, roomLabel(room)); // only while the pot is open
   const rest = await membersOf(ctx, room._id);
   if (rest.length === 0) {
+    if (room.pot_id) await voidPot(ctx, room.pot_id, roomLabel(room)); // nobody left to win: every stake goes back
     const requests = await ctx.db.query('play_requests').withIndex('by_room_id_and_status', (q) => q.eq('room_id', room._id)).take(100);
     for (const r of requests) await ctx.db.delete(r._id);
     const signals = await ctx.db.query('voice_signals').withIndex('by_room_id_and_to', (q) => q.eq('room_id', room._id)).take(500);
@@ -86,6 +132,15 @@ async function removeMember(ctx: MutationCtx, room: Room, member: Doc<'play_memb
   const seat = seatOf(s, member.member_id);
   if (!s || s.status !== 'playing' || seat < 0) return;
   const spec = SPECS[room.game];
+  if (room.pot_id) {
+    // Money rooms: the leaver forfeits. If only one player with a stake is left, they win the pot now.
+    const playing = s.players.map((_, i) => i)
+      .filter((i) => i !== seat && !s.players[i].isAI && rest.some((m) => m.member_id === s.players[i].id));
+    if (playing.length === 1) {
+      await save(ctx, room, { ...s, status: 'finished', winner: playing[0], updatedAt: Date.now() });
+      return;
+    }
+  }
   if (!spec.bots) { if (spec.onLeave) await save(ctx, room, spec.onLeave(s, seat)); return; }
   const players: Player[] = s.players.map((p, i) => (i === seat ? { id: p.id, name: `${p.name} (bot)`, isAI: true, difficulty: 'medium' } : p));
   await save(ctx, room, { ...s, players });
@@ -106,13 +161,27 @@ export const view = query({
     const requests = me?.host
       ? (await pendingRequests(ctx, room._id)).map((r) => ({ id: r.request_id, name: r.name, createdAt: r.created_at }))
       : [];
+    const pot = room.pot_id ? await ctx.db.get(room.pot_id) : null;
+    const meUser = me?.user_id ? await ctx.db.get(me.user_id) : null;
+    const staked = new Set(pot
+      ? (await ctx.db.query('pot_entries').withIndex('by_pot', (q) => q.eq('pot_id', pot._id)).collect())
+        .filter((e) => e.status === 'held').map((e) => e.user_id as string)
+      : []);
     return {
       code: room.code,
       game: room.game,
       version: room.version,
       isPublic: !!room.is_public,
-      me: me && { id: me.member_id, host: me.host, seat },
-      members: members.map((m) => ({ id: m.member_id, name: m.name, host: m.host, lastSeen: m.last_seen, voice: !!m.voice })),
+      me: me && { id: me.member_id, host: me.host, seat, pro: isPro(meUser), gamesLeft: meUser ? await gamesLeft(ctx, meUser) : null },
+      members: members.map((m) => ({
+        id: m.member_id, name: m.name, host: m.host, lastSeen: m.last_seen, voice: !!m.voice, talk: !!m.voice_talk,
+        staked: !!m.user_id && staked.has(m.user_id),
+      })),
+      money: room.stake === undefined ? null : {
+        stake: room.stake,
+        pot: pot ? { total: pot.total, status: pot.status, feeBps: pot.fee_bps } : null,
+        lastPrize: room.last_prize ?? null,
+      },
       state,
       offer: (room.offer ?? null) as null | { from: number; to: number; give: TradeSideT; get: TradeSideT },
       requests,
@@ -123,17 +192,30 @@ type TradeSideT = { spaces: number[]; cash: number; jailCards: number };
 
 /** Make a new room; you are its host. */
 export const create = mutation({
-  args: { game: roomGameV, name: v.string(), secret: v.string() },
-  handler: async (ctx, { game, name, secret }) => {
+  args: { game: roomGameV, name: v.string(), secret: v.string(), stake: v.optional(v.number()) },
+  handler: async (ctx, { game, name, secret, stake }) => {
     checkSecret(secret);
+    let userId: Id<'users'> | undefined = (await currentUser(ctx))?._id;
+    if (!userId) throw new ConvexError('errors.signInRequired');
+    if (stake !== undefined) {
+      if (SPECS[game].noMoney) throw new ConvexError('This game can only be played for fun.');
+      if (!Number.isInteger(stake) || stake < WALLET_LIMITS.minStake || stake > WALLET_LIMITS.maxStake) {
+        throw new ConvexError(`The stake must be between ${formatLeones(WALLET_LIMITS.minStake)} and ${formatLeones(WALLET_LIMITS.maxStake)}.`);
+      }
+      userId = (await requireWalletUser(ctx))._id;
+    }
     let code = '';
     for (let tries = 0; tries < 20 && (!code || await roomByCode(ctx, code)); tries++) {
       code = Array.from({ length: 6 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
     }
     const now = Date.now();
-    const roomId = await ctx.db.insert('play_rooms', { code, game, version: 0, created_at: now });
+    const potId = stake !== undefined ? await openPot(ctx, game, code, stake) : undefined;
+    const roomId = await ctx.db.insert('play_rooms', { code, game, version: 0, created_at: now, stake, pot_id: potId });
     const memberId = `m${now.toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`;
-    await ctx.db.insert('play_members', { room_id: roomId, member_id: memberId, secret, name: cleanName(name), host: true, joined_at: now, last_seen: now });
+    await ctx.db.insert('play_members', {
+      room_id: roomId, member_id: memberId, secret, name: cleanName(name), host: true, joined_at: now, last_seen: now, user_id: userId,
+    });
+    if (potId && userId) await stakeIn(ctx, potId, userId, `${ROOM_GAME_NAMES[game]} room ${code}`);
     return { code, memberId };
   },
 });
@@ -154,8 +236,17 @@ export const join = mutation({
     if ((room.state as State | undefined)?.status === 'playing') throw new ConvexError('This game has already started. Ask the host to start a new one, then join.');
     const members = await membersOf(ctx, room._id);
     if (members.length >= SPECS[room.game].max) throw new ConvexError(`Room ${room.code} is full (${SPECS[room.game].max} players).`);
+    let userId: Id<'users'> | undefined = (await currentUser(ctx))?._id;
+    if (!userId) throw new ConvexError('errors.signInRequired');
+    if (room.stake !== undefined) {
+      userId = (await requireWalletUser(ctx))._id;
+      if (members.some((m) => m.user_id === userId)) throw new ConvexError('You are already in this room on another device.');
+    }
     const memberId = `m${now.toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`;
-    await ctx.db.insert('play_members', { room_id: room._id, member_id: memberId, secret, name: cleanName(name), host: false, joined_at: now, last_seen: now });
+    await ctx.db.insert('play_members', {
+      room_id: room._id, member_id: memberId, secret, name: cleanName(name), host: false, joined_at: now, last_seen: now, user_id: userId,
+    });
+    if (room.pot_id && userId) await stakeIn(ctx, room.pot_id, userId, roomLabel(room));
     const request = await myRequest(ctx, room._id, secret); // they were let in from Live games: done with it
     if (request) await ctx.db.delete(request._id);
     return { code: room.code, memberId };
@@ -176,6 +267,32 @@ export const leave = mutation({
     const room = await roomByCode(ctx, code);
     const me = room && await memberBySecret(ctx, room._id, secret);
     if (room && me) await removeMember(ctx, room, me);
+  },
+});
+
+/** Money rooms: the signed-in member behind this seat (their account must be the one calling). */
+async function requireStaker(ctx: MutationCtx, code: string, secret: string) {
+  const { room, me } = await requireMember(ctx, code, secret);
+  if (!room.pot_id || !me.user_id) throw new ConvexError('This room is not played for money.');
+  if ((await requireWalletUser(ctx))._id !== me.user_id) throw new ConvexError('errors.signInRequired');
+  return { room, potId: room.pot_id, userId: me.user_id };
+}
+
+/** Money rooms: put your stake in for the next game ("play again"). */
+export const stake = mutation({
+  args: { code: v.string(), secret: v.string() },
+  handler: async (ctx, { code, secret }) => {
+    const { room, potId, userId } = await requireStaker(ctx, code, secret);
+    await stakeIn(ctx, potId, userId, roomLabel(room));
+  },
+});
+
+/** Money rooms: take your stake back before the game starts. */
+export const unstakeMe = mutation({
+  args: { code: v.string(), secret: v.string() },
+  handler: async (ctx, { code, secret }) => {
+    const { room, potId, userId } = await requireStaker(ctx, code, secret);
+    await unstake(ctx, potId, userId, roomLabel(room));
   },
 });
 
@@ -207,6 +324,7 @@ export const publicList = query({
         players: members.length,
         maxPlayers: SPECS[room.game].max,
         playing: s?.status === 'playing',
+        stake: room.stake ?? null,
         createdAt: room.created_at,
       };
     }));
@@ -288,15 +406,35 @@ export const answerRequest = mutation({
 
 /** Host only: deal a new game with everyone in the room, plus bots in the empty seats. */
 export const start = mutation({
-  args: { code: v.string(), secret: v.string(), bots: v.number(), difficulty: difficultyV, minutes: v.optional(v.number()) },
-  handler: async (ctx, { code, secret, bots, difficulty, minutes }) => {
+  args: { code: v.string(), secret: v.string(), bots: v.number(), difficulty: difficultyV, minutes: v.optional(v.number()), variant: v.optional(v.string()) },
+  handler: async (ctx, { code, secret, bots, difficulty, minutes, variant }) => {
     const { room, me } = await requireMember(ctx, code, secret);
     if (!me.host) throw new ConvexError('Only the host can start the game.');
     if ((room.state as State | undefined)?.status === 'playing') throw new ConvexError('A game is already being played.');
     const spec = SPECS[room.game];
-    const humans = (await membersOf(ctx, room._id)).slice(0, spec.max);
-    const botCount = spec.bots ? Math.max(0, Math.min(Math.floor(bots), spec.max - humans.length)) : 0;
+    let humans = (await membersOf(ctx, room._id)).slice(0, spec.max);
+    if (room.pot_id) {
+      const pot = await ctx.db.get(room.pot_id);
+      if (pot?.status !== 'open') throw new ConvexError('This round has already started.');
+      const staked = new Set((await heldEntries(ctx, pot._id)).map((e) => e.user_id));
+      humans = humans.filter((m) => m.user_id && staked.has(m.user_id));
+      if (humans.length < 2) throw new ConvexError('At least 2 players must put their stake in before the game can start.');
+    }
+    // Free players get FREE_DAILY_ONLINE_GAMES online games a day; Pro is unlimited.
+    const outOfGames: string[] = [];
+    for (const m of humans) {
+      const u = m.user_id ? await ctx.db.get(m.user_id) : null;
+      if (u && !isPro(u) && (await gamesLeft(ctx, u)) === 0) outOfGames.push(m.member_id);
+    }
+    if (outOfGames.length) {
+      const names = humans.filter((m) => outOfGames.includes(m.member_id)).map((m) => m.name).join(', ');
+      // Money rooms can't leave anyone out: their stake is already in the pot.
+      if (room.pot_id) throw new ConvexError(`${names} ${outOfGames.length === 1 ? 'has' : 'have'} played today's ${FREE_DAILY_ONLINE_GAMES} free games. Go Pro to keep playing, or take your stake back.`);
+      humans = humans.filter((m) => !outOfGames.includes(m.member_id)); // they watch this game instead
+    }
+    const botCount = spec.bots && !room.pot_id ? Math.max(0, Math.min(Math.floor(bots), spec.max - humans.length)) : 0;
     if (humans.length + botCount < 2) {
+      if (outOfGames.length) throw new ConvexError(`Not enough players: some have used today's ${FREE_DAILY_ONLINE_GAMES} free games. Add a bot, or go Pro for unlimited games.`);
       throw new ConvexError(spec.bots ? 'Add a bot or wait for a friend: you need at least 2 players.' : 'Wait for a friend: you need at least 2 players.');
     }
     const players: Player[] = [
@@ -304,7 +442,9 @@ export const start = mutation({
       ...Array.from({ length: botCount }, (_, i) => ({ id: `bot${i + 1}`, name: `Bot ${i + 1}`, isAI: true, difficulty })),
     ];
     const timed = spec.timer && minutes ? Math.min(120, Math.max(room.game === 'snake' ? 1 : 10, Math.floor(minutes))) : 0;
-    await save(ctx, room, spec.start(players, timed));
+    if (room.pot_id) await lockPot(ctx, room.pot_id);
+    await countGame(ctx, humans.flatMap((m) => (m.user_id ? [m.user_id] : [])));
+    await save(ctx, room, spec.start(players, timed, variant?.slice(0, 32)));
     if (timed) await ctx.scheduler.runAfter(timed * 60_000, internal.rooms.timeUp, { roomId: room._id });
   },
 });

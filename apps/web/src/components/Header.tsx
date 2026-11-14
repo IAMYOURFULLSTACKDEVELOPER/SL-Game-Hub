@@ -1,42 +1,58 @@
 import { t, avatarEmoji } from '@slgh/shared';
 import { getMe } from '@/lib/session';
-import { NavBar, type NavItem } from './NavBar';
+import { api, query } from '@/lib/convex';
+import { NavBar, type NavItem, type NavSection } from './NavBar';
 import { Icon } from './Icon';
 import { SignOutButton } from './SignOutButton';
 
 export async function Header() {
-  const me = await getMe();
-  const primary: NavItem[] = [
-    { href: '/games', label: t('nav.games'), icon: 'gamepad' },
-    { href: '/lobby', label: 'Live games', icon: 'globe' },
-    { href: '/leaderboards', label: 'Leaderboards', icon: 'trophy' },
-    { href: '/tournaments', label: 'Tournaments', icon: 'swords' },
-    ...(me ? [{ href: '/chat', label: 'Chat', icon: 'chat' } as NavItem] : []),
-  ];
-  const tabs: NavItem[] = [
-    { href: '/', label: t('nav.home'), icon: 'home' },
-    { href: '/games', label: t('nav.games'), icon: 'gamepad' },
-    { href: '/leaderboards', label: 'Ranks', icon: 'trophy' },
-    { href: '/tournaments', label: 'Events', icon: 'swords' },
-  ];
-  const more: NavItem[] = [
-    ...(me ? [
+  // The rail lists the published games; fetched alongside the session so pages don't wait twice.
+  const [me, catalog] = await Promise.all([getMe(), query(api.games.list, {}).catch(() => [])]);
+
+  const sections: NavSection[] = [
+    { items: [
+      { href: '/', label: t('nav.home'), icon: 'home' },
+      { href: '/games', label: 'Browse games', icon: 'gamepad' },
+      { href: '/lobby', label: 'Live games', icon: 'live' },
+    ] },
+    { title: 'Compete', items: [
+      { href: '/leaderboards', label: 'Leaderboards', icon: 'trophy' },
+      { href: '/tournaments', label: 'Tournaments', icon: 'swords' },
+    ] },
+    { title: 'Community', items: [
+      ...(me ? [{ href: '/chat', label: 'chat', icon: 'hash' } as NavItem] : []),
+      { href: '/roadmap', label: 'roadmap', icon: 'hash' },
+    ] },
+    ...(me ? [{ title: 'You', items: [
       { href: '/profile', label: t('nav.profile'), icon: 'user' },
       { href: '/achievements', label: 'Achievements', icon: 'medal' },
       { href: '/wallet', label: 'Wallet', icon: 'wallet' },
       { href: '/shop', label: 'Shop', icon: 'bag' },
-    ] as NavItem[] : []),
-    ...(me?.role === 'admin' ? [{ href: '/admin', label: t('nav.admin'), icon: 'shield' } as NavItem] : []),
-    { href: '/roadmap', label: 'Roadmap', icon: 'map' },
+      { href: '/groups', label: 'Groups', icon: 'users' },
+      { href: '/pro', label: 'Pro', icon: 'star' },
+      ...(me.role === 'admin' ? [{ href: '/admin', label: t('nav.admin'), icon: 'shield' } as NavItem] : []),
+    ] as NavItem[] }] : []),
   ];
+  const tabs: NavItem[] = [
+    { href: '/', label: t('nav.home'), icon: 'home' },
+    { href: '/games', label: t('nav.games'), icon: 'gamepad' },
+    { href: '/lobby', label: 'Live', icon: 'live' },
+    { href: '/leaderboards', label: 'Ranks', icon: 'trophy' },
+  ];
+  const account: NavItem[] = me ? [
+    { href: '/profile', label: t('nav.profile'), icon: 'user' },
+    { href: '/wallet', label: 'Wallet', icon: 'wallet' },
+    { href: '/achievements', label: 'Achievements', icon: 'medal' },
+  ] : [];
 
   return (
     <NavBar
-      appName={t('app.name')} primary={primary} tabs={tabs} more={more}
+      appName={t('app.name')} sections={sections} tabs={tabs} account={account}
+      games={catalog.map((g) => ({ slug: g.slug, name: g.name }))}
       user={me ? { name: me.username, avatar: avatarEmoji(me.avatar) } : null}
       signIn={t('nav.signIn')} signUp={t('nav.signUp')} themeLabel={t('nav.theme')}
       signOut={
-        <SignOutButton className="menu-item w-full text-danger"><Icon name="logout" size={18} />{t('nav.signOut')}</SignOutButton>
+        <SignOutButton className="menu-item w-full menu-danger"><Icon name="logout" size={18} />{t('nav.signOut')}</SignOutButton>
       }
     />
   );

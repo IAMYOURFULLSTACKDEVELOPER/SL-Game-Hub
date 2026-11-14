@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { useAction, useMutation, useQuery } from 'convex/react';
-import { ConvexError } from 'convex/values';
+import { playerMessage } from '@slgh/shared/src/errors';
 import { api } from '@slgh/backend/convex/_generated/api';
 
 // Client side of convex/rooms.ts, shared by every online game (see convex/roomGames.ts).
@@ -26,7 +26,7 @@ export function mySecret() {
   return s;
 }
 export const savedName = () => load(NAME_KEY) ?? '';
-export const errorText = (e: unknown) => (e instanceof ConvexError && typeof e.data === 'string' ? e.data : 'Something went wrong. Check your connection and try again.');
+export const errorText = (e: unknown) => playerMessage(e);
 
 export function useRoom(game: RoomGame) {
   const [secret, setSecret] = useState('');
@@ -52,6 +52,8 @@ export function useRoom(game: RoomGame) {
   const respondM = useMutation(api.rooms.respondTrade);
   const setPublicM = useMutation(api.rooms.setPublic);
   const answerM = useMutation(api.rooms.answerRequest);
+  const stakeM = useMutation(api.rooms.stake);
+  const unstakeM = useMutation(api.rooms.unstakeMe);
   const scrabbleM = useAction(api.scrabbleNode.move);
 
   const joined = !!view?.me;
@@ -73,12 +75,16 @@ export function useRoom(game: RoomGame) {
 
   const enter = (c: string) => { setCode(c); store(roomKey(game), c); };
   return {
-    code, secret, view, joined, error, busy, setError,
-    create: (name: string) => run(async () => {
+    game, code, secret, view, joined, error, busy, setError,
+    /** Make a room. `stake` (minor units) makes it a money room: needs a signed-in player aged 18+. */
+    create: (name: string, options: { stake?: number } = {}) => run(async () => {
       store(NAME_KEY, name);
-      const r = await createM({ game, name, secret });
+      const r = await createM({ game, name, secret, ...options });
       enter(r.code);
     }),
+    /** Money rooms: put your stake in for the next game, or take it back before it starts */
+    stake: () => run(() => stakeM({ code: code!, secret })),
+    unstake: () => run(() => unstakeM({ code: code!, secret })),
     join: (c: string, name: string) => run(async () => {
       store(NAME_KEY, name);
       const r = await joinM({ code: c.toUpperCase(), name, secret });
@@ -91,8 +97,8 @@ export function useRoom(game: RoomGame) {
     }),
     /** Look at a room before joining (from a link): forget it without telling the server. */
     forget: () => { setCode(null); store(roomKey(game), null); },
-    start: (bots: number, difficulty: 'easy' | 'medium' | 'hard', minutes?: number) =>
-      run(() => startM({ code: code!, secret, bots, difficulty, minutes })),
+    start: (bots: number, difficulty: 'easy' | 'medium' | 'hard', minutes?: number, variant?: string) =>
+      run(() => startM({ code: code!, secret, bots, difficulty, minutes, variant })),
     move: (m: Parameters<typeof moveM>[0]['move']) => run(() => moveM({ code: code!, secret, move: m })),
     /** Scrabble: every move goes through the server's dictionary check */
     scrabbleMove: (m: Parameters<typeof scrabbleM>[0]['move']) => run(() => scrabbleM({ code: code!, secret, move: m })),

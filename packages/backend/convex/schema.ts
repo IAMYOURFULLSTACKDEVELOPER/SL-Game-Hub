@@ -20,6 +20,7 @@ export const momoProvider = v.union(v.literal('m17'), v.literal('m18'));
 export const walletTxType = v.union(
   v.literal('deposit'), v.literal('stake'), v.literal('stake_refund'), v.literal('stake_lost'), v.literal('winnings'),
   v.literal('withdrawal_hold'), v.literal('withdrawal_paid'), v.literal('withdrawal_refund'), v.literal('adjustment'),
+  v.literal('pro'),
 );
 const rarity = v.union(v.literal('common'), v.literal('rare'), v.literal('epic'), v.literal('legendary'));
 
@@ -46,6 +47,7 @@ export default defineSchema({
     is_public: v.boolean(),
     banned: v.boolean(),
     updated_at: v.number(),
+    pro_until: v.optional(v.number()), // SL Game Hub Pro is active until this time (see convex/pro.ts)
   })
     .index('email', ['email'])
     .index('by_username_lower', ['username_lower']),
@@ -440,6 +442,53 @@ export default defineSchema({
     updated_at: v.number(),
   }).index('by_user', ['user_id']),
 
+  // SL Game Hub Pro -------------------------------------------------------------------
+  // One row per payment (wallet or USSD); each adds 30 days to users.pro_until.
+  pro_payments: defineTable({
+    user_id: v.id('users'),
+    method: v.union(v.literal('wallet'), v.literal('ussd')),
+    amount: v.number(),
+    pro_until: v.number(), // the new end date this payment gave
+    deposit_id: v.optional(v.id('deposits')),
+  }).index('by_user', ['user_id']),
+
+  // Online games each free player started today (UTC day, e.g. "2026-11-14").
+  daily_plays: defineTable({ user_id: v.id('users'), day: v.string(), count: v.number() })
+    .index('by_user_day', ['user_id', 'day']),
+
+  // Groups and forums for teams. Pro players create them; anyone signed in can join with the invite code.
+  groups: defineTable({
+    name: v.string(),
+    description: v.optional(v.string()),
+    owner_id: v.id('users'),
+    invite_code: v.string(),
+    member_count: v.number(),
+    last_post_at: v.optional(v.number()),
+  })
+    .index('by_invite_code', ['invite_code'])
+    .index('by_owner', ['owner_id']),
+  group_members: defineTable({
+    group_id: v.id('groups'),
+    user_id: v.id('users'),
+    role: v.union(v.literal('owner'), v.literal('member')),
+    joined_at: v.number(),
+  })
+    .index('by_group_user', ['group_id', 'user_id'])
+    .index('by_user', ['user_id']),
+  group_threads: defineTable({
+    group_id: v.id('groups'),
+    author_id: v.id('users'),
+    title: v.string(),
+    reply_count: v.number(),
+    last_post_at: v.number(),
+  }).index('by_group_last_post', ['group_id', 'last_post_at']),
+  group_posts: defineTable({
+    thread_id: v.id('group_threads'),
+    group_id: v.id('groups'),
+    author_id: v.id('users'),
+    body: v.string(),
+  }).index('by_thread', ['thread_id']),
+
   // Wallet (real money) ---------------------------------------------------------------
   // Amounts are integers in minor units, as Monime counts them: 100 = SLE 1.
   // `balance` can be spent; `held` is locked in game pots and pending withdrawals.
@@ -475,6 +524,7 @@ export default defineSchema({
     error: v.optional(v.string()),
     completed_at: v.optional(v.number()),
     updated_at: v.number(),
+    purpose: v.optional(v.literal('pro')), // paying for Pro by USSD: completing it adds Pro days instead of wallet money
   })
     .index('by_user', ['user_id'])
     .index('by_monime_id', ['monime_id'])
@@ -554,6 +604,10 @@ export default defineSchema({
     offer: v.optional(v.any()), // Salone-Poly: a trade waiting for the other player's answer
     created_at: v.number(),
     is_public: v.optional(v.boolean()), // listed in Live games, where anyone can ask to join (the code stays hidden)
+    // Money rooms: every player stakes this much (minor units) into the round's pot; the server pays the winner.
+    stake: v.optional(v.number()),
+    pot_id: v.optional(v.id('pots')),
+    last_prize: v.optional(v.object({ names: v.array(v.string()), each: v.number() })), // last round's payout
   })
     .index('by_code', ['code'])
     .index('by_is_public', ['is_public']),
@@ -566,6 +620,8 @@ export default defineSchema({
     joined_at: v.number(),
     last_seen: v.number(),
     voice: v.optional(v.boolean()), // in the room's voice chat
+    voice_talk: v.optional(v.boolean()), // may talk (Pro); everyone else in voice listens only
+    user_id: v.optional(v.id('users')), // money rooms: the signed-in player whose wallet stakes and wins
   })
     .index('by_room_id_and_joined_at', ['room_id', 'joined_at'])
     .index('by_room_id_and_secret', ['room_id', 'secret'])

@@ -7,12 +7,13 @@ import { t } from '@slgh/shared';
 import {
   MOMO_PROVIDERS, WALLET_LIMITS, displaySlPhone, formatLeones, parseLeones, providerName, ussdHref,
 } from '@slgh/shared/src/wallet';
+import { playerMessage } from '@slgh/shared/src/errors';
 import { api } from '@/convex';
 import { useAuth } from '@/auth';
 import { useColors } from '@/theme';
 import { Banner, Button, Card, Chip, Field, Loading, Screen, Txt } from '@/ui';
 
-const message = (e: unknown) => (e instanceof ConvexError ? String(e.data) : t('common.offline'));
+const message = (e: unknown) => playerMessage(e);
 const QUICK = [1_000, 2_500, 5_000, 10_000];
 
 /** Wallet: top up by dialling a Monime USSD code straight from the app, withdraw to mobile money. */

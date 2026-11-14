@@ -8,6 +8,8 @@ import {
 import Rulebook from './Rulebook';
 import { RoomLobby, JoinRequests } from './RoomLobby';
 import { VoiceChat } from './VoiceChat';
+import { ProBar } from './ProBar';
+import { MoneyBar } from './MoneyBar';
 import { ConvexRoomProvider } from './ConvexRoomProvider';
 import { Icon } from './Icon';
 import { useRoom, type RoomApi } from '@/lib/useRoom';
@@ -230,6 +232,8 @@ function OnlineChess() {
   return (
     <div className="space-y-4">
       <VoiceChat room={room} />
+      <MoneyBar room={room} />
+      <ProBar room={room} />
       {room.joined && game && <OnlineChessTable game={game} seat={v?.me?.seat ?? -1} busy={room.busy} onMove={(m) => { room.move(m); }} />}
       {playing && <JoinRequests room={room} />}
       {room.error && playing && <p role="alert" className="flash rounded-xl border border-danger/40 bg-danger/10 p-3 text-sm font-semibold text-danger">{room.error}</p>}

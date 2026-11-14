@@ -6,6 +6,13 @@ import type {
   GameManifest,
 } from '../types';
 import { getRandomMove } from '../games';
+import { pickVariant, type GameVariant } from './variants';
+
+export type SnakeAndLadderVariant = 'classic' | 'quick-finish';
+export const SNAKE_AND_LADDER_VARIANTS: GameVariant<SnakeAndLadderVariant>[] = [
+  { id: 'classic', name: 'Classic', blurb: 'Land exactly on 100. Roll too high and you bounce back.' },
+  { id: 'quick-finish', name: 'Quick finish', blurb: 'Any roll that reaches 100 wins, so no bouncing back.' },
+];
 
 /** What happened on the last roll, so UIs can animate and narrate it */
 export interface SnakeAndLadderLastMove {
@@ -28,6 +35,8 @@ export interface SnakeAndLadderState extends GameState {
   diceValue: number | null; // last dice roll
   consecutiveSixes: number; // sixes rolled in a row by the current player this turn
   lastMove: SnakeAndLadderLastMove | null;
+  /** House rules (missing on games saved before variants existed = classic) */
+  variant?: SnakeAndLadderVariant;
   winner: number | null;
 }
 
@@ -129,10 +138,11 @@ export const SNAKE_AND_LADDER_RULES: { title: string; rules: string[] }[] = [
   },
 ];
 
-/** Walk a roll forward from a square, bouncing back off 100 */
-export function walkRoll(from: number, roll: number): { landed: number; bounced: boolean } {
+/** Walk a roll forward from a square, bouncing back off 100 (or stopping on it when `exact` is false) */
+export function walkRoll(from: number, roll: number, exact = true): { landed: number; bounced: boolean } {
   const raw = from + roll;
   if (raw <= SNAKE_AND_LADDER_FINISH) return { landed: raw, bounced: false };
+  if (!exact) return { landed: SNAKE_AND_LADDER_FINISH, bounced: false };
   return { landed: SNAKE_AND_LADDER_FINISH - (raw - SNAKE_AND_LADDER_FINISH), bounced: true };
 }
 
@@ -153,6 +163,7 @@ export class SnakeAndLadderEngine implements GameEngine<SnakeAndLadderState, Sna
       playerPositions: players.map(() => SNAKE_AND_LADDER_START),
       snakes: { ...SNAKE_AND_LADDER_SNAKES },
       ladders: { ...SNAKE_AND_LADDER_LADDERS },
+      variant: pickVariant(SNAKE_AND_LADDER_VARIANTS, options?.variant),
       diceValue: null,
       consecutiveSixes: 0,
       lastMove: null,
@@ -185,7 +196,7 @@ export class SnakeAndLadderEngine implements GameEngine<SnakeAndLadderState, Sna
       };
     }
 
-    const { landed, bounced } = walkRoll(from, move);
+    const { landed, bounced } = walkRoll(from, move, state.variant !== 'quick-finish');
     let to = landed;
     let kind: SnakeAndLadderLastMove['kind'] = 'move';
     if (state.snakes[landed]) {
@@ -237,7 +248,7 @@ export class SnakeAndLadderEngine implements GameEngine<SnakeAndLadderState, Sna
         // Prefer moves that land on ladders or avoid snakes
         const currentPos = state.playerPositions[state.currentPlayerIndex];
         const scoredMoves = moves.map((move) => {
-          const newPos = walkRoll(currentPos, move).landed;
+          const newPos = walkRoll(currentPos, move, state.variant !== 'quick-finish').landed;
 
           let score = move; // Prefer higher rolls
           if (state.ladders[newPos]) score += 10; // Bonus for ladder
@@ -258,7 +269,7 @@ export class SnakeAndLadderEngine implements GameEngine<SnakeAndLadderState, Sna
         // Always pick best move
         const currentPosHard = state.playerPositions[state.currentPlayerIndex];
         const scoredMovesHard = moves.map((move) => {
-          const newPos = walkRoll(currentPosHard, move).landed;
+          const newPos = walkRoll(currentPosHard, move, state.variant !== 'quick-finish').landed;
 
           let score = move;
           if (state.ladders[newPos]) score += 15;

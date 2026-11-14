@@ -9,11 +9,11 @@ export const sendFriendRequest = mutation({
   args: { targetUserId: v.id('users') },
   handler: async (ctx, { targetUserId }) => {
     const me = await requireActiveUser(ctx);
-    if (targetUserId === me._id) throw new ConvexError('cannot friend yourself');
-    if (!(await ctx.db.get(targetUserId))) throw new ConvexError('user not found');
+    if (targetUserId === me._id) throw new ConvexError("You can't add yourself as a friend.");
+    if (!(await ctx.db.get(targetUserId))) throw new ConvexError('errors.notFound');
     const existing = await ctx.db.query('friendships').withIndex('by_pair', (q) => q.eq('requester_id', me._id).eq('receiver_id', targetUserId)).unique()
       ?? await ctx.db.query('friendships').withIndex('by_pair', (q) => q.eq('requester_id', targetUserId).eq('receiver_id', me._id)).unique();
-    if (existing) throw new ConvexError('friendship already exists');
+    if (existing) throw new ConvexError("You're already friends, or a friend request is waiting.");
     return ctx.db.insert('friendships', { requester_id: me._id, receiver_id: targetUserId, status: 'pending', updated_at: Date.now() });
   },
 });
@@ -23,7 +23,7 @@ export const respondFriendRequest = mutation({
   handler: async (ctx, { friendshipId, accept }) => {
     const me = await requireActiveUser(ctx);
     const f = await ctx.db.get(friendshipId);
-    if (!f || f.receiver_id !== me._id || f.status !== 'pending') throw new ConvexError('request not found');
+    if (!f || f.receiver_id !== me._id || f.status !== 'pending') throw new ConvexError('errors.notFound');
     await ctx.db.patch(f._id, { status: accept ? 'accepted' : 'blocked', updated_at: Date.now() });
   },
 });
@@ -34,7 +34,7 @@ export const removeFriend = mutation({
     const me = await requireActiveUser(ctx);
     const f = await ctx.db.get(friendshipId);
     if (!f || f.status !== 'accepted' || (f.requester_id !== me._id && f.receiver_id !== me._id)) {
-      throw new ConvexError('friendship not found');
+      throw new ConvexError('errors.notFound');
     }
     await ctx.db.delete(f._id);
   },
@@ -46,7 +46,7 @@ const randomCode = () => Array.from({ length: 6 }, () => CODE_CHARS[Math.floor(M
 
 async function requirePublishedGame(ctx: QueryCtx, gameId: Id<'games'>) {
   const g = await ctx.db.get(gameId);
-  if (!g || g.status !== 'published') throw new ConvexError('game not available');
+  if (!g || g.status !== 'published') throw new ConvexError('errors.gameUnavailable');
 }
 
 export const createRoom = mutation({
@@ -54,7 +54,7 @@ export const createRoom = mutation({
   handler: async (ctx, { gameId, maxPlayers = 2 }) => {
     const me = await requireActiveUser(ctx);
     await requirePublishedGame(ctx, gameId);
-    if (!Number.isInteger(maxPlayers) || maxPlayers < 2 || maxPlayers > 8) throw new ConvexError('max players must be 2-8');
+    if (!Number.isInteger(maxPlayers) || maxPlayers < 2 || maxPlayers > 8) throw new ConvexError('Rooms can have 2 to 8 players.');
     let room_code = randomCode();
     while (await ctx.db.query('game_rooms').withIndex('by_code', (q) => q.eq('room_code', room_code)).first()) room_code = randomCode();
     const room_id = await ctx.db.insert('game_rooms', {
@@ -70,12 +70,12 @@ export const joinRoom = mutation({
   handler: async (ctx, { roomCode }) => {
     const me = await requireActiveUser(ctx);
     const room = await ctx.db.query('game_rooms').withIndex('by_code', (q) => q.eq('room_code', roomCode.toUpperCase())).first();
-    if (!room || room.status !== 'waiting') throw new ConvexError('room not found or not available');
+    if (!room || room.status !== 'waiting') throw new ConvexError('errors.notFound');
     const already = await ctx.db.query('room_participants').withIndex('by_room_user', (q) => q.eq('room_id', room._id).eq('user_id', me._id)).unique();
     if (already && already.left_at === undefined) return room._id;
     const present = (await ctx.db.query('room_participants').withIndex('by_room_user', (q) => q.eq('room_id', room._id)).collect())
       .filter((p) => p.left_at === undefined).length;
-    if (present >= room.max_players) throw new ConvexError('room is full');
+    if (present >= room.max_players) throw new ConvexError('That room is full.');
     if (already) await ctx.db.patch(already._id, { left_at: undefined, joined_at: Date.now(), is_ready: false });
     else await ctx.db.insert('room_participants', { room_id: room._id, user_id: me._id, joined_at: Date.now(), is_ready: false });
     return room._id;
@@ -103,7 +103,7 @@ export const leaveMatchmaking = mutation({
   handler: async (ctx, { queueId }) => {
     const me = await requireUser(ctx);
     const e = await ctx.db.get(queueId);
-    if (!e || e.user_id !== me._id || e.status !== 'queued') throw new ConvexError('queue entry not found');
+    if (!e || e.user_id !== me._id || e.status !== 'queued') throw new ConvexError('errors.notFound');
     await ctx.db.patch(e._id, { status: 'cancelled' });
   },
 });

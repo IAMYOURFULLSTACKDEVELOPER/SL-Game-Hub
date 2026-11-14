@@ -53,21 +53,21 @@ export const get = query({
 export const register = mutation({
   args: { tournamentId: v.id('tournaments') },
   handler: async (ctx, { tournamentId }) => {
-    const me = await requireActiveUser(ctx, 'account banned');
+    const me = await requireActiveUser(ctx, 'errors.suspended');
     const t = await ctx.db.get(tournamentId);
-    if (!t) throw new ConvexError('tournament not found');
-    if (t.status !== 'registration') throw new ConvexError('registration not open');
+    if (!t) throw new ConvexError('errors.notFound');
+    if (t.status !== 'registration') throw new ConvexError('errors.registrationClosed');
     const now = Date.now();
     if ((t.registration_starts_at && now < t.registration_starts_at) || (t.registration_ends_at && now > t.registration_ends_at)) {
-      throw new ConvexError('registration not in time window');
+      throw new ConvexError('errors.registrationClosed');
     }
     const existing = await ctx.db.query('tournament_registrations')
       .withIndex('by_tournament_user', (q) => q.eq('tournament_id', t._id).eq('user_id', me._id)).unique();
-    if (existing) throw new ConvexError('already registered');
+    if (existing) throw new ConvexError('errors.alreadyRegistered');
     const count = (await ctx.db.query('tournament_registrations')
       .withIndex('by_tournament_status', (q) => q.eq('tournament_id', t._id).eq('status', 'registered')).collect()).length;
-    if (count >= t.max_players) throw new ConvexError('tournament full');
-    if (t.entry_fee_coins > 0) throw new ConvexError('coin payment not yet implemented');
+    if (count >= t.max_players) throw new ConvexError('errors.tournamentFull');
+    if (t.entry_fee_coins > 0) throw new ConvexError("Paying coins to enter isn't available yet.");
     await ctx.db.insert('tournament_registrations', { tournament_id: t._id, user_id: me._id, registered_at: now, status: 'registered' });
   },
 });

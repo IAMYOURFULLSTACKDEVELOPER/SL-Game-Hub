@@ -17,6 +17,10 @@ import type { Difficulty, GameState, Player } from '@slgh/shared/src/types';
 
 export const ROOM_GAMES = ['uno', 'salone-poly', 'chess', 'checkers', 'snake-and-ladder', 'scrabble', 'word-search', 'snake'] as const;
 export type RoomGame = (typeof ROOM_GAMES)[number];
+export const ROOM_GAME_NAMES: Record<RoomGame, string> = {
+  uno: 'UNO', 'salone-poly': 'Salone-Poly', chess: 'Chess', checkers: 'Checkers',
+  'snake-and-ladder': 'Snake & Ladder', scrabble: 'Scrabble', 'word-search': 'Word Search', snake: 'Snake',
+};
 export const roomGameV = v.union(
   v.literal('uno'), v.literal('salone-poly'), v.literal('chess'), v.literal('checkers'),
   v.literal('snake-and-ladder'), v.literal('scrabble'), v.literal('word-search'), v.literal('snake'),
@@ -76,8 +80,11 @@ export interface GameSpec<S = any> {
   simultaneous?: boolean;
   /** The host can set a time limit */
   timer?: boolean;
+  /** Can't be played for money: the server doesn't decide the result (e.g. Snake trusts each phone's score) */
+  noMoney?: boolean;
   moveTypes: ReadonlySet<string>;
-  start(players: Player[], minutes: number): S;
+  /** `variant`: the house rules the host picked (the engine checks it and falls back to its default) */
+  start(players: Player[], minutes: number, variant?: string): S;
   /** What `seat` (-1 for a spectator) may see */
   view(s: S, seat: number): unknown;
   /** Seat that must act now (turn-based games) */
@@ -102,7 +109,7 @@ const uno = new UnoEngine();
 const unoSpec: GameSpec<UnoState> = {
   max: UNO_MANIFEST.maxPlayers, bots: true, botDelayMs: 1100,
   moveTypes: new Set(['play', 'draw', 'pass']),
-  start: (players) => uno.initialize(players),
+  start: (players, _minutes, variant) => uno.initialize(players, { variant }),
   view: (s, seat) => unoViewFor(s, seat),
   actor: (s) => s.currentPlayerIndex,
   check: (s, m, seat) => ('placements' in m ? 'That move belongs to a different game.' : uno.check(s, m as UnoMove, seat)),
@@ -177,7 +184,7 @@ const ladder = new SnakeAndLadderEngine();
 const ladderSpec: GameSpec<SnakeAndLadderState> = {
   max: SNAKE_AND_LADDER_MANIFEST.maxPlayers, bots: true, botDelayMs: 1200,
   moveTypes: new Set(['roll']),
-  start: (players) => ladder.initialize(players),
+  start: (players, _minutes, variant) => ladder.initialize(players, { variant }),
   view: (s) => s,
   actor: (s) => s.currentPlayerIndex,
   check: (s, _m, seat) => notYourTurn(s, seat),
@@ -238,7 +245,7 @@ const finishSnake = (s: SnakeRaceState): SnakeRaceState => {
   return { ...s, status: 'finished', winner: top.length === 1 ? top[0] : null, alive: s.alive.map(() => false), updatedAt: Date.now() };
 };
 const snakeSpec: GameSpec<SnakeRaceState> = {
-  max: 6, bots: false, botDelayMs: 0, simultaneous: true, timer: true,
+  max: 6, bots: false, botDelayMs: 0, simultaneous: true, timer: true, noMoney: true,
   moveTypes: new Set(['snake_score']),
   start: (players, minutes) => {
     const now = Date.now();

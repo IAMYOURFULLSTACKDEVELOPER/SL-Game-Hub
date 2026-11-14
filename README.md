@@ -93,6 +93,17 @@ Deployment environment variables (`cd packages/backend && npx convex env set NAM
 
 A cron re-checks top-ups and payouts every 5 minutes, in case a webhook is missed.
 
+## SL Game Hub Pro
+SLE 10 for 30 days (`convex/pro.ts`, constants in `packages/shared/src/pro.ts`), paid from the wallet (players aged 18+)
+or by a Monime USSD code (anyone, e.g. a parent pays; a deposit with `purpose: 'pro'` adds Pro days instead of wallet money).
+Paying again adds 30 days; nothing renews automatically.
+- **Online games:** free players get 10 a day (UTC), counted per account when a game starts (`daily_plays`); Pro is unlimited.
+  Online play therefore needs a signed-in account (free is fine). Games against bots on the device stay unlimited and offline.
+- **Groups and forums** (`convex/groups.ts`, `/groups`): Pro players create a group and share its invite code; anyone signed
+  in can join, start threads and reply. The owner can remove members and posts, change the code or delete the group.
+- **Voice chat:** free players join to listen; Pro players can talk. Listeners never open the microphone, and every browser
+  mutes audio from members the server hasn't allowed to talk.
+
 ## Why it is fast on low-end phones
 - **Server-rendered pages, almost no client JS.** Pages fetch from Convex on the server (`lib/convex.ts`) and forms post to
   server actions. The Convex client is only shipped where something is live (Chat, online Dice). Sign-in forms post

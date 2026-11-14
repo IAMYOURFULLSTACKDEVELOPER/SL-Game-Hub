@@ -1,5 +1,9 @@
 import type { GameState, GameEngine, Player, Difficulty, GameManifest } from '../types';
 import { shuffle, youGrammar } from '../games';
+import { pickVariant, type GameVariant } from './variants';
+
+export type { GameVariant } from './variants';
+export { pickVariant } from './variants';
 
 /** UNO card colours ('wild' only for the two wild cards) */
 export type CardColor = 'red' | 'blue' | 'green' | 'yellow' | 'wild';
@@ -49,7 +53,19 @@ export interface UnoState extends GameState {
   log: string[];
   /** Points scored by each player when the game ends (winner gets everyone else's card values) */
   scores: number[] | null;
+  /** House rules for this game (missing on games saved before variants existed = classic) */
+  variant?: UnoVariant;
+  /** Stacking: cards the current player must take unless they answer with a Draw card */
+  pendingDraw?: number;
 }
+
+export type UnoVariant = 'classic' | 'express' | 'stacking' | 'draw-till-play';
+export const UNO_VARIANTS: GameVariant<UnoVariant>[] = [
+  { id: 'classic', name: 'Classic', blurb: '7 cards each, the standard rules.' },
+  { id: 'express', name: 'Express', blurb: '5 cards each, so a game takes just a few minutes.' },
+  { id: 'stacking', name: 'Stacking', blurb: 'Answer a Draw card with your own. The next player takes the whole pile.' },
+  { id: 'draw-till-play', name: 'Draw till you play', blurb: 'No card to play? Keep drawing until you find one.' },
+];
 
 export const UNO_MANIFEST: GameManifest = {
   id: 'uno',
@@ -63,6 +79,7 @@ export const UNO_MANIFEST: GameManifest = {
 };
 
 export const HAND_SIZE = 7;
+export const unoHandSize = (variant: UnoVariant | undefined) => (variant === 'express' ? 5 : HAND_SIZE);
 
 /** The 108-card deck: per colour one 0, two each of 1-9, Skip, Reverse and Draw Two; 4 Wild and 4 Wild Draw Four. */
 export function createUnoDeck(): Card[] {
@@ -96,6 +113,11 @@ export function cardLabel(c: Card): string {
 
 const top = (s: UnoState) => s.discardPile[s.discardPile.length - 1];
 
+/** Whether `card` may be played now, taking pending stacked draws into account */
+function playableNow(s: UnoState, card: Card, hand: Card[]): boolean {
+  return s.pendingDraw ? canStack(card, top(s)) : canPlay(card, hand, top(s), s.currentColor);
+}
+
 /** Colour/number/symbol match, ignoring the Wild Draw Four restriction */
 function matches(card: Card, onTop: Card, color: PlayColor): boolean {
   if (card.color === 'wild') return true;
@@ -103,6 +125,9 @@ function matches(card: Card, onTop: Card, color: PlayColor): boolean {
   if (card.type === 'number') return onTop.type === 'number' && card.value === onTop.value;
   return card.type === onTop.type;
 }
+
+/** Stacking: with draws pending, only a Draw Four, or a Draw Two on a Draw Two, passes them on. */
+export const canStack = (card: Card, onTop: Card) => card.type === 'wild_draw_four' || (card.type === 'draw_two' && onTop.type === 'draw_two');
 
 /** Can `card` be played from `hand` right now? Wild Draw Four only when you hold no card of the current colour. */
 export function canPlay(card: Card, hand: Card[], onTop: Card, color: PlayColor): boolean {
@@ -112,9 +137,12 @@ export function canPlay(card: Card, hand: Card[], onTop: Card, color: PlayColor)
 }
 
 export class UnoEngine implements GameEngine<UnoState, UnoMove> {
-  initialize(players: Player[]): UnoState {
+  /** options.variant: one of UNO_VARIANTS (default classic) */
+  initialize(players: Player[], options?: Record<string, unknown>): UnoState {
+    const variant = pickVariant(UNO_VARIANTS, options?.variant);
+    const size = unoHandSize(variant);
     const deck = shuffle(createUnoDeck());
-    const playersHands = players.map(() => deck.splice(deck.length - HAND_SIZE, HAND_SIZE));
+    const playersHands = players.map(() => deck.splice(deck.length - size, size));
     // Turn over a starting card; wild cards go back into the deck.
     let first = deck.pop()!;
     while (first.color === 'wild') { deck.unshift(first); first = deck.pop()!; }
@@ -137,6 +165,8 @@ export class UnoEngine implements GameEngine<UnoState, UnoMove> {
       lastEvent: { kind: 'start', player: 0, cardId: first.id },
       log: [`Starting card: ${cardLabel(first)}.`],
       scores: null,
+      variant,
+      pendingDraw: 0,
       createdAt: now,
       updatedAt: now,
     };
@@ -159,12 +189,18 @@ export class UnoEngine implements GameEngine<UnoState, UnoMove> {
     if (state.status !== 'playing') return 'The game is over.';
     if (playerIndex !== state.currentPlayerIndex) return 'It is not your turn.';
     const hand = state.playersHands[playerIndex];
+    const pending = state.pendingDraw ?? 0;
     switch (move.type) {
       case 'draw': return state.drawnCardId ? 'You already drew. Play that card or pass.' : null;
       case 'pass': return state.drawnCardId ? null : 'Draw a card first.';
       case 'play': {
         const card = hand.find((c) => c.id === move.cardId);
         if (!card) return 'That card is not in your hand.';
+        if (pending) {
+          if (!canStack(card, top(state))) return `Stack a Draw card on it, or draw ${pending}.`;
+          if (card.color === 'wild' && !UNO_COLORS.includes(move.color as PlayColor)) return 'Choose a colour for your wild card.';
+          return null;
+        }
         if (state.drawnCardId && card.id !== state.drawnCardId) return 'After drawing you may only play the card you drew.';
         if (!matches(card, top(state), state.currentColor)) return 'That card does not match the colour, number or symbol.';
         if (!canPlay(card, hand, top(state), state.currentColor)) return `Wild Draw Four can only be played when you have no ${state.currentColor} card.`;
@@ -188,13 +224,29 @@ export class UnoEngine implements GameEngine<UnoState, UnoMove> {
     const name = s.players[p].name;
 
     if (move.type === 'draw') {
-      const [card] = this.give(s, p, 1);
-      s.lastEvent = { kind: 'draw', player: p, count: card ? 1 : 0 };
-      if (card && canPlay(card, s.playersHands[p], top(s), s.currentColor)) {
+      // Stacking: take every pending card and lose the turn.
+      if (s.pendingDraw) {
+        const got = this.give(s, p, s.pendingDraw).length;
+        s.pendingDraw = 0;
+        s.lastEvent = { kind: 'draw', player: p, count: got };
+        this.say(s, `${name} draws ${got} and is skipped.`);
+        s.currentPlayerIndex = this.next(s);
+        return s;
+      }
+      const playable = (c: Card) => canPlay(c, s.playersHands[p], top(s), s.currentColor);
+      let [card] = this.give(s, p, 1);
+      let count = card ? 1 : 0;
+      // Draw till you play: keep going until a card fits (or the deck runs dry).
+      if (s.variant === 'draw-till-play') {
+        while (card && !playable(card)) { [card] = this.give(s, p, 1); if (card) count++; }
+      }
+      s.lastEvent = { kind: 'draw', player: p, count };
+      const many = count === 1 ? 'a card' : `${count} cards`;
+      if (card && playable(card)) {
         s.drawnCardId = card.id; // they may play it or keep it
-        this.say(s, `${name} draws a card.`);
+        this.say(s, `${name} draws ${many}.`);
       } else {
-        this.say(s, `${name} draws a card and passes.`);
+        this.say(s, `${name} draws ${many} and passes.`);
         s.currentPlayerIndex = this.next(s);
       }
       return s;
@@ -250,6 +302,12 @@ export class UnoEngine implements GameEngine<UnoState, UnoMove> {
       case 'draw_two':
       case 'wild_draw_four': {
         const n = card.type === 'draw_two' ? 2 : 4;
+        if (s.variant === 'stacking') {
+          s.pendingDraw = (s.pendingDraw ?? 0) + n;
+          this.say(s, `${s.players[nextP].name} must stack a Draw card or draw ${s.pendingDraw}.`);
+          s.currentPlayerIndex = nextP;
+          break;
+        }
         this.give(s, nextP, n);
         this.say(s, `${s.players[nextP].name} draws ${n} and is skipped.`);
         s.currentPlayerIndex = this.next(s, nextP);
@@ -298,7 +356,7 @@ export class UnoEngine implements GameEngine<UnoState, UnoMove> {
     const moves: UnoMove[] = [state.drawnCardId ? { type: 'pass' } : { type: 'draw' }];
     for (const c of hand) {
       if (state.drawnCardId && c.id !== state.drawnCardId) continue;
-      if (!canPlay(c, hand, top(state), state.currentColor)) continue;
+      if (!playableNow(state, c, hand)) continue;
       const uno = hand.length === 2;
       if (c.color === 'wild') UNO_COLORS.forEach((color) => moves.push({ type: 'play', cardId: c.id, color, uno }));
       else moves.push({ type: 'play', cardId: c.id, uno });
@@ -371,6 +429,9 @@ export interface UnoView {
   canDraw: boolean;
   canPass: boolean;
   drawnCardId: string | null;
+  variant: UnoVariant;
+  /** Stacking: cards the player to move must draw unless they stack */
+  pendingDraw: number;
   turn: number;
   lastEvent: UnoEvent | null;
   /** The last few cards played, oldest first (for the pile animation) */
@@ -398,10 +459,12 @@ export function unoViewFor(s: UnoState, seat: number): UnoView {
     handCounts: s.playersHands.map((h) => h.length),
     saidUno: s.saidUno,
     hand,
-    playable: mine ? hand.filter((c) => (!s.drawnCardId || c.id === s.drawnCardId) && canPlay(c, hand, onTop, s.currentColor)).map((c) => c.id) : [],
+    playable: mine ? hand.filter((c) => (!s.drawnCardId || c.id === s.drawnCardId) && playableNow(s, c, hand)).map((c) => c.id) : [],
     canDraw: mine && !s.drawnCardId,
     canPass: mine && !!s.drawnCardId,
     drawnCardId: mine ? s.drawnCardId : null,
+    variant: s.variant ?? 'classic',
+    pendingDraw: s.pendingDraw ?? 0,
     turn: s.turn,
     lastEvent: s.lastEvent,
     recent: s.discardPile.slice(-4),

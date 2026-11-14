@@ -7,7 +7,7 @@ import {
 } from '@slgh/shared';
 import Link from 'next/link';
 import { useMutation, useQuery } from 'convex/react';
-import { ConvexError } from 'convex/values';
+import { errorKeyFor, playerMessage } from '@slgh/shared/src/errors';
 import { api } from '@slgh/backend/convex/_generated/api';
 import { formatLeones, parseLeones } from '@slgh/shared/src/wallet';
 import DiceTray from './DiceTray';
@@ -282,9 +282,8 @@ function OnlineDice({ rollMode }: { rollMode: RollMode }) {
   useEffect(() => { setName(localStorage.getItem('dice_name') ?? ''); }, []);
   useEffect(() => { if (me?.username) setName((n) => n || me.username); }, [me?.username]);
 
-  const fail = useCallback((e: unknown) => setError(e instanceof ConvexError
-    ? (e.data === 'auth required' ? 'Sign in to play for money.' : String(e.data))
-    : 'Could not connect to the game server. Check your connection and try again.'), []);
+  const fail = useCallback((e: unknown) => setError(
+    errorKeyFor(String((e as { data?: unknown })?.data ?? '')) === 'errors.signInRequired' ? 'Sign in to play for money.' : playerMessage(e)), []);
 
   const leave = useCallback(() => {
     if (stake !== null && state?.status === 'playing' && state.players.some((p) => p.id === myId)

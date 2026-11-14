@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { Icon } from '@/components/Icon';
 import { errorText, mySecret, savedName, type RoomGame } from '@/lib/useRoom';
 import { sfx } from '@/lib/sound';
+import { formatLeones } from '@slgh/shared/src/wallet';
 
 // Live games: every online room whose host chose to list it. Players ask to join; the host
 // says yes or no from their room, and a yes hands this browser the room link. No account needed.
@@ -37,7 +38,7 @@ export default function LobbyClient() {
   return <ConvexRoomProvider><Lobby /></ConvexRoomProvider>;
 }
 
-type Listed = { id: string; game: RoomGame; host: string; players: number; maxPlayers: number; playing: boolean; createdAt: number };
+type Listed = { id: string; game: RoomGame; host: string; players: number; maxPlayers: number; playing: boolean; stake: number | null; createdAt: number };
 
 function Lobby() {
   const rooms = useQuery(api.rooms.publicList) as Listed[] | undefined;
@@ -132,6 +133,7 @@ function RoomCard({ room: r, index, secret, name, asked, onAsked }: {
         <div className="min-w-0 flex-1">
           <p className="font-display text-lg font-bold">{g.name}</p>
           <p className="truncate text-sm text-muted">Hosted by {r.host}</p>
+          {r.stake !== null && <p className="text-sm font-semibold">💰 {formatLeones(r.stake)} stake · winner takes the pot</p>}
         </div>
         <div className="text-right text-sm">
           <span className={`chip ${r.playing ? 'chip-accent' : 'chip-muted'}`}>{r.playing ? 'Playing' : 'Waiting'}</span>

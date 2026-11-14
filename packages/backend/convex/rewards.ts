@@ -56,17 +56,17 @@ export const shop = query({
 export const purchaseCosmetic = mutation({
   args: { cosmeticId: v.id('cosmetics') },
   handler: async (ctx, { cosmeticId }) => {
-    const me = await requireActiveUser(ctx, 'account banned');
+    const me = await requireActiveUser(ctx, 'errors.suspended');
     const c = await ctx.db.get(cosmeticId);
-    if (!c || !c.is_active) throw new ConvexError('cosmetic not found');
+    if (!c || !c.is_active) throw new ConvexError('errors.notFound');
     const now = Date.now();
-    if (c.is_limited && c.available_from && now < c.available_from) throw new ConvexError('cosmetic not yet available');
-    if (c.is_limited && c.available_until && now > c.available_until) throw new ConvexError('cosmetic no longer available');
+    if (c.is_limited && c.available_from && now < c.available_from) throw new ConvexError('errors.itemUnavailable');
+    if (c.is_limited && c.available_until && now > c.available_until) throw new ConvexError('errors.itemUnavailable');
     const owned = await ctx.db.query('user_cosmetics')
       .withIndex('by_user_cosmetic', (q) => q.eq('user_id', me._id).eq('cosmetic_id', cosmeticId)).unique();
-    if (owned) throw new ConvexError('already owned');
+    if (owned) throw new ConvexError('errors.alreadyOwned');
     if (!await spendCoins(ctx, me._id, c.price_coins, 'purchase', `Purchased: ${c.name}`, { cosmetic_id: cosmeticId })) {
-      throw new ConvexError('insufficient coins');
+      throw new ConvexError('errors.notEnoughCoins');
     }
     await ctx.db.insert('user_cosmetics', {
       user_id: me._id, cosmetic_id: cosmeticId, is_equipped: false, obtained_at: now, source_type: 'purchase', source_id: cosmeticId,
@@ -80,9 +80,9 @@ export const equipCosmetic = mutation({
   handler: async (ctx, { cosmeticId }) => {
     const me = await requireUser(ctx);
     const c = await ctx.db.get(cosmeticId);
-    if (!c) throw new ConvexError('cosmetic not found');
+    if (!c) throw new ConvexError('errors.notFound');
     const mine = await ctx.db.query('user_cosmetics').withIndex('by_user_cosmetic', (q) => q.eq('user_id', me._id)).collect();
-    if (!mine.some((uc) => uc.cosmetic_id === cosmeticId)) throw new ConvexError('do not own this cosmetic');
+    if (!mine.some((uc) => uc.cosmetic_id === cosmeticId)) throw new ConvexError('errors.notOwned');
     for (const uc of mine) {
       if (uc.cosmetic_id === cosmeticId) { if (!uc.is_equipped) await ctx.db.patch(uc._id, { is_equipped: true }); continue; }
       if (uc.is_equipped && (await ctx.db.get(uc.cosmetic_id))?.type === c.type) await ctx.db.patch(uc._id, { is_equipped: false });

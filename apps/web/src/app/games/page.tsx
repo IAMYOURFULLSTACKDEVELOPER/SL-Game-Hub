@@ -19,10 +19,10 @@ export default async function Library({ searchParams }: { searchParams: { q?: st
   const filtered = !!(q || cat || mode);
 
   return (
-    <main className="mx-auto max-w-6xl space-y-5 px-4 pb-4 pt-5 sm:space-y-6 sm:pt-10">
-      <div className="reveal">
-        <span className="eyebrow"><Icon name="gamepad" size={16} />{list.length} {list.length === 1 ? 'game' : 'games'}</span>
-        <h1 className="mt-3">{t('library.title')}</h1>
+    <main className="mx-auto max-w-6xl space-y-4 px-4 pb-6 pt-4 sm:px-6 sm:pt-6">
+      <div className="reveal flex items-end justify-between gap-3">
+        <h1>{t('library.title')}</h1>
+        <span className="eyebrow pb-1"><Icon name="gamepad" size={14} />{list.length} {list.length === 1 ? 'game' : 'games'}</span>
       </div>
 
       <form className="card reveal grid grid-cols-2 gap-2 p-3 sm:gap-3 sm:p-4 lg:grid-cols-[2fr_1fr_1.2fr_auto] lg:items-end" role="search" style={{ ['--i' as string]: 1 }}>
@@ -35,11 +35,11 @@ export default async function Library({ searchParams }: { searchParams: { q?: st
             {(cats ?? []).map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
           </select></div>
         <fieldset><legend className="label max-sm:sr-only">{t('library.mode')}</legend>
-          <div className="grid grid-cols-3 gap-1 rounded-xl border-2 border-border bg-bg/60 p-1">
+          <div className="grid grid-cols-3 gap-1 rounded-lg bg-input p-1">
             {([['', t('library.all'), 'globe'], ['single', 'Solo', 'user'], ['multi', 'Multi', 'users']] as const).map(([v, label, icon]) => (
               <label key={v} className="cursor-pointer" title={v ? t(`library.${v}`) : undefined}>
                 <input type="radio" name="mode" value={v} defaultChecked={mode === v} className="peer sr-only" />
-                <span className="flex min-h-[36px] items-center justify-center gap-1 rounded-lg text-sm font-semibold text-muted transition-all peer-checked:bg-surface peer-checked:text-primary peer-checked:shadow-soft peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-accent">
+                <span className="flex min-h-[36px] items-center justify-center gap-1 rounded-md text-sm font-semibold text-muted transition-colors hover:text-text peer-checked:bg-selected peer-checked:text-heading peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-secondary">
                   <Icon name={icon} size={15} className="max-sm:hidden" />{label}</span>
               </label>
             ))}
@@ -51,7 +51,7 @@ export default async function Library({ searchParams }: { searchParams: { q?: st
         <div className="card reveal p-10 text-center">
           <LostArt />
           <p className="mx-auto mt-4 max-w-sm text-muted">{t('library.empty')}</p>
-          {filtered && <Link href="/games" className="btn btn-outline mt-4"><Icon name="close" size={18} />Clear filters</Link>}
+          {filtered && <Link href="/games" className="btn btn-secondary mt-4"><Icon name="close" size={18} />Clear filters</Link>}
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">{list.map((g, i) => <GameCard key={g.id} g={g} i={i} variant="list" />)}</div>

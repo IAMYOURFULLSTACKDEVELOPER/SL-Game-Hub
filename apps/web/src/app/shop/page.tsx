@@ -14,13 +14,13 @@ export default async function ShopPage() {
       <PageHeader icon="bag" tone="gold" title="Rewards & Shop" subtitle="Spend your coins on avatars, themes and more." />
 
       {/* Coin Balance */}
-      <div className="card p-6 bg-gradient-to-r from-accent/15 to-accent/5 border-accent/40">
+      <div className="card border-l-4 border-l-accent p-6">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold">Your Balance</h2>
             <p className="text-muted">Earn coins by playing games, winning tournaments, and completing achievements</p>
           </div>
-          <div className="text-4xl font-bold text-yellow-600">
+          <div className="text-4xl font-bold text-accent">
             🪙 {balance}
           </div>
         </div>

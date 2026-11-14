@@ -3,7 +3,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useAction, useMutation, useQuery } from 'convex/react';
-import { ConvexError } from 'convex/values';
+import { playerMessage } from '@slgh/shared/src/errors';
 import { api } from '@slgh/backend/convex/_generated/api';
 import type { Id } from '@slgh/backend/convex/_generated/dataModel';
 import {
@@ -11,7 +11,7 @@ import {
 } from '@slgh/shared/src/wallet';
 import { PageHeader } from '@/components/PageHeader';
 
-const message = (e: unknown) => (e instanceof ConvexError ? String(e.data) : 'Something went wrong. Check your connection and try again.');
+const message = (e: unknown) => playerMessage(e);
 const QUICK = [1_000, 2_500, 5_000, 10_000];
 
 const STATUS: Record<string, string> = {
