@@ -7,7 +7,7 @@ import {
   type SalonePolyState, type SalonePolyMove, type TradeSide, type Difficulty, type BoardSpace,
 } from '@slgh/shared';
 import Rulebook from './Rulebook';
-import Die3D from './Die3D';
+import DiceTray from './DiceTray';
 import { RoomLobby, JoinRequests } from './RoomLobby';
 import { VoiceChat } from './VoiceChat';
 import { ConvexRoomProvider } from './ConvexRoomProvider';
@@ -15,6 +15,7 @@ import { Icon } from './Icon';
 import { Portal } from './Portal';
 import { useRoom } from '@/lib/useRoom';
 import { sfx } from '@/lib/sound';
+import { coinBurstFrom } from '@/lib/celebrate';
 import { useEndSfx } from '@/lib/useGameSfx';
 
 const engine = new SalonePolyEngine();
@@ -262,13 +263,8 @@ function PolyTable({ s, me, onMove, onTrade, busy = false, banner }: {
       <Board s={s} shown={shown} onTap={setSelected} selected={selected}>
         <div className="flex flex-col items-center gap-1 text-center sm:gap-2">
           <Logo />
-          <div className="flex items-center gap-2 sm:gap-3">
-            {[0, 1].map((k) => (
-              <div key={`${rolls}-${k}`} className={rolls > 0 ? 'sl-die-drop' : ''}>
-                <Die3D value={s.dice[k] || 6} size={30} still={rolls === 0} delayMs={k * 90} />
-              </div>
-            ))}
-          </div>
+          <DiceTray className="max-w-[11rem]" values={[s.dice[0] || 6, s.dice[1] || 6]} rollKey={rolls > 0 ? `${s.createdAt}-${rolls}` : null}
+            size={28} height={64} duration={0.95} tilt={22} />
           {s.lastCard && (
             <div key={`${s.lastCard.text}-${rolls}`} className={`poly-card ${s.lastCard.deck === 'luck' ? 'is-luck' : 'is-osusu'}`}>
               <span className="font-display font-bold">{s.lastCard.deck === 'luck' ? '❓ Luck' : '🪙 Osusu'}</span>
@@ -655,8 +651,13 @@ function useTableEvents(s: SalonePolyState) {
     if (p === s) return;
     const at = s.log.lastIndexOf(p.log[p.log.length - 1]);
     const fresh = at >= 0 ? s.log.slice(at + 1) : s.log.slice(-3);
-    if (fresh.some((l) => / rolled /.test(l))) { setRolls((r) => r + 1); sfx('dice'); }
-    if (s.owners.filter((o) => o !== null).length > p.owners.filter((o) => o !== null).length) setTimeout(() => sfx('coin'), 900);
+    if (fresh.some((l) => / rolled /.test(l))) setRolls((r) => r + 1); // the dice tray plays its own impacts
+    // Coins jump out of a square when it is bought or built on (after the pawn has walked there).
+    const tile = (i: number) => document.querySelector(`.poly-tile[aria-label="${CSS.escape(SALONE_POLY_BOARD[i].name)}"]`);
+    const bought = s.owners.map((o, i) => (o !== null && p.owners[i] === null ? i : -1)).filter((i) => i >= 0);
+    if (bought.length) setTimeout(() => { sfx('coin'); bought.forEach((i) => coinBurstFrom(tile(i), 12)); }, 900);
+    const built = s.buildings.map((b, i) => (b > p.buildings[i] ? i : -1)).filter((i) => i >= 0);
+    built.forEach((i) => coinBurstFrom(tile(i), 8));
     if (fresh.some((l) => /^(❓ Luck|🪙 Osusu|💰 Osusu)/.test(l))) setTimeout(() => sfx('card'), 900);
     if (s.buildings.reduce((x, y) => x + y, 0) > p.buildings.reduce((x, y) => x + y, 0)) sfx('success');
   }, [s]);

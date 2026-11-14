@@ -5,7 +5,7 @@
 export type Sfx =
   | 'click' | 'hover' | 'toggleOn' | 'toggleOff' | 'nav' | 'success' | 'error'
   | 'move' | 'capture' | 'dice' | 'win' | 'lose' | 'pop'
-  | 'card' | 'shuffle' | 'coin';
+  | 'card' | 'shuffle' | 'coin' | 'diceHit' | 'clink';
 
 type Prefs = { sfx: boolean; music: boolean };
 const KEY = { sfx: 'sfx', music: 'music' } as const;
@@ -77,7 +77,7 @@ const N = (semis: number) => 440 * 2 ** ((semis - 9) / 12); // semitones from C4
 
 // ---------- sound effects ----------
 let lastHover = 0;
-export function sfx(name: Sfx) {
+export function sfx(name: Sfx, volume = 1) {
   if (!prefs.sfx || typeof window === 'undefined') return;
   const c = audio(); if (!c) return;
   const t = c.currentTime + 0.005;
@@ -105,6 +105,8 @@ export function sfx(name: Sfx) {
     case 'card': hiss(t, 0.07, { vol: 0.16, freq: 2600, q: 1.4, sweep: 900 }); tone(320, t, 0.05, { vol: 0.05, to: 180 }); break;
     case 'shuffle': for (let i = 0; i < 9; i++) hiss(t + i * 0.045, 0.05, { vol: 0.09, freq: 2000 + (i % 3) * 700, q: 1.2, sweep: 800 }); break;
     case 'coin': tone(N(28), t, 0.12, { type: 'triangle', vol: 0.09 }); tone(N(35), t + 0.06, 0.3, { type: 'triangle', vol: 0.08 }); break;
+    case 'clink': tone(2400 + Math.random() * 900, t, 0.07, { type: 'triangle', vol: 0.035 }); break;
+    case 'diceHit': hiss(t, 0.035, { vol: 0.1 + volume * 0.12, freq: 2600 + Math.random() * 1400, q: 2.5 }); tone(520 + Math.random() * 300, t, 0.05, { type: 'triangle', vol: 0.03 + volume * 0.07, to: 260 }); break;
     case 'lose': [7, 3, 0, -5].forEach((s, i) => tone(N(s), t + i * 0.16, 0.34, { type: 'triangle', vol: 0.1 })); break;
   }
 }

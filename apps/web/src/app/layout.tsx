@@ -8,6 +8,7 @@ import { Header } from '@/components/Header';
 import { FX } from '@/components/FX';
 import { LogoMark } from '@/components/Art';
 import { PwaManager } from '@/components/PwaManager';
+import { PhysicsFX } from '@/components/PhysicsFX';
 
 // One display face for headings only (~30 KB, swaps in so text never waits).
 // Body text stays on the system font so the shell remains light.
@@ -47,6 +48,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Header />
         <Suspense fallback={null}><FX /></Suspense>
         <PwaManager />
+        <PhysicsFX />
         <div id="main" className="app-main">{children}</div>
         <footer className="mx-auto mt-16 max-w-6xl px-4 pb-28 pt-8 lg:pb-10">
           <div className="flag-rule mb-6" aria-hidden="true" />

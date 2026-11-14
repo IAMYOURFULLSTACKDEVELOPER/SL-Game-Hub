@@ -10,9 +10,8 @@ import { useMutation, useQuery } from 'convex/react';
 import { ConvexError } from 'convex/values';
 import { api } from '@slgh/backend/convex/_generated/api';
 import { formatLeones, parseLeones } from '@slgh/shared/src/wallet';
-import Die3D from './Die3D';
+import DiceTray from './DiceTray';
 import { ConvexClientProvider } from './ConvexClientProvider';
-import { sfx } from '@/lib/sound';
 import { useEndSfx } from '@/lib/useGameSfx';
 
 const engine = new DiceEngine();
@@ -91,8 +90,7 @@ function Board({ state, myId, canRoll, onRoll, rollMode, children }: {
 
   useEffect(() => {
     if (!state.lastRoll) return;
-    setAnimating(true);
-    sfx('dice');
+    setAnimating(true); // the tray plays each die's impacts as it lands
     navigator.vibrate?.(40);
     const t = setTimeout(() => setAnimating(false), ROLL_MS);
     return () => clearTimeout(t);
@@ -109,12 +107,8 @@ function Board({ state, myId, canRoll, onRoll, rollMode, children }: {
   return (
     <div className="space-y-4">
       <div className="dice-tray flex flex-col items-center gap-3 rounded-xl p-5 text-white">
-        <div className={`flex h-32 items-center justify-center gap-8 ${shaking ? 'dice-rattle' : ''}`} data-testid="dice-tray">
-          {shown.map((v, k) => (
-            <div key={`${state.turn}-${k}`} className={state.lastRoll ? 'sl-die-drop' : ''} style={{ animationDelay: `${k * 90}ms` }}>
-              <Die3D value={v} size={76} still={!state.lastRoll} delayMs={k * 90} />
-            </div>
-          ))}
+        <div className={`w-full ${shaking ? 'dice-rattle' : ''}`} data-testid="dice-tray">
+          <DiceTray className="mt-2" values={shown} rollKey={state.lastRoll ? `${state.createdAt}-${state.turn}` : null} size={64} height={160} duration={1.05} />
         </div>
         <p className="min-h-6 text-center font-semibold">
           {shaking ? 'Rattling… stop shaking to throw!' : animating ? 'Rolling…' : rollText(state)}

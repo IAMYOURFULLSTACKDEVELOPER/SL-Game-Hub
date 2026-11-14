@@ -6,13 +6,12 @@ import {
   type SnakeAndLadderState, type SnakeAndLadderLastMove,
 } from '@slgh/shared';
 import SnakeAndLadderRulebook from './SnakeAndLadderRulebook';
-import Die3D from './Die3D';
+import DiceTray from './DiceTray';
 import { RoomLobby, JoinRequests } from './RoomLobby';
 import { VoiceChat } from './VoiceChat';
 import { ConvexRoomProvider } from './ConvexRoomProvider';
 import { Icon } from './Icon';
 import { useRoom } from '@/lib/useRoom';
-import { sfx } from '@/lib/sound';
 import { useEndSfx } from '@/lib/useGameSfx';
 
 const engine = new SnakeAndLadderEngine();
@@ -72,7 +71,7 @@ function describe(s: SnakeAndLadderState) {
 type Mode = 'local' | 'online';
 type Players = SnakeAndLadderState['players'];
 interface Seat { name: string; ai: boolean }
-interface DiceDrop { id: number; value: number; x: number; y: number }
+interface DiceDrop { id: number; value: number; fast: boolean }
 
 export default function SnakeAndLadderGame({ onBack }: { onBack: () => void }) {
   const [mode, setMode] = useState<Mode>('local');
@@ -118,8 +117,7 @@ function useRollAnimation() {
     const run = ++runRef.current;
     const alive = () => runRef.current === run;
     const m = next.lastMove!;
-    sfx('dice');
-    setDice({ id: Date.now(), value: m.roll, x: 25 + Math.random() * 50, y: 25 + Math.random() * 50 });
+    setDice({ id: Date.now(), value: m.roll, fast }); // thrown with physics; it always lands on the rolled number
     await sleep(fast ? 700 : 1100);
     for (const sq of walkPath(m)) {
       if (!alive()) return false;
@@ -428,10 +426,9 @@ function LadderBoard({ players, display, sliding, dice, current }: {
             );
           })}
         </div>
-        {dice && (
-          <div key={dice.id} className="sl-die-drop absolute z-40" style={{ left: `${dice.x}%`, top: `${dice.y}%`, marginLeft: -diceSize / 2, marginTop: -diceSize / 2 }}>
-            <Die3D value={dice.value} size={diceSize} />
-          </div>
+        {dice && boardPx > 0 && (
+          <DiceTray className="pointer-events-none !absolute inset-0 z-40" values={[dice.value]} rollKey={dice.id} size={diceSize}
+            height={(boardPx * 600) / 594} duration={dice.fast ? 0.65 : 1} tilt={0} />
         )}
       </div>
 

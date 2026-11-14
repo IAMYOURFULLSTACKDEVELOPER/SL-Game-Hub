@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import {
-  UnoEngine, unoViewFor, UNO_COLORS, UNO_RULES, cardLabel, createPlayer,
+  UnoEngine, unoViewFor, UNO_COLORS, UNO_RULES, cardLabel, createPlayer, stepSpring,
   type UnoState, type UnoMove, type UnoView, type Card, type PlayColor, type Difficulty,
 } from '@slgh/shared';
 import Rulebook from './Rulebook';
@@ -191,6 +191,7 @@ function UnoTable({ view: v, onMove, busy = false }: { view: UnoView; onMove: (m
   }, [v.turn, v.lastEvent]);
   useEndSfx(over, v.seat >= 0 && v.winner !== v.seat);
 
+  const pileRef = useRef<HTMLDivElement>(null);
   const play = (card: Card) => {
     if (!myTurn || !v.playable.includes(card.id)) { sfx('error'); return; }
     if (card.color === 'wild') { setWildFor(card.id); return; }
@@ -244,13 +245,13 @@ function UnoTable({ view: v, onMove, busy = false }: { view: UnoView; onMove: (m
               <path d="m86 22 4 10-10 1M78 86l-10 4-1-10M14 78l-4-10 10-1M22 14l10-4 1 10" />
             </svg>
           </span>
-          <div className="relative">
-            {v.recent.slice(0, -1).map((c, i) => (
-              <div key={c.id} className="absolute inset-0" style={{ transform: `rotate(${(i - 1.5) * 9}deg) translate(${(i - 1) * 3}px, ${(i % 2) * 3}px)` }}>
+          <div className="relative" ref={pileRef}>
+            {v.recent.slice(0, -1).map((c) => (
+              <div key={c.id} className="absolute inset-0" style={{ transform: poseCss(restPose(c.id)) }}>
                 <UnoCard card={c} size="lg" />
               </div>
             ))}
-            <div key={v.top.id} className="uno-drop relative"><UnoCard card={v.top} size="lg" /></div>
+            <PileTop key={v.top.id} card={v.top} fromMe={v.lastEvent?.player === v.seat && v.lastEvent?.kind !== 'start'} />
           </div>
         </div>
         <div className="flex flex-col items-center gap-1 text-center text-white">
@@ -280,7 +281,7 @@ function UnoTable({ view: v, onMove, busy = false }: { view: UnoView; onMove: (m
       )}
 
       {/* your hand */}
-      {v.seat >= 0 && <Hand cards={v.hand} playable={myTurn ? v.playable : null} drawnId={v.drawnCardId} onPlay={play} />}
+      {v.seat >= 0 && <Hand cards={v.hand} playable={myTurn ? v.playable : null} drawnId={v.drawnCardId} onPlay={play} pileRef={pileRef} />}
 
       {/* wild colour picker */}
       {wildFor && (
@@ -320,10 +321,104 @@ function UnoTable({ view: v, onMove, busy = false }: { view: UnoView; onMove: (m
   );
 }
 
-/** Your hand: fans out to fit the screen, playable cards lift up. */
-function Hand({ cards, playable, drawnId, onPlay }: { cards: Card[]; playable: string[] | null; drawnId: string | null; onPlay: (c: Card) => void }) {
+/* ---------- card physics ---------- */
+
+const stillMotion = () => typeof window !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+type Pose = { x: number; y: number; r: number };
+/** Every card rests at its own slight angle on the pile, like real thrown cards, and keeps it once covered. */
+function restPose(id: string): Pose {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i++) { h ^= id.charCodeAt(i); h = Math.imul(h, 16777619); }
+  const u = (k: number) => (((h >>> k) & 255) / 255) * 2 - 1;
+  return { x: u(0) * 6, y: u(8) * 5, r: u(16) * 16 };
+}
+const poseCss = (p: Pose, s = 1) => `translate(${p.x}px, ${p.y}px) rotate(${p.r}deg) scale(${s})`;
+
+/** Where (and how fast) the last card was flung, so it keeps flying from there onto the pile. */
+let lastThrow: { cardId: string; x: number; y: number; vx: number; vy: number; r: number; at: number } | null = null;
+
+/** Run damped springs from `from` to `to` (with starting velocities), calling `draw` every frame. */
+function springTo(from: Pose & { s?: number }, vel: { x: number; y: number; r: number }, to: Pose & { s?: number }, draw: (p: Pose & { s: number }) => void, done?: () => void, stiffness = 210, damping = 19) {
+  const sx = { x: from.x, v: vel.x }, sy = { x: from.y, v: vel.y }, sr = { x: from.r, v: vel.r }, ss = { x: from.s ?? 1, v: 0 };
+  let last = performance.now();
+  const tick = (now: number) => {
+    const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
+    const a = stepSpring(sx, to.x, dt, stiffness, damping), b = stepSpring(sy, to.y, dt, stiffness, damping);
+    const c = stepSpring(sr, to.r, dt, stiffness, damping), d = stepSpring(ss, to.s ?? 1, dt, stiffness * 1.4, damping);
+    draw({ x: sx.x, y: sy.x, r: sr.x, s: ss.x });
+    if (a && b && c && d) done?.(); else requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+/** The card on top of the pile: flies in (from where you flung it, from your hand, or from an opponent) and slaps down. */
+function PileTop({ card, fromMe }: { card: Card; fromMe: boolean }) {
+  const el = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const node = el.current; if (!node) return;
+    const rest = restPose(card.id);
+    if (stillMotion()) { node.style.transform = poseCss(rest); return; }
+    const box = node.getBoundingClientRect();
+    const cx = box.left + box.width / 2, cy = box.top + box.height / 2;
+    const thrown = lastThrow && lastThrow.cardId === card.id && performance.now() - lastThrow.at < 2000 ? lastThrow : null;
+    lastThrow = null;
+    const wobble = (Math.random() - 0.5) * 50;
+    const start = thrown ? { x: thrown.x - cx, y: thrown.y - cy, r: thrown.r, s: 1.12 }
+      : fromMe ? { x: (Math.random() - 0.5) * 40, y: 240, r: wobble, s: 1.15 } : { x: (Math.random() - 0.5) * 120, y: -200, r: wobble, s: 1.15 };
+    const vel = thrown ? { x: thrown.vx, y: thrown.vy, r: thrown.vx * 0.05 } : { x: 0, y: fromMe ? -700 : 500, r: 0 };
+    node.style.transform = poseCss(start, start.s);
+    springTo(start, vel, rest, (p) => { node.style.transform = poseCss(p, p.s); });
+  }, [card.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  return <div ref={el} className="relative" style={{ transform: poseCss(restPose(card.id)) }}><UnoCard card={card} size="lg" /></div>;
+}
+
+/** Your hand: fans out to fit the screen, playable cards lift up. Drag a playable card onto the pile (or flick it up) to play it. */
+function Hand({ cards, playable, drawnId, onPlay, pileRef }: {
+  cards: Card[]; playable: string[] | null; drawnId: string | null; onPlay: (c: Card) => void; pileRef: RefObject<HTMLDivElement>;
+}) {
   const box = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ id: string; card: HTMLElement; button: HTMLElement; x0: number; y0: number; x: number; y: number; t: number; vx: number; vy: number; moved: boolean } | null>(null);
+  const skipClick = useRef<string | null>(null);
   const [width, setWidth] = useState(320);
+
+  const startDrag = (e: React.PointerEvent<HTMLButtonElement>, c: Card) => {
+    if (e.button !== 0 || !playable?.includes(c.id)) return;
+    const card = e.currentTarget.firstElementChild as HTMLElement;
+    drag.current = { id: c.id, card, button: e.currentTarget, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, t: performance.now(), vx: 0, vy: 0, moved: false };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const moveDrag = (e: React.PointerEvent) => {
+    const d = drag.current; if (!d) return;
+    const dx = e.clientX - d.x0, dy = e.clientY - d.y0;
+    if (!d.moved && Math.hypot(dx, dy) < 8) return;
+    if (!d.moved) { d.moved = true; d.button.classList.add('is-dragging'); sfx('card'); }
+    const now = performance.now(), dt = Math.max(0.001, (now - d.t) / 1000);
+    d.vx = d.vx * 0.6 + ((e.clientX - d.x) / dt) * 0.4;
+    d.vy = d.vy * 0.6 + ((e.clientY - d.y) / dt) * 0.4;
+    d.x = e.clientX; d.y = e.clientY; d.t = now;
+    // The card leans into the direction it is being dragged, like a card held by one corner.
+    d.card.style.transform = poseCss({ x: dx, y: dy, r: Math.max(-25, Math.min(25, d.vx * 0.02)) }, 1.08);
+  };
+  const endDrag = (c: Card, cancelled = false) => {
+    const d = drag.current; drag.current = null;
+    if (!d || !d.moved) return; // a plain tap: the click handler plays the card
+    skipClick.current = c.id;
+    const dx = d.x - d.x0, dy = d.y - d.y0, r = Math.max(-25, Math.min(25, d.vx * 0.02));
+    const pile = pileRef.current?.getBoundingClientRect();
+    const overPile = !!pile && d.x > pile.left - 30 && d.x < pile.right + 30 && d.y > pile.top - 30 && d.y < pile.bottom + 30;
+    const flickedUp = d.vy < -900 && dy < -40;
+    if (!cancelled && (overPile || flickedUp)) {
+      const rect = d.card.getBoundingClientRect();
+      lastThrow = { cardId: c.id, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, vx: d.vx, vy: d.vy, r, at: performance.now() };
+      onPlay(c);
+    }
+    // Always spring home. If the play is accepted the card leaves the hand and lands on the pile;
+    // if not (wrong turn, waiting for the server, choosing a wild colour) it is back where it was.
+    const { card, button } = d;
+    springTo({ x: dx, y: dy, r, s: 1.08 }, { x: d.vx * 0.3, y: d.vy * 0.3, r: 0 }, { x: 0, y: 0, r: 0, s: 1 },
+      (p) => { card.style.transform = poseCss(p, p.s); },
+      () => { card.style.transform = ''; button.classList.remove('is-dragging'); }, 260, 22);
+  };
   useLayoutEffect(() => {
     const el = box.current; if (!el) return;
     const ro = new ResizeObserver(() => setWidth(el.clientWidth));
@@ -340,10 +435,13 @@ function Hand({ cards, playable, drawnId, onPlay }: { cards: Card[]; playable: s
       {sorted.map((c, i) => {
         const can = playable?.includes(c.id) ?? false;
         return (
-          <button key={c.id} type="button" onClick={() => onPlay(c)} aria-label={`${cardLabel(c)}${can ? ', playable' : ''}`}
+          <button key={c.id} type="button" aria-label={`${cardLabel(c)}${can ? ', playable' : ''}`}
+            onClick={() => { if (skipClick.current === c.id) { skipClick.current = null; return; } onPlay(c); }}
+            onPointerDown={(e) => startDrag(e, c)} onPointerMove={moveDrag}
+            onPointerUp={() => endDrag(c)} onPointerCancel={() => endDrag(c, true)}
             className={`uno-hand-card ${can ? 'is-playable' : playable ? 'is-dim' : ''} ${c.id === drawnId ? 'is-drawn' : ''}`}
-            style={{ marginLeft: i === 0 ? 0 : -overlap, zIndex: i, ['--i' as string]: i }}>
-            <div className="uno-deal"><UnoCard card={c} size={cardW < 70 ? 'md' : 'lg'} /></div>
+            style={{ marginLeft: i === 0 ? 0 : -overlap, zIndex: i, ['--i' as string]: i, ...(can ? { touchAction: 'none' } : {}) }}>
+            <div className="uno-drag"><div className="uno-deal"><UnoCard card={c} size={cardW < 70 ? 'md' : 'lg'} /></div></div>
           </button>
         );
       })}

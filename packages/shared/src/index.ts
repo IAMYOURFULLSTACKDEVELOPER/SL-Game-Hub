@@ -21,6 +21,7 @@ export * from './games/salone-poly';
 export * from './games/salone-poly-rules';
 export * from './games/dice';
 export * from './games/dice-rules';
+export * from './physics';
 export * from './multiplayer';
 export * from './friends';
 export * from './rooms';
