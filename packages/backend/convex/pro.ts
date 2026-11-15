@@ -6,7 +6,7 @@ import { internal } from './_generated/api';
 import { PRO_PRICE, FREE_DAILY_ONLINE_GAMES, isProActive, extendPro, dayKey } from '@slgh/shared/src/pro';
 import { formatLeones } from '@slgh/shared/src/wallet';
 import { currentUser, requireActiveUser } from './lib';
-import { monimeConfigured, post, requireWalletUser } from './wallet';
+import { chargeFor, monimeConfigured, post, requireWalletUser } from './wallet';
 
 // SL Game Hub Pro: SLE 10 for 30 days, paid from the wallet (players aged 18+) or by a Monime USSD
 // code (anyone, e.g. a parent pays). Paying again adds 30 more days; nothing renews by itself.
@@ -62,8 +62,10 @@ export const status = query({
       canUseWallet: me.age_band === '18_plus' && !me.banned,
       walletBalance: wallet?.balance ?? 0,
       ussdAvailable: monimeConfigured(),
+      ussdCharge: chargeFor(PRO_PRICE), // the USSD price includes Monime's fee
       pendingUssd: pending ? {
         id: pending._id, status: pending.status, ussd_code: pending.ussd_code ?? null, expires_at: pending.expires_at ?? null,
+        charge: pending.charge ?? pending.amount,
       } : null,
     };
   },
@@ -89,7 +91,7 @@ export const buyWithUssd = mutation({
     const open = recent.find((d) => d.purpose === 'pro' && (d.status === 'creating' || d.status === 'pending'));
     if (open) return open._id; // reuse the code they already have
     const id = await ctx.db.insert('deposits', {
-      user_id: me._id, amount: PRO_PRICE, status: 'creating', purpose: 'pro', updated_at: Date.now(),
+      user_id: me._id, amount: PRO_PRICE, charge: chargeFor(PRO_PRICE), status: 'creating', purpose: 'pro', updated_at: Date.now(),
     });
     await ctx.scheduler.runAfter(0, internal.monime.createPaymentCode, { depositId: id });
     return id;

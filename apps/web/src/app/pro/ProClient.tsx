@@ -78,7 +78,7 @@ export default function ProClient() {
 
         {pending?.status === 'pending' && pending.ussd_code ? (
           <div className="space-y-3 rounded-2xl border border-primary/40 p-4">
-            <p className="text-sm text-muted">Dial this code on the phone with your mobile money account to pay {price}:</p>
+            <p className="text-sm text-muted">Dial this code on the phone with your mobile money account to pay {formatLeones(pending.charge)} ({price} plus Monime's fee):</p>
             <p className="font-mono text-3xl font-extrabold tracking-wider">{pending.ussd_code}</p>
             <div className="flex flex-wrap gap-2">
               <a href={ussdHref(pending.ussd_code)} className="btn btn-primary btn-sm">📞 Dial now</a>
@@ -94,7 +94,7 @@ export default function ProClient() {
           <p className="text-muted">Getting your USSD code…</p>
         ) : s.ussdAvailable ? (
           <button className={`btn w-full ${s.canUseWallet ? 'btn-outline' : 'btn-primary'}`} disabled={busy} onClick={() => void run(() => buyUssd({}))}>
-            Pay {price} with mobile money (USSD)
+            Pay {formatLeones(s.ussdCharge)} with mobile money (USSD, includes Monime's fee)
           </button>
         ) : !s.canUseWallet && (
           <p className="text-muted">Paying by mobile money isn't switched on yet. Check back soon.</p>

@@ -7,7 +7,7 @@ import { playerMessage } from '@slgh/shared/src/errors';
 import { api } from '@slgh/backend/convex/_generated/api';
 import type { Id } from '@slgh/backend/convex/_generated/dataModel';
 import {
-  MOMO_PROVIDERS, WALLET_LIMITS, displaySlPhone, formatLeones, parseLeones, providerName, ussdHref,
+  MOMO_PROVIDERS, WALLET_LIMITS, withMonimeFee, displaySlPhone, formatLeones, parseLeones, providerName, ussdHref,
 } from '@slgh/shared/src/wallet';
 import { PageHeader } from '@/components/PageHeader';
 
@@ -27,7 +27,7 @@ function useNow(every = 15_000) {
 
 /** One USSD top-up code: dial it, approve on the phone, and the balance updates by itself. */
 function PendingDeposit({ d }: {
-  d: { id: Id<'deposits'>; amount: number; status: string; ussd_code: string | null; expires_at: number | null; error: string | null };
+  d: { id: Id<'deposits'>; amount: number; charge: number; status: string; ussd_code: string | null; expires_at: number | null; error: string | null };
 }) {
   const refresh = useAction(api.monime.refreshDeposit);
   const cancel = useMutation(api.wallet.cancelDeposit);
@@ -48,7 +48,10 @@ function PendingDeposit({ d }: {
   if (d.status === 'creating') return <div className="card p-4 text-muted">Getting a USSD code for {formatLeones(d.amount)}…</div>;
   return (
     <div className="card space-y-3 border-primary/50 p-4">
-      <p className="text-sm text-muted">Top up {formatLeones(d.amount)}: dial this code on the phone with your mobile money account</p>
+      <p className="text-sm text-muted">
+        Top up {formatLeones(d.amount)}: dial this code on the phone with your mobile money account.
+        {d.charge > d.amount && <> You pay {formatLeones(d.charge)} (includes Monime's {formatLeones(d.charge - d.amount)} fee), and the full {formatLeones(d.amount)} goes into your wallet.</>}
+      </p>
       <p className="font-mono text-3xl font-extrabold tracking-wider" data-testid="ussd-code">{d.ussd_code}</p>
       <div className="flex flex-wrap gap-2">
         {d.ussd_code && <a href={ussdHref(d.ussd_code)} className="btn btn-primary btn-sm">📞 Dial now</a>}
@@ -70,7 +73,7 @@ function PendingDeposit({ d }: {
   );
 }
 
-function TopUp({ configured }: { configured: boolean }) {
+function TopUp({ configured, feeBps }: { configured: boolean; feeBps: number }) {
   const create = useMutation(api.wallet.createDeposit);
   const [amount, setAmount] = useState('');
   const [error, setError] = useState('');
@@ -99,6 +102,7 @@ function TopUp({ configured }: { configured: boolean }) {
           placeholder={`${WALLET_LIMITS.minDeposit / 100} – ${(WALLET_LIMITS.maxDeposit / 100).toLocaleString('en-US')}`} />
         <button className="btn btn-primary" disabled={busy || !amount}>Get USSD code</button>
       </div>
+      {feeBps > 0 && <p className="text-xs text-muted">Monime adds its {feeBps / 100}% fee on top when you pay, so the full amount reaches your wallet{parseLeones(amount) ? ` (SLE ${amount} costs ${formatLeones(withMonimeFee(parseLeones(amount)!, feeBps))})` : ''}.</p>}
       {error && <p className="text-sm font-semibold text-danger">{error}</p>}
     </form>
   );
@@ -183,7 +187,7 @@ export default function WalletClient() {
             <h2 className="text-xl font-bold">Top up</h2>
             {open.map((d) => <PendingDeposit key={d.id} d={d} />)}
             {recentFailure && <p className="text-sm font-semibold text-danger">{recentFailure.error}</p>}
-            <TopUp configured={w.configured} />
+            <TopUp configured={w.configured} feeBps={w.feeBps} />
           </section>
 
           <section className="card space-y-2 p-5">

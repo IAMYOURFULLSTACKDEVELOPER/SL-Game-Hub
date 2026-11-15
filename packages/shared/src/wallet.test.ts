@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
-import { formatLeones, parseLeones, normalizeSlPhone, displaySlPhone, ussdHref, splitPot } from './wallet';
+import { formatLeones, parseLeones, normalizeSlPhone, displaySlPhone, ussdHref, splitPot, withMonimeFee } from './wallet';
 import { verifyMonimeSignature } from './monime-signature';
 
 test('formats leones from minor units', () => {
@@ -56,4 +56,20 @@ test('rejects tampered, stale or unsigned webhooks', async () => {
   assert.equal(await verifyMonimeSignature(SECRET, null, body, now), false);
   assert.equal(await verifyMonimeSignature(SECRET, `v1=${sign(now, body)}`, body, now), false);
   assert.equal(await verifyMonimeSignature(SECRET, `t=${now},v1=not base64!`, body, now), false);
+});
+
+test('adds the Monime fee on top so the hub receives the full amount', () => {
+  assert.equal(withMonimeFee(1000), 1011); // SLE 10 -> the player pays SLE 10.11
+  assert.equal(withMonimeFee(500), 506);
+  assert.equal(withMonimeFee(1000, 0), 1000);
+  for (const amount of [100, 500, 999, 1000, 2500, 10_000, 500_000]) {
+    for (const bps of [50, 100, 150, 250]) {
+      const charge = withMonimeFee(amount, bps);
+      const feeRoundedUp = Math.ceil((charge * bps) / 10_000); // worst case: Monime rounds its fee up
+      assert.ok(charge - feeRoundedUp >= amount - 1, `${amount}@${bps}: nets at least the amount (to the cent)`);
+      assert.ok(charge - Math.floor((charge * bps) / 10_000) >= amount, `${amount}@${bps}: nets the full amount when the fee rounds down`);
+      const f = bps / 10_000; // the exact difference from 'add the fee on top' is amount*f^2/(1-f), under a cent for normal amounts
+      assert.ok(charge - amount * (1 + f) <= (amount * f * f) / (1 - f) + 1, `${amount}@${bps}: barely more than adding the fee on top`);
+    }
+  }
 });

@@ -92,8 +92,8 @@ export default async function AdminWallet({ searchParams }: { searchParams: { er
 
       <section className="space-y-2">
         <h2 className="font-bold">Recent payments in (USSD)</h2>
-        {table(['When', 'Player', 'For', 'Amount', 'Status'], w.deposits.map((d) => [
-          when(d.created_at), d.username, d.purpose, formatLeones(d.amount),
+        {table(['When', 'Player', 'For', 'Amount', 'Player paid', 'Status'], w.deposits.map((d) => [
+          when(d.created_at), d.username, d.purpose, formatLeones(d.amount), formatLeones(d.charge),
           <span key="s" className={d.status === 'completed' ? 'font-semibold text-primary' : 'text-muted'}>{STATUS[d.status] ?? d.status}{d.error ? ` (${d.error})` : ''}</span>,
         ]), 'No payments yet.')}
       </section>

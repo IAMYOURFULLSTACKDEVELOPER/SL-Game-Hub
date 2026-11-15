@@ -73,7 +73,7 @@ export default function Wallet() {
         <Card key={d.id}>
           {d.status === 'creating' ? <Txt muted>Getting a USSD code for {formatLeones(d.amount)}…</Txt> : (
             <>
-              <Txt muted>Top up {formatLeones(d.amount)}: dial</Txt>
+              <Txt muted>Top up {formatLeones(d.amount)}{d.charge > d.amount ? ` (you pay ${formatLeones(d.charge)} incl. Monime's fee)` : ''}: dial</Txt>
               <Txt size={30} bold color={c.primary}>{d.ussd_code}</Txt>
               <Button title="📞 Dial now" onPress={() => d.ussd_code && void Linking.openURL(ussdHref(d.ussd_code))} />
               <Txt size={14} muted>Enter your mobile money PIN when asked. Your balance updates by itself once it is paid.</Txt>

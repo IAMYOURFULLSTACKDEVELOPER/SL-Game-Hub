@@ -59,7 +59,7 @@ export const createPaymentCode = internalAction({
       const code = await monime<PaymentCode>('POST', '/v1/payment-codes', {
         name: d.purpose === 'pro' ? 'SL Game Hub Pro (30 days)' : 'SL Game Hub wallet top-up',
         mode: 'one_time',
-        amount: { currency: CURRENCY, value: d.amount },
+        amount: { currency: CURRENCY, value: d.charge ?? d.amount }, // includes Monime's fee, so all of d.amount reaches us
         duration: CODE_DURATION,
         reference: depositId,
         metadata: { deposit_id: depositId, user_id: d.user_id },

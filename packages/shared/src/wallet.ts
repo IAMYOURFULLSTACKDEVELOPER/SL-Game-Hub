@@ -52,6 +52,19 @@ export const displaySlPhone = (msisdn: string) =>
 /** A tel: link that opens the phone dialer with a USSD code (the # must be escaped). */
 export const ussdHref = (code: string) => `tel:${code.replace(/#/g, '%23')}`;
 
+/** Monime keeps this share of every payment it collects (basis points: 100 = 1%). */
+export const MONIME_FEE_BPS_DEFAULT = 100;
+
+/**
+ * What the player pays at Monime so that, after Monime takes its fee, the hub receives the full `amount`:
+ * the smallest amount whose fee-deducted value is at least `amount` (SLE 10 -> SLE 10.11 at 1%).
+ * The player's mobile money pays the fee instead of it coming out of the top-up.
+ */
+export function withMonimeFee(amount: number, feeBps = MONIME_FEE_BPS_DEFAULT): number {
+  const bps = Math.max(0, Math.min(feeBps, 2_000));
+  return Math.ceil((amount * 10_000) / (10_000 - bps));
+}
+
 /** How a pot is paid out. The fee is in basis points (250 = 2.5%) and is rounded down. */
 export function splitPot(total: number, feeBps: number) {
   const fee = Math.floor((total * Math.max(0, Math.min(feeBps, 10_000))) / 10_000);

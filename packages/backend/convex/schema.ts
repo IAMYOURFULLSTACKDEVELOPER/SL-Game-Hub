@@ -525,6 +525,7 @@ export default defineSchema({
     completed_at: v.optional(v.number()),
     updated_at: v.number(),
     purpose: v.optional(v.literal('pro')), // paying for Pro by USSD: completing it adds Pro days instead of wallet money
+    charge: v.optional(v.number()), // what the player pays at Monime: `amount` plus Monime's fee, so the hub receives all of `amount`
   })
     .index('by_user', ['user_id'])
     .index('by_monime_id', ['monime_id'])

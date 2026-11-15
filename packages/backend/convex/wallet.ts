@@ -4,7 +4,7 @@ import type { MutationCtx, QueryCtx } from './_generated/server';
 import type { Doc, Id } from './_generated/dataModel';
 import { internal } from './_generated/api';
 import {
-  WALLET_LIMITS, formatLeones, isMomoProvider, normalizeSlPhone, providerName, CURRENCY,
+  WALLET_LIMITS, formatLeones, isMomoProvider, normalizeSlPhone, providerName, CURRENCY, MONIME_FEE_BPS_DEFAULT, withMonimeFee,
 } from '@slgh/shared/src/wallet';
 import { currentUser, requireActiveUser, requireAdmin } from './lib';
 import { grantPro } from './pro';
@@ -17,6 +17,14 @@ import type { walletTxType } from './schema';
 type TxType = Infer<typeof walletTxType>;
 
 export const monimeConfigured = () => !!(process.env.MONIME_ACCESS_TOKEN && process.env.MONIME_SPACE_ID);
+
+/** Monime's fee on payments it collects, in basis points (MONIME_FEE_BPS; default 100 = 1%). */
+export const monimeFeeBps = () => {
+  const n = Number(process.env.MONIME_FEE_BPS ?? MONIME_FEE_BPS_DEFAULT);
+  return Number.isInteger(n) && n >= 0 && n <= 1_000 ? n : MONIME_FEE_BPS_DEFAULT;
+};
+/** What a player pays at Monime for `amount` to arrive in full (the fee is added on top). */
+export const chargeFor = (amount: number) => withMonimeFee(amount, monimeFeeBps());
 export const walletAllowed = (u: Doc<'users'>) => u.age_band === '18_plus' && !u.banned;
 
 /** Signed in, not suspended, and 18 or over. */
@@ -67,10 +75,11 @@ export const summary = query({
     return {
       eligible: walletAllowed(me),
       configured: monimeConfigured(),
+      feeBps: monimeFeeBps(),
       balance: w?.balance ?? 0,
       held: w?.held ?? 0,
       deposits: deposits.filter((d) => d.purpose !== 'pro').map((d) => ({
-        id: d._id, amount: d.amount, status: d.status, ussd_code: d.ussd_code ?? null,
+        id: d._id, amount: d.amount, charge: d.charge ?? d.amount, status: d.status, ussd_code: d.ussd_code ?? null,
         expires_at: d.expires_at ?? null, error: d.error ?? null, created_at: d._creationTime,
       })),
       withdrawals: withdrawals.map((w) => ({
@@ -96,7 +105,7 @@ export const createDeposit = mutation({
     if (recent.filter((d) => d.status === 'creating' || d.status === 'pending').length >= WALLET_LIMITS.maxPendingDeposits) {
       throw new ConvexError('You already have top-ups waiting. Pay or cancel one of them first.');
     }
-    const id = await ctx.db.insert('deposits', { user_id: me._id, amount, status: 'creating', updated_at: Date.now() });
+    const id = await ctx.db.insert('deposits', { user_id: me._id, amount, charge: chargeFor(amount), status: 'creating', updated_at: Date.now() });
     await ctx.scheduler.runAfter(0, internal.monime.createPaymentCode, { depositId: id });
     return id;
   },
@@ -184,7 +193,7 @@ export const adminOverview = query({
       processing: await queue('processing'),
       withdrawalHistory: await Promise.all(recentWithdrawals.map(withdrawalRow)),
       deposits: await Promise.all(recentDeposits.map(async (d) => ({
-        id: d._id, amount: d.amount, status: d.status, purpose: d.purpose === 'pro' ? 'Pro (USSD)' : 'Top-up',
+        id: d._id, amount: d.amount, charge: d.charge ?? d.amount, status: d.status, purpose: d.purpose === 'pro' ? 'Pro (USSD)' : 'Top-up',
         created_at: d._creationTime, username: await nameOf(d.user_id), error: d.error ?? null,
       }))),
       pro: await Promise.all(proPayments.sort((a, b) => b._creationTime - a._creationTime).slice(0, 20).map(async (p) => ({
@@ -270,9 +279,10 @@ export const applyDepositStatus = internalMutation({
     const d = await ctx.db.query('deposits').withIndex('by_monime_id', (q) => q.eq('monime_id', monimeId)).unique();
     if (!d || d.status === 'completed') return;
     if (status === 'completed') {
-      if (amount && (amount.currency !== CURRENCY || amount.value !== d.amount)) {
+      const charged = d.charge ?? d.amount; // the code was created for amount + Monime's fee
+      if (amount && (amount.currency !== CURRENCY || amount.value !== charged)) {
         // Never expected for a one-time code; leave it for a person to look at rather than guess.
-        console.error(`deposit ${d._id}: Monime reported ${amount.value} ${amount.currency}, expected ${d.amount}`);
+        console.error(`deposit ${d._id}: Monime reported ${amount.value} ${amount.currency}, expected ${charged}`);
         await ctx.db.patch(d._id, { error: 'Amount mismatch, contact support.', updated_at: Date.now() });
         return;
       }
