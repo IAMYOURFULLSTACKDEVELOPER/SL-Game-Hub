@@ -785,3 +785,8 @@ button.vc-person[aria-pressed="true"] { opacity: .6; }
 .gp .rb-callout-here { border-color: var(--game); background: color-mix(in srgb, var(--game) 10%, transparent); }
 .gp .rb-rules li::before { background: var(--game); }
 .gp .rb-step-n { border-color: var(--game); }
+
+/* Game mode: while a game is open it fills the screen (components/GameShell.tsx). Players can turn it off. */
+html[data-game-mode] .shell-side, html[data-game-mode] .topbar, html[data-game-mode] .tabbar, html[data-game-mode] .drawer-backdrop { display: none !important; }
+html[data-game-mode] .app-main { margin-left: 0 !important; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom) !important; }
+html[data-game-mode] .music-dock { bottom: calc(8px + env(safe-area-inset-bottom)); }

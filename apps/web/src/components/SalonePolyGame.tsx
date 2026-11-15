@@ -19,6 +19,7 @@ import { useRoom } from '@/lib/useRoom';
 import { sfx } from '@/lib/sound';
 import { coinBurstFrom } from '@/lib/celebrate';
 import { useEndSfx } from '@/lib/useGameSfx';
+import { botThinkMs } from '@slgh/shared/src/bot-think';
 
 const engine = new SalonePolyEngine();
 const SAVE_KEY = 'salone_poly_state_v1';
@@ -93,7 +94,7 @@ function LocalPoly({ pass }: { pass: boolean }) {
       if (!g || g.status !== 'playing') return g;
       const p = g.players[actor(g)];
       return p.isAI ? engine.applyMove(g, engine.getAIMove(g, p.difficulty ?? 'medium')) : g;
-    }), s.phase === 'auction' ? 450 : 750);
+    }), botThinkMs(s.phase === 'auction' ? 'salone-poly-auction' : 'salone-poly'));
     return () => clearTimeout(t);
   }, [botTurn, s]);
 

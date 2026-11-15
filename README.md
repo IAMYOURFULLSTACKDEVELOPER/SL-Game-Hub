@@ -101,8 +101,8 @@ Paying again adds 30 days; nothing renews automatically.
   Online play therefore needs a signed-in account (free is fine). Games against bots on the device stay unlimited and offline.
 - **Groups and forums** (`convex/groups.ts`, `/groups`): Pro players create a group and share its invite code; anyone signed
   in can join, start threads and reply. The owner can remove members and posts, change the code or delete the group.
-- **Voice chat:** free players join to listen; Pro players can talk. Listeners never open the microphone, and every browser
-  mutes audio from members the server hasn't allowed to talk.
+- **Camera in game rooms:** everyone can talk in a room's voice chat; only Pro players can turn on their camera (needs LiveKit,
+  see below).
 
 ## Why it is fast on low-end phones
 - **Server-rendered pages, almost no client JS.** Pages fetch from Convex on the server (`lib/convex.ts`) and forms post to
@@ -137,9 +137,9 @@ Paying again adds 30 days; nothing renews automatically.
 ## Video and voice chat, and broadcasts
 Two separate services, because they do different jobs:
 
-**Video and voice chat in game rooms (LiveKit).** Players in a room talk and see each other in real time. Code:
-`convex/livekit.ts` (call tokens), `components/LiveCall.tsx`. Pro players may send their microphone and camera; everyone else
-watches and listens (the token itself forbids publishing, so this can't be bypassed in the browser). Cameras start off and send
+**Voice and video chat in game rooms (LiveKit).** Players in a room talk to each other while they play. Code:
+`convex/livekit.ts` (call tokens), `components/LiveCall.tsx`. Everyone may send their microphone; only Pro players may send their
+camera (the token itself forbids it for everyone else, so this can't be bypassed in the browser). Cameras start off and send
 360p. Until the three `LIVEKIT_*` variables are set, rooms keep the browser-to-browser voice chat described above.
 
 **Broadcasts to spectators (Mux).** An admin creates a channel in **Admin → Broadcasts**, puts the server URL and stream key

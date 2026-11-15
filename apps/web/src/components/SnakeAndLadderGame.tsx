@@ -16,6 +16,7 @@ import { Icon } from './Icon';
 import { GameGlyph } from './GameGlyph';
 import { useRoom } from '@/lib/useRoom';
 import { useEndSfx } from '@/lib/useGameSfx';
+import { botThinkMs } from '@slgh/shared/src/bot-think';
 
 const engine = new SnakeAndLadderEngine();
 const SAVE_KEY = 'snake_and_ladder_game_state';
@@ -193,7 +194,7 @@ function LocalLadder() {
   const botTurn = !!game && game.status === 'playing' && game.players[game.currentPlayerIndex].isAI;
   useEffect(() => {
     if (!botTurn || busy) return;
-    const t = setTimeout(play, 900);
+    const t = setTimeout(play, botThinkMs('snake-and-ladder'));
     return () => clearTimeout(t);
   }, [botTurn, busy, play]);
 

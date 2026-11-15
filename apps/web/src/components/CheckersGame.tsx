@@ -12,6 +12,7 @@ import { GameGlyph } from './GameGlyph';
 import { useRoom, type RoomApi } from '@/lib/useRoom';
 import { sfx } from '@/lib/sound';
 import { useEndSfx } from '@/lib/useGameSfx';
+import { botThinkMs } from '@slgh/shared/src/bot-think';
 
 const engine = new CheckersEngine();
 const SAVE_KEY = 'checkers_game_state_v2';
@@ -70,7 +71,7 @@ export default function CheckersGame({ onBack }: { onBack: () => void }) {
   const botTurn = !!game && game.status === 'playing' && !result && game.players[game.currentPlayerIndex].isAI;
   useEffect(() => {
     if (!botTurn || !game) return;
-    const t = setTimeout(() => play(engine.getAIMove(game, game.players[game.currentPlayerIndex].difficulty ?? 'medium')), 650);
+    const t = setTimeout(() => play(engine.getAIMove(game, game.players[game.currentPlayerIndex].difficulty ?? 'medium')), botThinkMs('checkers'));
     return () => clearTimeout(t);
   }, [botTurn, game]); // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -27,11 +27,13 @@ type Props = {
   user: { name: string; avatar: string | null } | null;
   signIn: string; signUp: string; themeLabel: string;
   signOut: ReactNode;
+  /** Dodo Pro is active (unlocks playing your own music) */
+  pro: boolean;
 };
 
 const isActive = (path: string, href: string) => (href === '/' ? path === '/' : path === href || path.startsWith(href + '/'));
 
-export function NavBar({ appName, sections, tabs, games, account, user, signIn, signUp, themeLabel, signOut }: Props) {
+export function NavBar({ appName, sections, tabs, games, account, user, signIn, signUp, themeLabel, signOut, pro }: Props) {
   const path = usePathname();
   const [drawer, setDrawer] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -146,7 +148,7 @@ export function NavBar({ appName, sections, tabs, games, account, user, signIn, 
               </div>
             )}
             <div className="flex items-center">
-              <SoundControls />
+              <SoundControls pro={pro} />
               <ThemeToggle label={themeLabel} />
               {user && (
                 <button type="button" className="btn btn-icon" aria-label="Account menu" title="Account" onClick={() => setMenu((m) => !m)}>

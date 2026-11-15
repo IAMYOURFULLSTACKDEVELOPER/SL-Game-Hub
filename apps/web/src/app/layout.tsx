@@ -16,7 +16,16 @@ export const metadata: Metadata = {
   applicationName: t('app.name'),
   // Installed on iPhone/iPad: launches full screen with our icon and name
   appleWebApp: { capable: true, title: 'Dodo', statusBarStyle: 'default' },
-  icons: { apple: '/icons/apple-touch-icon.png' },
+  // The Dodo logo in the browser tab (SVG where supported, PNG and .ico as fallbacks) and on iPhone home screens.
+  // Listed here because setting `icons` turns off Next's automatic app/icon.svg link.
+  icons: {
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+    ],
+    shortcut: '/favicon.ico',
+    apple: '/icons/apple-touch-icon.png',
+  },
   formatDetection: { telephone: false },
 };
 export const viewport: Viewport = {

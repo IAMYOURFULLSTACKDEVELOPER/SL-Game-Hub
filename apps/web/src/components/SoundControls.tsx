@@ -1,11 +1,12 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { getPrefs, setMusic, setSfx, subscribe, sfx } from '@/lib/sound';
-import { getMusic, subscribeMusic, playLink, stopMyMusic, useCanChooseMusic } from '@/lib/music';
+import Link from 'next/link';
+import { getMusic, subscribeMusic, playLink, stopMyMusic, canChooseMusic } from '@/lib/music';
 import { SourceLogo } from './MusicDock';
 import { Icon } from './Icon';
 
-export function SoundControls() {
+export function SoundControls({ pro }: { pro: boolean }) {
   // Start with defaults so server and client HTML match, then read the saved choice.
   const [p, setP] = useState({ sfx: true, music: false });
   const [mine, setMine] = useState<ReturnType<typeof getMusic>['track']>(null);
@@ -13,9 +14,11 @@ export function SoundControls() {
   const [link, setLink] = useState('');
   const [bad, setBad] = useState(false);
   const box = useRef<HTMLDivElement>(null);
-  const canChoose = useCanChooseMusic();
+  const canChoose = canChooseMusic(pro);
   useEffect(() => { setP(getPrefs()); return subscribe(setP); }, []);
   useEffect(() => { setMine(getMusic().track); return subscribeMusic(() => setMine(getMusic().track)); }, []);
+  // Your own music is a Pro feature: a saved song stops when Pro has ended (or after signing out)
+  useEffect(() => { if (!canChoose && getMusic().track) stopMyMusic(); }, [canChoose]);
   useEffect(() => {
     if (!open) return;
     const away = (e: PointerEvent) => { if (!box.current?.contains(e.target as Node)) setOpen(false); };
@@ -77,6 +80,13 @@ export function SoundControls() {
               : 'Any song, album or playlist. Spotify Premium or Apple Music members signed in on this browser hear full songs; others hear previews.'}
           </p>
         </form>}
+        {!canChoose && (
+          <Link href="/pro" className="menu-item" onClick={() => setOpen(false)}>
+            <SourceLogo source="spotify" size={14} /><SourceLogo source="apple" size={14} />
+            <span className="min-w-0 flex-1">Play your own music</span>
+            <span className="chip chip-muted text-xs"><Icon name="star" size={12} />Pro</span>
+          </Link>
+        )}
       </div>
     </div>
   );

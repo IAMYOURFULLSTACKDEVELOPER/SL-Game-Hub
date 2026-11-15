@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAction, useMutation, useQuery } from 'convex/react';
 import { playerMessage } from '@slgh/shared/src/errors';
 import { api } from '@slgh/backend/convex/_generated/api';
+import type { Id } from '@slgh/backend/convex/_generated/dataModel';
 
 // Client side of convex/rooms.ts, shared by every online game (see convex/roomGames.ts).
 // This browser's private secret proves which seat is ours; it never leaves this device except to the server.
@@ -10,7 +11,6 @@ import { api } from '@slgh/backend/convex/_generated/api';
 export type RoomGame = 'uno' | 'salone-poly' | 'chess' | 'checkers' | 'snake-and-ladder' | 'scrabble' | 'word-search' | 'snake';
 export const HEARTBEAT_MS = 10_000;
 const SECRET_KEY = 'slgh-room-secret';
-const NAME_KEY = 'slgh-player-name';
 const roomKey = (game: RoomGame) => `slgh-room-${game}`;
 
 function load(key: string) { try { return localStorage.getItem(key); } catch { return null; } }
@@ -25,7 +25,6 @@ export function mySecret() {
   }
   return s;
 }
-export const savedName = () => load(NAME_KEY) ?? '';
 export const errorText = (e: unknown) => playerMessage(e);
 
 export function useRoom(game: RoomGame) {
@@ -43,6 +42,7 @@ export function useRoom(game: RoomGame) {
 
   const view = useQuery(api.rooms.view, code && secret ? { code, secret } : 'skip');
   const createM = useMutation(api.rooms.create);
+  const attachM = useMutation(api.schedule.attachRoom);
   const joinM = useMutation(api.rooms.join);
   const leaveM = useMutation(api.rooms.leave);
   const heartbeatM = useMutation(api.rooms.heartbeat);
@@ -78,15 +78,16 @@ export function useRoom(game: RoomGame) {
     game, code, secret, view, joined, error, busy, setError,
     /** Make a room. `stake` (minor units) makes it a money room: needs a signed-in player aged 18+. */
     create: (name: string, options: { stake?: number } = {}) => run(async () => {
-      store(NAME_KEY, name);
       const r = await createM({ game, name, secret, ...options });
       enter(r.code);
+      // Opened from a scheduled game: attach the room so everyone going can join it
+      const event = new URLSearchParams(location.search).get('event');
+      if (event) attachM({ eventId: event as Id<'scheduled_games'>, code: r.code }).catch(() => {});
     }),
     /** Money rooms: put your stake in for the next game, or take it back before it starts */
     stake: () => run(() => stakeM({ code: code!, secret })),
     unstake: () => run(() => unstakeM({ code: code!, secret })),
     join: (c: string, name: string) => run(async () => {
-      store(NAME_KEY, name);
       const r = await joinM({ code: c.toUpperCase(), name, secret });
       enter(r.code);
     }),

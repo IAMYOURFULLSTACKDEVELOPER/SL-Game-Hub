@@ -15,6 +15,7 @@ import { GameGlyph } from './GameGlyph';
 import DiceTray from './DiceTray';
 import { ConvexClientProvider } from './ConvexClientProvider';
 import { useEndSfx } from '@/lib/useGameSfx';
+import { botThinkMs } from '@slgh/shared/src/bot-think';
 
 const engine = new DiceEngine();
 const MAX = DICE_MANIFEST.maxPlayers;
@@ -194,7 +195,7 @@ function LocalDice({ rollMode }: { rollMode: RollMode }) {
   const aiTurn = game?.status === 'playing' && game.players[game.currentPlayerIndex].isAI;
   useEffect(() => {
     if (!aiTurn) return;
-    const t = setTimeout(roll, 1200);
+    const t = setTimeout(roll, botThinkMs('dice'));
     return () => clearTimeout(t);
   }, [aiTurn, game?.turn, roll]);
 
@@ -244,7 +245,7 @@ interface Member { id: string; name: string; host: boolean; joinedAt: number; st
 const HEARTBEAT_MS = 10_000; // keep in step with packages/backend/convex/dice.ts
 const money = (minor: number) => formatLeones(minor);
 
-/** Online play talks to Convex as the signed-in player when there is one (money rooms need it; free rooms don't). */
+/** Online play talks to Convex as the signed-in player: every online room needs an account. */
 function OnlineDiceRoom({ rollMode }: { rollMode: RollMode }) {
   return <ConvexClientProvider><OnlineDice rollMode={rollMode} /></ConvexClientProvider>;
 }
@@ -281,8 +282,9 @@ function OnlineDice({ rollMode }: { rollMode: RollMode }) {
   const amHost = members.some((m) => m.id === myId && m.host); // the server hands hosting on if the host leaves
   const canUseWallet = !!me && !!wallet?.eligible;
 
-  useEffect(() => { setName(localStorage.getItem('dice_name') ?? ''); }, []);
-  useEffect(() => { if (me?.username) setName((n) => n || me.username); }, [me?.username]);
+  // Your username by default; changing it only renames you in this game.
+  const nameEdited = useRef(false);
+  useEffect(() => { if (me?.username && !nameEdited.current) setName(me.username); }, [me?.username]);
 
   const fail = useCallback((e: unknown) => setError(
     errorKeyFor(String((e as { data?: unknown })?.data ?? '')) === 'errors.signInRequired' ? 'Sign in to play for money.' : playerMessage(e)), []);
@@ -312,7 +314,6 @@ function OnlineDice({ rollMode }: { rollMode: RollMode }) {
 
   const enter = async (code: string, host: boolean, roomStake: number | null) => {
     const display = name.trim() || 'Player';
-    localStorage.setItem('dice_name', display);
     setError('');
     if (roomStake !== null) {
       if (!me) { setError('Sign in to play for money.'); return; }
@@ -356,12 +357,26 @@ function OnlineDice({ rollMode }: { rollMode: RollMode }) {
     rollInRoom({ code: room.code, memberId: myId }).catch((e) => { setRollSent(false); fail(e); });
   };
 
+  if (!room && me === null) {
+    // Online play is for registered players only
+    return (
+      <div className="card flex flex-col items-center gap-3 p-6 text-center">
+        <h2 className="text-lg">Sign in to play online</h2>
+        <p className="max-w-sm text-sm text-muted">Online rooms are for registered players. Playing against bots on this device needs no account.</p>
+        <div className="flex flex-wrap justify-center gap-2">
+          <Link href="/login?next=/games/dice/play" className="btn btn-primary"><Icon name="login" size={18} />Sign in</Link>
+          <Link href="/signup?next=/games/dice/play" className="btn btn-outline">Create a free account</Link>
+        </div>
+      </div>
+    );
+  }
+
   if (!room) {
     const peekStake = peek?.stake ?? null;
     return (
       <div className="space-y-3">
         <p className="text-sm text-muted">Play live with up to {MAX} friends on their own devices. Create a room and share the code.</p>
-        <input value={name} maxLength={20} onChange={(e) => setName(e.target.value)} placeholder="Your name"
+        <input value={name} maxLength={20} onChange={(e) => { nameEdited.current = true; setName(e.target.value); }} placeholder="Your name"
           className="input" aria-label="Your name" />
         <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Room type">
           {([false, true] as const).map((m) => (

@@ -5,7 +5,7 @@ import { useQuery } from 'convex/react';
 import { api } from '@slgh/backend/convex/_generated/api';
 import { WALLET_LIMITS, formatLeones, parseLeones } from '@slgh/shared/src/wallet';
 import type { RoomApi } from '@/lib/useRoom';
-import { savedName, HEARTBEAT_MS } from '@/lib/useRoom';
+import { HEARTBEAT_MS } from '@/lib/useRoom';
 import { sfx } from '@/lib/sound';
 import type { GameVariant } from '@slgh/shared';
 import { Icon } from './Icon';
@@ -72,7 +72,9 @@ export function RoomLobby({ room, title, maxSeats, timer = false, bots: allowBot
   useEffect(() => { setListedNow(null); }, [serverListed]);
   useEffect(() => { if (room.error) setListedNow(null); }, [room.error]); // the change didn't save
   const [now, setNow] = useState(() => Date.now());
-  useEffect(() => { setName(savedName()); }, []);
+  // Your username by default; changing it here only renames you in this game.
+  const nameEdited = useRef(false);
+  useEffect(() => { if (account?.username && !nameEdited.current) setName(account.username); }, [account?.username]);
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 5000); return () => clearInterval(t); }, []);
 
   const v = room.view;
@@ -88,18 +90,31 @@ export function RoomLobby({ room, title, maxSeats, timer = false, bots: allowBot
   // Not in a room yet (or a link to a room we haven't joined)
   if (!room.joined) {
     const linked = room.code && v ? room.code : null;
+    // Online play is for registered players only: guests get a way to sign in instead of the room forms.
+    if (account === null) {
+      const next = typeof window === 'undefined' ? '/games' : location.pathname + location.search;
+      return (
+        <div className="card flex flex-col items-center gap-3 p-6 text-center">
+          <span className="icon-badge icon-badge-blue h-12 w-12 rounded-2xl"><Icon name="users" size={24} /></span>
+          <h2 className="text-lg">Sign in to play online</h2>
+          <p className="max-w-sm text-sm text-muted">
+            {linked ? <>You were invited to {title} room <span className="font-mono tracking-widest">{linked}</span>. </> : null}
+            Online rooms are for registered players. A free account takes a minute; games against bots on this device need no account.
+          </p>
+          <div className="flex flex-wrap justify-center gap-2">
+            <Link href={`/login?next=${encodeURIComponent(next)}`} className="btn btn-primary"><Icon name="login" size={18} />Sign in</Link>
+            <Link href={`/signup?next=${encodeURIComponent(next)}`} className="btn btn-outline">Create a free account</Link>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="space-y-4">
         <div>
           <label className="label" htmlFor="room-name">Your name</label>
-          <input id="room-name" className="input" maxLength={20} value={name} onChange={(e) => setName(e.target.value)} placeholder="What should friends call you?" autoComplete="nickname" />
+          <input id="room-name" className="input" maxLength={20} value={name} onChange={(e) => { nameEdited.current = true; setName(e.target.value); }} placeholder="What should friends call you?" autoComplete="nickname" aria-describedby="room-name-help" />
+          <p id="room-name-help" className="mt-1 text-xs text-muted">Your username is used. Change it if you want a different name in this game.</p>
         </div>
-        {account === null && (
-          <p className="rounded-2xl border border-primary/30 bg-primary/5 p-3 text-sm">
-            <Link href={`/login?next=${encodeURIComponent(typeof window === 'undefined' ? '/games' : location.pathname + location.search)}`} className="font-semibold text-secondary">Sign in</Link>
-            {' '}or <Link href="/signup" className="font-semibold text-secondary">create a free account</Link> to play online. Free accounts can make 10 rooms a day and come back to them any time; games against bots on this device are unlimited.
-          </p>
-        )}
         {errorBox}
         {linked ? (
           <div className="card space-y-3 p-4">

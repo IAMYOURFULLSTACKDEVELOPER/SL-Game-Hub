@@ -8,8 +8,7 @@ import { isPro } from './pro';
 // the server only passes along the short set-up messages (offer, answer, network candidates)
 // from one member to another. Only members of the room can join, and each member can read only
 // the messages addressed to them (their private room secret proves who they are).
-// Talking is a Pro feature: other players join to listen only (their browsers never open the microphone,
-// and everyone's browser ignores audio from members who aren't allowed to talk).
+// Everyone in the room can talk. Video (convex/livekit.ts, when a call server is set up) is for Pro players only.
 //
 // Many mobile networks hide phones behind shared addresses, so a direct connection can't be made.
 // A TURN relay fixes that. Set either:
@@ -21,14 +20,13 @@ const MAX_SIGNAL_BYTES = 16_000; // an SDP offer is a few KB; anything bigger is
 const MAX_INBOX = 50; // waiting messages per member, so one member can't flood another
 const TURN_TTL_SECONDS = 4 * 3600; // long enough for a game night, short enough to be useless if leaked
 
-/** Join or leave the room's voice chat. Pro players may talk; everyone else joins to listen. */
+/** Join or leave the room's voice chat. */
 export const setVoice = mutation({
   args: { code: v.string(), secret: v.string(), on: v.boolean() },
   handler: async (ctx, { code, secret, on }) => {
     const { me } = await requireMember(ctx, code, secret);
-    const user = me.user_id ? await ctx.db.get(me.user_id) : null;
-    await ctx.db.patch(me._id, { voice: on, voice_talk: on && isPro(user) });
-    return { talk: on && isPro(user) };
+    await ctx.db.patch(me._id, { voice: on, voice_talk: on });
+    return { talk: on };
   },
 });
 
@@ -151,7 +149,7 @@ export const mode = query({
   handler: async () => ({ server: liveKitReady() }),
 });
 
-/** Who a room secret belongs to, for a call token: their member id, name and whether they may talk. */
+/** Who a room secret belongs to, for a call token: their member id, name and whether they may use their camera (Pro). */
 export const callPass = internalQuery({
   args: { code: v.string(), secret: v.string() },
   handler: async (ctx, { code, secret }) => {
@@ -159,6 +157,6 @@ export const callPass = internalQuery({
     const me = room && await memberBySecret(ctx, room._id, secret);
     if (!room || !me) return null;
     const user = me.user_id ? await ctx.db.get(me.user_id) : null;
-    return { roomId: room._id as string, memberId: me.member_id, name: me.name, talk: isPro(user) };
+    return { roomId: room._id as string, memberId: me.member_id, name: me.name, video: isPro(user) };
   },
 });

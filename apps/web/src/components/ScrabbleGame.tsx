@@ -15,6 +15,7 @@ import { GameGlyph } from './GameGlyph';
 import { useRoom } from '@/lib/useRoom';
 import { sfx } from '@/lib/sound';
 import { useEndSfx } from '@/lib/useGameSfx';
+import { botThinkMs } from '@slgh/shared/src/bot-think';
 
 const engine = new ScrabbleEngine();
 let dictionaryPromise: Promise<void> | null = null;
@@ -120,7 +121,7 @@ function LocalScrabble({ onBack, tabs }: { onBack: () => void; tabs: ReactNode }
     const t = setTimeout(() => {
       commit(game, engine.getAIMove(game, current!.difficulty ?? 'medium'));
       setThinking(false);
-    }, 700);
+    }, botThinkMs('scrabble'));
     return () => { clearTimeout(t); setThinking(false); };
   }, [botTurn, game, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 

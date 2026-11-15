@@ -13,8 +13,8 @@ import { sfx } from '@/lib/sound';
 import { Icon } from './Icon';
 import { Bars, MicIcon, SpeakingNow } from './VoiceChat';
 
-// Video and voice chat through the call server (convex/livekit.ts hands out the tokens). Pro players can talk
-// and turn on their camera; everyone else watches and listens. Cameras start off and send small video
+// Voice and video chat through the call server (convex/livekit.ts hands out the tokens). Everyone can talk;
+// Pro players can also turn on their camera. Cameras start off and send small video
 // (360p, lower on weak connections), so a call stays light on mobile data.
 
 const CameraIcon = ({ off = false }: { off?: boolean }) => (
@@ -59,7 +59,7 @@ export function LiveCall({ room }: { room: RoomApi }) {
   const getToken = useAction(api.livekit.token);
   const setVoice = useMutation(api.voice.setVoice);
   const [call, setCall] = useState<Room | null>(null);
-  const [talk, setTalk] = useState(false);
+  const [video, setVideo] = useState(false);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [silenced, setSilenced] = useState<Record<string, boolean>>({});
@@ -92,7 +92,7 @@ export function LiveCall({ room }: { room: RoomApi }) {
     if (!room.code || !room.secret) return;
     setJoining(true); setError(null);
     try {
-      const { url, token, talk: mayTalk } = await getToken({ code: room.code, secret: room.secret });
+      const { url, token, video: mayShowVideo } = await getToken({ code: room.code, secret: room.secret });
       const c = new Room({
         adaptiveStream: true, // only download video at the size it is shown
         dynacast: true, // stop sending video layers nobody is watching
@@ -108,11 +108,9 @@ export function LiveCall({ room }: { room: RoomApi }) {
       await c.connect(url, token);
       callRef.current = c;
       setCall(c);
-      setTalk(mayTalk);
+      setVideo(mayShowVideo);
       await setVoice({ code: room.code, secret: room.secret, on: true });
-      if (mayTalk) {
-        try { await c.localParticipant.setMicrophoneEnabled(true); } catch { setError('Allow the microphone in your browser to talk.'); }
-      }
+      try { await c.localParticipant.setMicrophoneEnabled(true); } catch { setError('Allow the microphone in your browser to talk.'); }
       sfx('toggleOn');
     } catch (e) {
       setError(playerMessage(e));
@@ -148,11 +146,11 @@ export function LiveCall({ room }: { room: RoomApi }) {
     return (
       <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-bg/50 p-3">
         <button type="button" className="btn btn-sm btn-outline" disabled={joining} onClick={() => { sfx('click'); void join(); }}>
-          <MicIcon />{joining ? 'Joining…' : 'Join video & voice chat'}
+          <MicIcon />{joining ? 'Joining…' : 'Join voice chat'}
         </button>
         <span className="min-w-0 flex-1 text-sm text-muted">
-          {inVoice.length ? `${inVoice.map((m) => m.name).join(', ')} ${inVoice.length === 1 ? 'is' : 'are'} in the call.` : 'Talk and see each other while you play.'}
-          {!proHere && <> You can watch and listen; <Link href="/pro" className="font-semibold text-secondary">Pro</Link> players can talk and use their camera.</>}
+          {inVoice.length ? `${inVoice.map((m) => m.name).join(', ')} ${inVoice.length === 1 ? 'is' : 'are'} in the call.` : 'Talk with the other players while you play.'}
+          {proHere ? ' You can also turn on your camera.' : <> <Link href="/pro" className="font-semibold text-secondary">Pro</Link> players can also use their camera.</>}
         </span>
         {error && <p role="alert" className="w-full text-sm font-semibold text-danger">{error}</p>}
       </div>
@@ -169,11 +167,11 @@ export function LiveCall({ room }: { room: RoomApi }) {
   return (
     <div className="space-y-3 rounded-2xl border border-primary/40 bg-primary/5 p-3">
       <div className="flex flex-wrap items-center gap-2">
-        {talk && (
+        <button type="button" aria-pressed={!micOn} onClick={() => void toggle('mic')} className={`btn btn-sm ${micOn ? 'btn-primary' : 'btn-outline text-danger'}`}>
+          <MicIcon off={!micOn} />{micOn ? 'Mute' : 'Unmute'}
+        </button>
+        {video && (
           <>
-            <button type="button" aria-pressed={!micOn} onClick={() => void toggle('mic')} className={`btn btn-sm ${micOn ? 'btn-primary' : 'btn-outline text-danger'}`}>
-              <MicIcon off={!micOn} />{micOn ? 'Mute' : 'Unmute'}
-            </button>
             <button type="button" aria-pressed={lp.isCameraEnabled} onClick={() => void toggle('camera')} className={`btn btn-sm ${lp.isCameraEnabled ? 'btn-primary' : 'btn-outline'}`}>
               <CameraIcon off={!lp.isCameraEnabled} />{lp.isCameraEnabled ? 'Camera off' : 'Camera on'}
             </button>
@@ -182,8 +180,7 @@ export function LiveCall({ room }: { room: RoomApi }) {
         <button type="button" className="btn btn-sm btn-ghost" onClick={() => { sfx('toggleOff'); void leave(); }}><Icon name="logout" size={16} />Leave call</button>
         <span className="text-xs font-semibold text-muted">
           {reconnecting ? 'Reconnecting…'
-            : !talk ? <><Icon name="headphones" size={14} className="inline-block align-[-2px]" /> Watching and listening · <Link href="/pro" className="font-semibold text-secondary">Go Pro to talk</Link></>
-              : !micOn ? 'You are muted' : remotes.length ? 'Your microphone is on' : 'Waiting for others to join the call'}
+            : !micOn ? 'You are muted' : remotes.length ? 'Your microphone is on' : 'Waiting for others to join the call'}
         </span>
       </div>
 
@@ -203,7 +200,6 @@ export function LiveCall({ room }: { room: RoomApi }) {
         {everyone.map((p) => {
           const mine = p === lp;
           const mic = p.getTrackPublication(Track.Source.Microphone);
-          const canSpeak = mine ? talk : !!mic;
           const muted = !mic || mic.isMuted;
           const off = !!silenced[p.identity];
           const name = `${p.name || 'Player'}${mine ? ' (you)' : ''}`;
@@ -217,8 +213,7 @@ export function LiveCall({ room }: { room: RoomApi }) {
                 <span className="block max-w-[7rem] truncate text-sm font-semibold">{name}</span>
                 <span className="flex items-center gap-1 text-xs text-muted">
                   {off ? 'muted by you'
-                    : !canSpeak ? <><Icon name="headphones" size={12} />listening</>
-                      : muted ? <><MicIcon off size={12} />muted</>
+                    : muted ? <><MicIcon off size={12} />muted</>
                         : <><Bars level={p.audioLevel} on={p.isSpeaking} />{p.isSpeaking ? 'speaking' : 'quiet'}</>}
                 </span>
               </span>

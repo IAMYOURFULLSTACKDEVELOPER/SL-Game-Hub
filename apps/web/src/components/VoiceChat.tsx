@@ -4,7 +4,6 @@ import { useVoice } from '@/lib/useVoice';
 import { sfx } from '@/lib/sound';
 import { Icon } from './Icon';
 import { Portal } from './Portal';
-import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useQuery } from 'convex/react';
 import { api } from '@slgh/backend/convex/_generated/api';
@@ -35,7 +34,7 @@ export function Bars({ level, on }: { level: number; on: boolean }) {
 
 /**
  * Talk to the other players in an online room. Shown above the lobby and the game.
- * With a call server configured (convex/livekit.ts) players can also turn on their camera;
+ * With a call server configured (convex/livekit.ts) Pro players can also turn on their camera;
  * otherwise audio goes straight between the browsers.
  */
 export function VoiceChat({ room }: { room: RoomApi }) {
@@ -58,7 +57,6 @@ function PeerVoiceChat({ room }: { room: RoomApi }) {
         </button>
         <span className="min-w-0 flex-1 text-sm text-muted">
           {inVoice.length ? `${inVoice.map((m) => m.name).join(', ')} ${inVoice.length === 1 ? 'is' : 'are'} in voice chat.` : 'Talk with the other players while you play.'}
-          {!voice.canTalk && <> You can listen; <Link href="/pro" className="font-semibold text-secondary">Pro</Link> players can talk.</>}
         </span>
         {voice.error && <p role="alert" className="w-full text-sm font-semibold text-danger">{voice.error}</p>}
       </div>
@@ -78,8 +76,7 @@ function PeerVoiceChat({ room }: { room: RoomApi }) {
         )}
         <button type="button" className="btn btn-sm btn-ghost" onClick={voice.leave}><Icon name="logout" size={16} />Leave voice</button>
         <span className="text-xs font-semibold text-muted">
-          {!voice.canTalk ? <><Icon name="headphones" size={14} className="inline-block align-[-2px]" /> Listening only · <Link href="/pro" className="font-semibold text-secondary">Go Pro to talk</Link></>
-            : voice.muted ? 'You are muted' : alone ? 'Waiting for others to join voice' : 'Your microphone is on'}
+          {voice.muted ? 'You are muted' : alone ? 'Waiting for others to join voice' : 'Your microphone is on'}
         </span>
       </div>
 

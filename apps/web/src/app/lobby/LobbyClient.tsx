@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '@slgh/backend/convex/_generated/api';
@@ -8,13 +8,13 @@ import { ConvexRoomProvider } from '@/components/ConvexRoomProvider';
 import { PageHeader } from '@/components/PageHeader';
 import { Icon } from '@/components/Icon';
 import { GameGlyph } from '@/components/GameGlyph';
-import { errorText, mySecret, savedName, type RoomGame } from '@/lib/useRoom';
+import { errorText, mySecret, type RoomGame } from '@/lib/useRoom';
 import { sfx } from '@/lib/sound';
 import { formatLeones } from '@slgh/shared/src/wallet';
 import { RecentRooms, RoomsLeft } from '@/components/RecentRooms';
 
 // Live games: every online room whose host chose to list it. Players ask to join; the host
-// says yes or no from their room, and a yes hands this browser the room link. No account needed.
+// says yes or no from their room, and a yes hands this browser the room link. Joining needs an account (free is fine).
 
 const GAMES: Record<RoomGame, { name: string; href: string }> = {
   uno: { name: 'UNO', href: '/games/uno/play' },
@@ -27,7 +27,6 @@ const GAMES: Record<RoomGame, { name: string; href: string }> = {
   snake: { name: 'Snake', href: '/games/snake/play' },
 };
 const ASKED_KEY = 'slgh-asked-rooms';
-const NAME_KEY = 'slgh-player-name';
 
 function loadAsked(): string[] {
   try { return JSON.parse(localStorage.getItem(ASKED_KEY) ?? '[]'); } catch { return []; }
@@ -51,7 +50,11 @@ function Lobby() {
   const [name, setName] = useState('');
   const [filter, setFilter] = useState<RoomGame | 'all'>('all');
   const [asked, setAsked] = useState<string[]>([]);
-  useEffect(() => { setSecret(mySecret()); setName(savedName()); setAsked(loadAsked()); }, []);
+  useEffect(() => { setSecret(mySecret()); setAsked(loadAsked()); }, []);
+  // Your username by default; changing it here only renames you for the games you ask to join now.
+  const me = useQuery(api.users.me);
+  const nameEdited = useRef(false);
+  useEffect(() => { if (me?.username && !nameEdited.current) setName(me.username); }, [me?.username]);
 
   const remember = (id: string, on: boolean) => setAsked((a) => {
     const next = on ? [...a.filter((x) => x !== id), id] : a.filter((x) => x !== id);
@@ -75,7 +78,7 @@ function Lobby() {
         <div>
           <label className="label" htmlFor="lobby-name">Your name</label>
           <input id="lobby-name" className="input" maxLength={20} value={name} autoComplete="nickname" placeholder="What should other players call you?"
-            onChange={(e) => { setName(e.target.value); try { localStorage.setItem(NAME_KEY, e.target.value); } catch { /* private mode */ } }} />
+            onChange={(e) => { nameEdited.current = true; setName(e.target.value); }} />
         </div>
         <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Which game">
           {(['all', ...(Object.keys(GAMES) as RoomGame[])] as const).map((f) => (
@@ -103,7 +106,7 @@ function Lobby() {
       ) : (
         <ul className="space-y-3">
           {shown.map((r, i) => (
-            <RoomCard key={r.id} room={r} index={i} secret={secret} name={name} asked={asked.includes(r.id)} onAsked={(on) => remember(r.id, on)} />
+            <RoomCard key={r.id} room={r} index={i} secret={secret} name={name} asked={asked.includes(r.id)} onAsked={(on) => remember(r.id, on)} guest={mine === null} />
           ))}
         </ul>
       )}
@@ -111,8 +114,8 @@ function Lobby() {
   );
 }
 
-function RoomCard({ room: r, index, secret, name, asked, onAsked }: {
-  room: Listed; index: number; secret: string; name: string; asked: boolean; onAsked: (on: boolean) => void;
+function RoomCard({ room: r, index, secret, name, asked, onAsked, guest }: {
+  room: Listed; index: number; secret: string; name: string; asked: boolean; onAsked: (on: boolean) => void; guest: boolean;
 }) {
   const g = GAMES[r.game];
   const status = useQuery(api.rooms.requestStatus, asked && secret ? { roomId: r.id, secret } : 'skip');
@@ -165,6 +168,8 @@ function RoomCard({ room: r, index, secret, name, asked, onAsked }: {
         </div>
       ) : status?.status === 'declined' ? (
         <p className="rounded-xl bg-bg/60 p-3 text-sm text-muted">The host said no this time. Try another game.</p>
+      ) : guest ? (
+        <Link href="/login?next=/lobby" className="btn btn-primary w-full"><Icon name="login" size={18} />Sign in to join</Link>
       ) : (
         <button className="btn btn-primary w-full" disabled={busy || full || !secret} onClick={ask}>
           {full ? 'Room is full' : r.playing ? 'Ask to join the next game' : 'Ask to join'}

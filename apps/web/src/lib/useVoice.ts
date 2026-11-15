@@ -30,8 +30,8 @@ export function useVoice(room: RoomApi) {
   const meInVoiceOnServer = members.some((m) => m.id === me && m.voice);
   // Who else is in voice, as a stable string so effects only re-run when it really changes
   const othersKey = members.filter((m) => m.voice && m.id !== me).map((m) => m.id).sort().join(',');
-  // Talking is a Pro feature; everyone else listens. Audio from anyone the server hasn't allowed to talk stays muted.
-  const canTalk = !!room.view?.me?.pro;
+  // Everyone in voice chat can talk. Audio from anyone the server hasn't marked as talking stays muted.
+  const canTalk = true;
   const talkersKey = members.filter((m) => m.voice && m.talk).map((m) => m.id).sort().join(',');
 
   const [on, setOn] = useState(false);

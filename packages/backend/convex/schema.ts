@@ -354,14 +354,19 @@ export default defineSchema({
     .index('by_room_user', ['room_id', 'user_id'])
     .index('by_muted', ['is_muted', 'muted_until']),
 
+  // A message in a public chat room (room_id) or in a group's channel (channel_id): exactly one is set.
   chat_messages: defineTable({
-    room_id: v.id('chat_rooms'),
+    room_id: v.optional(v.id('chat_rooms')),
+    channel_id: v.optional(v.id('group_channels')),
     user_id: v.id('users'),
     content: v.string(),
     is_deleted: v.boolean(),
     is_flagged: v.boolean(),
+    reply_to: v.optional(v.id('chat_messages')),
+    edited_at: v.optional(v.number()),
   })
     .index('by_room', ['room_id'])
+    .index('by_channel_id', ['channel_id'])
     .index('by_flagged', ['is_flagged', 'is_deleted']),
 
   // user1_id is always the smaller id of the pair, so each pair has one conversation.
@@ -645,7 +650,7 @@ export default defineSchema({
     joined_at: v.number(),
     last_seen: v.number(),
     voice: v.optional(v.boolean()), // in the room's voice chat
-    voice_talk: v.optional(v.boolean()), // may talk (Pro); everyone else in voice listens only
+    voice_talk: v.optional(v.boolean()), // may talk (everyone in voice chat can)
     user_id: v.optional(v.id('users')), // money rooms: the signed-in player whose wallet stakes and wins
   })
     .index('by_room_id_and_joined_at', ['room_id', 'joined_at'])
@@ -703,4 +708,78 @@ export default defineSchema({
     .index('by_asset_id', ['asset_id'])
     .index('by_stream_id', ['stream_id'])
     .index('by_status', ['status']),
+  // Chat channels inside a group (#general, #tactics…). Messages live in chat_messages.channel_id.
+  group_channels: defineTable({
+    group_id: v.id('groups'),
+    name: v.string(),
+    topic: v.optional(v.string()),
+    position: v.number(),
+    created_by: v.id('users'),
+    last_message_at: v.optional(v.number()),
+  }).index('by_group_id_and_position', ['group_id', 'position']),
+  // A group owner invited a player (by username, email or from people they played with); the player accepts or declines.
+  group_invites: defineTable({
+    group_id: v.id('groups'),
+    user_id: v.id('users'),
+    invited_by: v.id('users'),
+    created_at: v.number(),
+  })
+    .index('by_user_id', ['user_id'])
+    .index('by_group_id_and_user_id', ['group_id', 'user_id']),
+  // Who played an online game with whom (written when a game starts), for "people you've played with".
+  played_with: defineTable({
+    user_id: v.id('users'),
+    other_id: v.id('users'),
+    games: v.number(),
+    last_at: v.number(),
+  })
+    .index('by_user_id_and_other_id', ['user_id', 'other_id'])
+    .index('by_user_id_and_last_at', ['user_id', 'last_at']),
+  // Emoji reactions on chat messages: one row per person, message and emoji.
+  chat_reactions: defineTable({
+    message_id: v.id('chat_messages'),
+    user_id: v.id('users'),
+    emoji: v.string(),
+  }).index('by_message_id_and_user_id_and_emoji', ['message_id', 'user_id', 'emoji']),
+  // "Someone is typing": one row per person and place (`room:<id>` / `channel:<id>`), valid until `until`.
+  chat_typing: defineTable({
+    place: v.string(),
+    user_id: v.id('users'),
+    until: v.number(),
+  })
+    .index('by_place_and_user_id', ['place', 'user_id'])
+    .index('by_until', ['until']),
+  // Where each player has read up to, for unread counts.
+  chat_reads: defineTable({
+    user_id: v.id('users'),
+    place: v.string(),
+    last_read: v.number(),
+  }).index('by_user_id_and_place', ['user_id', 'place']),
+  // Games planned for later: an online room at a set time, or a tournament (which also creates a `tournaments` row).
+  // Shared with a group (its members see it and it's announced in the group's chat) or listed for everyone.
+  scheduled_games: defineTable({
+    kind: v.union(v.literal('room'), v.literal('tournament')),
+    game: v.string(), // game slug
+    title: v.string(),
+    note: v.optional(v.string()),
+    starts_at: v.number(),
+    created_by: v.id('users'),
+    group_id: v.optional(v.id('groups')),
+    public: v.boolean(),
+    status: v.union(v.literal('scheduled'), v.literal('cancelled')),
+    room_code: v.optional(v.string()), // set when the host opens the room
+    tournament_id: v.optional(v.id('tournaments')),
+    max_players: v.optional(v.number()),
+  })
+    .index('by_public_and_starts_at', ['public', 'starts_at'])
+    .index('by_group_id_and_starts_at', ['group_id', 'starts_at'])
+    .index('by_created_by_and_starts_at', ['created_by', 'starts_at']),
+  // Who is coming to a scheduled game.
+  schedule_rsvps: defineTable({
+    event_id: v.id('scheduled_games'),
+    user_id: v.id('users'),
+    status: v.union(v.literal('going'), v.literal('maybe'), v.literal('no')),
+  })
+    .index('by_event_id_and_user_id', ['event_id', 'user_id'])
+    .index('by_user_id', ['user_id']),
 });

@@ -12,6 +12,8 @@ import { currentUser } from './lib';
 import { countGame, roomsLeft, spendRoomAllowance, isPro } from './pro';
 import { FREE_DAILY_ROOMS, ROOM_IDLE_DAYS } from '@slgh/shared/src/pro';
 import { lockPot, openPot, heldEntries, settleShared, stakeIn, unstake, voidPot } from './pots';
+import { BOT_THINK_MS, botThinkMs, type BotThinkKind } from '@slgh/shared/src/bot-think';
+import { recordPlayedWith } from './groups';
 
 // Online rooms for every multiplayer game (see roomGames.ts). Players must be signed in (a free account is
 // fine). Free players can create FREE_DAILY_ROOMS rooms a day (Pro: unlimited); joining and playing are unlimited.
@@ -109,9 +111,12 @@ async function scheduleBot(ctx: MutationCtx, room: Room) {
   if (!s || s.status !== 'playing' || !s.players[actorOf(room, s)]?.isAI) return;
   const spec = SPECS[room.game];
   const args = { roomId: room._id, version: room.version };
+  // Bots "think" for a varied, human-feeling moment before they play.
+  const kind = room.game === 'salone-poly' && (s as { phase?: string }).phase === 'auction' ? 'salone-poly-auction' : room.game;
+  const delay = kind in BOT_THINK_MS ? botThinkMs(kind as BotThinkKind) : spec.botDelayMs;
   // Scrabble bots need the dictionary, which only the Node runtime can load.
-  if (spec.nodeBot) await ctx.scheduler.runAfter(spec.botDelayMs, internal.scrabbleNode.botMove, args);
-  else await ctx.scheduler.runAfter(spec.botDelayMs, internal.rooms.botMove, args);
+  if (spec.nodeBot) await ctx.scheduler.runAfter(delay, internal.scrabbleNode.botMove, args);
+  else await ctx.scheduler.runAfter(delay, internal.rooms.botMove, args);
 }
 
 const pendingRequests = (ctx: QueryCtx, roomId: Id<'play_rooms'>) =>
@@ -425,6 +430,7 @@ export const requestJoin = mutation({
   args: { roomId: v.string(), name: v.string(), secret: v.string() },
   handler: async (ctx, { roomId, name, secret }) => {
     checkSecret(secret);
+    if (!(await currentUser(ctx))) throw new ConvexError('errors.signInRequired'); // online play needs an account
     const room = await publicRoom(ctx, roomId);
     if (await memberBySecret(ctx, room._id, secret)) throw new ConvexError('You are already in this room.');
     const members = await membersOf(ctx, room._id);
@@ -510,6 +516,7 @@ export const start = mutation({
     const timed = spec.timer && minutes ? Math.min(120, Math.max(room.game === 'snake' ? 1 : 10, Math.floor(minutes))) : 0;
     if (room.pot_id) await lockPot(ctx, room.pot_id);
     await countGame(ctx, humans.flatMap((m) => (m.user_id ? [m.user_id] : [])));
+    await recordPlayedWith(ctx, humans.flatMap((m) => (m.user_id ? [m.user_id] : []))); // for "people you've played with"
     await save(ctx, room, spec.start(players, timed, variant?.slice(0, 32)));
     if (timed) await ctx.scheduler.runAfter(timed * 60_000, internal.rooms.timeUp, { roomId: room._id });
   },

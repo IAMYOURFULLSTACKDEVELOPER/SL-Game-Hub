@@ -20,6 +20,7 @@ export async function Header() {
     { title: 'Compete', items: [
       { href: '/leaderboards', label: 'Leaderboards', icon: 'trophy' },
       { href: '/tournaments', label: 'Tournaments', icon: 'swords' },
+      ...(me ? [{ href: '/schedule', label: 'Schedule', icon: 'calendar' } as NavItem] : []),
     ] },
     ...(me ? [{ title: 'Community', items: [
       { href: '/chat', label: 'chat', icon: 'hash' },
@@ -50,7 +51,7 @@ export async function Header() {
     <NavBar
       appName={t('app.name')} sections={sections} tabs={tabs} account={account}
       games={catalog.map((g) => ({ slug: g.slug, name: g.name, icon: gameIcon(g.slug) }))}
-      user={me ? { name: me.username, avatar: me.avatar ?? null } : null}
+      user={me ? { name: me.username, avatar: me.avatar ?? null } : null} pro={!!me?.pro}
       signIn={t('nav.signIn')} signUp={t('nav.signUp')} themeLabel={t('nav.theme')}
       signOut={
         <SignOutButton className="menu-item w-full menu-danger"><Icon name="logout" size={18} />{t('nav.signOut')}</SignOutButton>

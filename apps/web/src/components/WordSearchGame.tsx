@@ -16,6 +16,7 @@ import { GameGlyph } from './GameGlyph';
 import { useRoom } from '@/lib/useRoom';
 import { sfx } from '@/lib/sound';
 import { useEndSfx } from '@/lib/useGameSfx';
+import { botThinkMs } from '@slgh/shared/src/bot-think';
 
 const engine = new WordSearchEngine();
 const SAVE_KEY = 'word_search_game_v2';
@@ -178,7 +179,7 @@ function LocalWordSearch({ onBack, tabs }: { onBack: () => void; tabs: ReactNode
     const t = setTimeout(() => {
       const m = engine.getAIMove(game, game.players[game.currentPlayerIndex].difficulty ?? 'medium');
       submit(m.start, m.end);
-    }, 1400);
+    }, botThinkMs('word-search'));
     return () => clearTimeout(t);
   }, [botTurn, game, submit]);
 

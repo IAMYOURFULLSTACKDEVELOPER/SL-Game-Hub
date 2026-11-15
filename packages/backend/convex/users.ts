@@ -3,6 +3,7 @@ import { query, mutation } from './_generated/server';
 import { USERNAME_RE } from '@slgh/shared/src/validation';
 import { isAvatarId } from '@slgh/shared/src/avatars';
 import { currentUser, requireAdmin, requireActiveUser } from './lib';
+import { isProActive } from '@slgh/shared/src/pro';
 
 /** The signed-in player's profile, or null. */
 export const me = query({
@@ -14,6 +15,7 @@ export const me = query({
       id: u._id, username: u.username, full_name: u.full_name, avatar: u.avatar, role: u.role,
       age_band: u.age_band, banned: u.banned, is_public: u.is_public,
       district_id: u.district_id ?? null, created_at: new Date(u._creationTime).toISOString(),
+      pro: isProActive(u.pro_until),
     };
   },
 });

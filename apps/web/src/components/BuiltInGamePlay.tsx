@@ -7,7 +7,7 @@ import { createPlayer } from '@slgh/shared';
 import dynamic from 'next/dynamic';
 import { DiceLoader } from './Art';
 import { Icon } from './Icon';
-import { SnakeBoard, SnakePad } from './SnakeBoard';
+import { SnakeBoard, SnakePad, SnakeSpeed, DEFAULT_SNAKE_LEVEL, loadSnakeLevel, msForLevel, saveSnakeLevel } from './SnakeBoard';
 
 // Each game is its own download: opening Chess never fetches Scrabble's code.
 const loading = () => <main className="mx-auto max-w-2xl p-4"><DiceLoader label="Setting up the game" /></main>;
@@ -115,6 +115,8 @@ function LocalSnake({ router, tabs }: { router: ReturnType<typeof useRouter>; ta
   const [score, setScore] = useState(0);
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
   const [isAIPlaying, setIsAIPlaying] = useState(false);
+  const [level, setLevel] = useState(DEFAULT_SNAKE_LEVEL); // speed slider, remembered on this device
+  const levelRef = useRef(DEFAULT_SNAKE_LEVEL);
   const engineRef = useRef(new SnakeEngine(20, 150));
   const gameLoopRef = useRef<number | null>(null);
   const lastScore = useRef(0);
@@ -123,10 +125,17 @@ function LocalSnake({ router, tabs }: { router: ReturnType<typeof useRouter>; ta
 
   useEffect(() => {
     const player = createPlayer('player', 'You', false);
-    const initialState = engineRef.current.initialize([player], { boardSize: 20, speed: 150 });
+    const initialState = engineRef.current.initialize([player], { boardSize: 20, speed: msForLevel(levelRef.current) });
     setState(initialState);
     setScore(0);
     setGameOver(false);
+  }, []);
+
+  const changeSpeed = useCallback((next: number) => {
+    levelRef.current = next;
+    setLevel(next);
+    saveSnakeLevel(next);
+    setState((s) => (s ? { ...s, speed: msForLevel(next) } : s));
   }, []);
 
   useEffect(() => {
@@ -204,11 +213,12 @@ function LocalSnake({ router, tabs }: { router: ReturnType<typeof useRouter>; ta
         console.error('Failed to load saved game:', e);
       }
     }
-  }, []);
+    changeSpeed(loadSnakeLevel()); // the player's chosen speed, also for a saved game
+  }, [changeSpeed]);
 
   const handleRestart = () => {
     const player = createPlayer('player', 'You', false);
-    const initialState = engineRef.current.initialize([player], { boardSize: 20, speed: 150 });
+    const initialState = engineRef.current.initialize([player], { boardSize: 20, speed: msForLevel(levelRef.current) });
     setState(initialState);
     setScore(0);
     setGameOver(false);
@@ -255,6 +265,8 @@ function LocalSnake({ router, tabs }: { router: ReturnType<typeof useRouter>; ta
           </label>
         </div>
 
+        <SnakeSpeed level={level} onChange={changeSpeed} />
+
         <SnakeBoard state={state} onTurn={turn} />
 
         {!isAIPlaying && <SnakePad onTurn={turn} />}
@@ -267,7 +279,7 @@ function LocalSnake({ router, tabs }: { router: ReturnType<typeof useRouter>; ta
 
         <div className="flex gap-2">
           <button onClick={handleRestart} className="btn btn-primary flex-1">Restart</button>
-          <button onClick={handleSaveAndExit} className="btn btn-outline flex-1">Save &amp; Exit</button>
+          <button onClick={handleSaveAndExit} className="btn btn-outline flex-1" data-leave-ok>Save &amp; Exit</button>
         </div>
 
         {gameOver && (

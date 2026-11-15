@@ -15,6 +15,7 @@ import { GameGlyph } from './GameGlyph';
 import { useRoom, type RoomApi } from '@/lib/useRoom';
 import { sfx } from '@/lib/sound';
 import { useEndSfx } from '@/lib/useGameSfx';
+import { botThinkMs } from '@slgh/shared/src/bot-think';
 
 const engine = new ChessEngine();
 const SAVE_KEY = 'chess_game_state_v2';
@@ -99,7 +100,7 @@ export default function ChessGame({ onBack }: { onBack: () => void }) {
     const t = setTimeout(() => {
       play(engine.getAIMove(game, game.players[game.currentPlayerIndex].difficulty ?? 'medium'));
       setThinking(false);
-    }, 450);
+    }, botThinkMs('chess'));
     return () => { clearTimeout(t); setThinking(false); };
   }, [botTurn, game]); // eslint-disable-line react-hooks/exhaustive-deps
 

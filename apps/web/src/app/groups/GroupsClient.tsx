@@ -7,6 +7,7 @@ import { useMutation, useQuery } from 'convex/react';
 import { api } from '@slgh/backend/convex/_generated/api';
 import { playerMessage } from '@slgh/shared/src/errors';
 import { PageHeader } from '@/components/PageHeader';
+import { Icon } from '@/components/Icon';
 
 const ago = (ms: number) => {
   const m = Math.round((Date.now() - ms) / 60_000);
@@ -19,6 +20,8 @@ export default function GroupsClient() {
   const data = useQuery(api.groups.mine);
   const create = useMutation(api.groups.create);
   const join = useMutation(api.groups.join);
+  const invites = useQuery(api.groups.myInvites);
+  const answer = useMutation(api.groups.answerInvite);
   const [form, setForm] = useState({ name: '', description: '', code: '' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -29,10 +32,39 @@ export default function GroupsClient() {
   };
   const onCreate = (e: FormEvent) => { e.preventDefault(); void go(() => create({ name: form.name, description: form.description || undefined })); };
   const onJoin = (e: FormEvent) => { e.preventDefault(); void go(() => join({ inviteCode: form.code })); };
+  const onAnswer = async (inviteId: (typeof invites & object)[number]['id'], accept: boolean) => {
+    setBusy(true); setError('');
+    try {
+      const groupId = await answer({ inviteId, accept });
+      if (groupId) { router.push(`/groups/${groupId}`); return; }
+    } catch (e) { setError(playerMessage(e)); }
+    setBusy(false);
+  };
 
   return (
     <main className="mx-auto max-w-3xl space-y-6 p-4">
-      <PageHeader icon="users" tone="blue" title="Groups" subtitle="Forums for your team: plan matches, share tips, talk between games." />
+      <PageHeader icon="users" tone="blue" title="Groups" subtitle="Your teams: chat channels, a forum, and the people you play with." />
+
+      {!!invites?.length && (
+        <section className="space-y-2" aria-label="Invites">
+          <h2 className="flex items-center gap-2 text-lg"><Icon name="mail" size={18} />Invites</h2>
+          <ul className="space-y-2">
+            {invites.map((i) => (
+              <li key={i.id} className="card pop-in flex flex-wrap items-center gap-3 border-accent/40 p-4">
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-bold">{i.name}</span>
+                  <span className="block text-sm text-muted">{i.from} invited you · {i.members} {i.members === 1 ? 'member' : 'members'}</span>
+                  {i.description && <span className="block truncate text-sm text-muted">{i.description}</span>}
+                </span>
+                <span className="flex gap-2">
+                  <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => void onAnswer(i.id, true)}><Icon name="check" size={15} />Join</button>
+                  <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => void onAnswer(i.id, false)}>Decline</button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {data === undefined ? <p className="text-muted">Loading…</p> : data.groups.length === 0 ? (
         <p className="card p-5 text-muted">You're not in any groups yet. Join one with a code from a friend{data.canCreate ? ', or start your own' : ''}.</p>
@@ -41,7 +73,8 @@ export default function GroupsClient() {
           {data.groups.map((g) => (
             <li key={g.id}>
               <Link href={`/groups/${g.id}`} className="card card-hover flex items-center justify-between gap-3 p-4">
-                <span className="min-w-0">
+                <span className="icon-badge icon-badge-blue h-11 w-11 shrink-0 rounded-xl font-display font-bold" aria-hidden>{g.name.slice(0, 2).toUpperCase()}</span>
+                <span className="min-w-0 flex-1">
                   <span className="block truncate font-bold">{g.name}{g.role === 'owner' && <span className="chip chip-muted ml-2">Owner</span>}</span>
                   {g.description && <span className="block truncate text-sm text-muted">{g.description}</span>}
                 </span>

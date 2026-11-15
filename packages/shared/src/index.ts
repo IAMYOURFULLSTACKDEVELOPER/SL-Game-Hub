@@ -37,3 +37,4 @@ export { default as tokens } from './tokens.json';
 
 // Register all games
 import './games/index';
+export * from './bot-think';

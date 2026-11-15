@@ -1,6 +1,7 @@
 import { ConvexError, v } from 'convex/values';
 import { query, mutation } from './_generated/server';
 import type { QueryCtx } from './_generated/server';
+import type { Doc, Id } from './_generated/dataModel';
 import { publicProfile, requireActiveUser, requireAdmin, requireUser } from './lib';
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -101,11 +102,18 @@ export const moderation = query({
     const flagged = await ctx.db.query('chat_messages')
       .withIndex('by_flagged', (q) => q.eq('is_flagged', true).eq('is_deleted', false)).order('desc').take(50);
     const muted = await ctx.db.query('chat_participants').withIndex('by_muted', (q) => q.eq('is_muted', true)).order('desc').collect();
-    const roomName = async (id: (typeof flagged)[number]['room_id']) => ({ name: (await ctx.db.get(id))?.name ?? '' });
+    const roomName = async (id: Id<'chat_rooms'>) => ({ name: (await ctx.db.get(id))?.name ?? '' });
+    // Messages are in a public room or in a group's channel
+    const placeName = async (m: Doc<'chat_messages'>) => {
+      if (m.room_id) return roomName(m.room_id);
+      const ch = m.channel_id && await ctx.db.get(m.channel_id);
+      const g = ch && await ctx.db.get(ch.group_id);
+      return { name: ch ? `${g?.name ?? 'Group'} #${ch.name}` : '' };
+    };
     return {
       flagged: await Promise.all(flagged.map(async (m) => ({
         id: m._id, content: m.content, created_at: new Date(m._creationTime).toISOString(),
-        profiles: await publicProfile(ctx, m.user_id), chat_rooms: await roomName(m.room_id),
+        profiles: await publicProfile(ctx, m.user_id), chat_rooms: await placeName(m),
       }))),
       muted: await Promise.all(muted.map(async (p) => ({
         id: p._id, muted_until: p.muted_until === undefined ? null : new Date(p.muted_until).toISOString(),

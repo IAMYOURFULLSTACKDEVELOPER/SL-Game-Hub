@@ -71,10 +71,7 @@ export function playLink(input: string): Track | null {
 export function stopMyMusic() { current = null; minimized = false; emit(); }
 export function setMinimized(v: boolean) { minimized = v; emit(); }
 
-/**
- * The single gate for choosing your own Spotify / Apple Music. Open to every player for now;
- * if access ever changes (e.g. a paid tier), change it here only.
- */
-export function useCanChooseMusic(): boolean {
-  return true;
+/** The single gate for choosing your own Spotify / Apple Music: a Dodo Pro feature. */
+export function canChooseMusic(pro: boolean): boolean {
+  return pro;
 }

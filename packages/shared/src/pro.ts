@@ -9,7 +9,8 @@ export const ROOM_IDLE_DAYS = 7; // a room nobody is in is kept this long, so it
 export const PRO_PERKS = [
   'Create unlimited online rooms (free players get 10 a day)',
   'Create groups and forums for your team',
-  'Talk in voice chat (free players can only listen)',
+  'Turn on your camera in game rooms (everyone can talk)',
+  'Play your own music from Spotify or Apple Music while you play',
   'Lower withdrawal fee: 2% instead of 5%',
 ] as const;
 

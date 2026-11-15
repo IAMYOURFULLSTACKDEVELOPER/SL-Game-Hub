@@ -5,6 +5,7 @@ import type { Doc } from './_generated/dataModel';
 import { DiceEngine, DICE_MANIFEST, rollDice, type DiceState } from '@slgh/shared/src/games/dice';
 import { WALLET_LIMITS, formatLeones } from '@slgh/shared/src/wallet';
 import { requireWalletUser } from './wallet';
+import { currentUser } from './lib';
 import { heldEntries, lockPot, openPot, settlePot, stakeIn, unstake, voidPot } from './pots';
 
 // Online Dice rooms. Free rooms are anonymous (no account needed): each browser makes up a
@@ -93,6 +94,7 @@ export const join = mutation({
   args: { code: v.string(), memberId: v.string(), name: v.string(), host: v.boolean(), stake: v.optional(v.number()) },
   handler: async (ctx, { code, memberId, name, host, stake }) => {
     if (!/^[A-Z0-9]{6}$/.test(code)) throw new ConvexError('Room codes are 6 letters and numbers.');
+    if (!(await currentUser(ctx))) throw new ConvexError('errors.signInRequired'); // online play needs an account
     const display = name.trim().slice(0, 20) || 'Player';
     let room = await roomByCode(ctx, code);
     if (host) {

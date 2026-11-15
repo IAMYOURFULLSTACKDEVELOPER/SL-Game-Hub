@@ -17,6 +17,7 @@ import { Portal } from './Portal';
 import { useRoom } from '@/lib/useRoom';
 import { sfx } from '@/lib/sound';
 import { useEndSfx } from '@/lib/useGameSfx';
+import { botThinkMs } from '@slgh/shared/src/bot-think';
 
 const engine = new UnoEngine();
 const SAVE_KEY = 'uno_game_state_v2';
@@ -68,12 +69,12 @@ function LocalUno({ pass }: { pass: boolean }) {
     try { if (state.status === 'playing') localStorage.setItem(SAVE_KEY, engine.serialize(state)); else localStorage.removeItem(SAVE_KEY); } catch { /* ignore */ }
   }, [state, pass]);
 
-  // Bots take their turn after a short pause so you can follow what happened.
+  // Bots take a moment to "think" before their turn, like a person would, so you can follow what happened.
   const botTurn = !!state && state.status === 'playing' && state.players[state.currentPlayerIndex].isAI;
   useEffect(() => {
     if (!botTurn || !state) return;
     const t = setTimeout(() => setState((s) => (s && s.status === 'playing' && s.players[s.currentPlayerIndex].isAI
-      ? engine.applyMove(s, engine.getAIMove(s, s.players[s.currentPlayerIndex].difficulty ?? 'medium')) : s)), 1000);
+      ? engine.applyMove(s, engine.getAIMove(s, s.players[s.currentPlayerIndex].difficulty ?? 'medium')) : s)), botThinkMs('uno'));
     return () => clearTimeout(t);
   }, [botTurn, state]);
 
