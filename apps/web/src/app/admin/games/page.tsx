@@ -2,6 +2,7 @@ import { t, GAME_STATUSES } from '@slgh/shared';
 import { api, query } from '@/lib/convex';
 import { setGameStatus } from '../../actions';
 import Link from 'next/link';
+import { GameGlyph } from '@/components/GameGlyph';
 
 export default async function AdminGames() {
   // Every game, with version counts for uploaded (non-built-in) games
@@ -19,7 +20,7 @@ export default async function AdminGames() {
         {(games ?? []).map((g) => (
           <li key={g.id} className="card flex flex-wrap items-center justify-between gap-3 p-3">
             <div className="flex-1">
-              <span className="font-bold">{g.icon} {g.name}</span>
+              <span className="inline-flex items-center gap-2 align-middle font-bold"><GameGlyph slug={g.slug} name={g.name} size={24} />{g.name}</span>
               <span className="font-normal text-muted ml-2">
                 v{g.version}
                 {g.coming_soon ? ` · ${t('library.comingSoon')}` : ''}

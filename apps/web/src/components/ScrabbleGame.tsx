@@ -8,10 +8,10 @@ import {
 import Rulebook from './Rulebook';
 import { RoomLobby, JoinRequests } from './RoomLobby';
 import { VoiceChat } from './VoiceChat';
-import { ProBar } from './ProBar';
 import { MoneyBar } from './MoneyBar';
 import { ConvexRoomProvider } from './ConvexRoomProvider';
 import { Icon } from './Icon';
+import { GameGlyph } from './GameGlyph';
 import { useRoom } from '@/lib/useRoom';
 import { sfx } from '@/lib/sound';
 import { useEndSfx } from '@/lib/useGameSfx';
@@ -39,7 +39,7 @@ interface Seat { name: string; ai: boolean; level: Difficulty }
 type ScrabbleView = ScrabbleState & { rackCounts: number[]; bagCount: number };
 
 const championText = (g: ScrabbleState) => (g.winner !== null
-  ? `🏆 ${g.players[g.winner].name} is the SCRABBLE CHAMPION!`
+  ? `${g.players[g.winner].name} is the SCRABBLE CHAMPION!`
   : `It’s a tie between ${g.tiedPlayers.map((i) => g.players[i].name).join(' and ')}!`);
 
 export default function ScrabbleGame({ onBack }: { onBack: () => void }) {
@@ -154,7 +154,7 @@ function LocalScrabble({ onBack, tabs }: { onBack: () => void; tabs: ReactNode }
           ))}
         </ul>
         {loadError && <p className="font-semibold text-red-600">Could not load the dictionary. Check your connection and reload.</p>}
-        <button onClick={start} disabled={!ready} className="btn btn-primary w-full disabled:opacity-50">{ready ? '🔠 Start game' : 'Loading dictionary…'}</button>
+        <button onClick={start} disabled={!ready} className="btn btn-primary w-full disabled:opacity-50">{ready ? <><Icon name="play" size={18} />Start game</> : 'Loading dictionary…'}</button>
         {saved && <button onClick={() => begin(saved)} disabled={!ready} className="btn btn-outline w-full">Resume saved game</button>}
         <Rulebook title="Scrabble Official Game Rulebook" sections={SCRABBLE_RULES} open />
       </Shell>
@@ -177,7 +177,7 @@ function LocalScrabble({ onBack, tabs }: { onBack: () => void; tabs: ReactNode }
         onMove={(m) => commit(game, m)}
         onReject={setMessage}
         rackSlot={humanTurn && !revealed && (
-          <button onClick={() => setRevealed(true)} className="btn btn-primary w-full">🙈 Hand the device to {current!.name} — tap to show rack</button>
+          <button onClick={() => setRevealed(true)} className="btn btn-primary w-full"><Icon name="eyeOff" size={18} />Hand the device to {current!.name} — tap to show rack</button>
         )}
         footer={finished && <button onClick={start} className="btn btn-primary w-full">Play again</button>}
         asideFooter={(
@@ -222,7 +222,6 @@ function OnlineScrabble() {
     <div className="space-y-4">
       <VoiceChat room={room} />
       <MoneyBar room={room} />
-      <ProBar room={room} />
       {room.joined && state && current && (
         <ScrabbleTable
           game={state}
@@ -325,8 +324,8 @@ function ScrabbleTable({
 
   const submit = () => {
     if (!analysis || !canAct) return;
-    if (!analysis.ok) { onReject?.(`⚠️ ${analysis.error}`); return; }
-    if (analysis.invalid.length) { onReject?.(`❌ Not in the dictionary: ${analysis.invalid.join(', ')}. Try another word.`); return; }
+    if (!analysis.ok) { onReject?.(analysis.error); return; }
+    if (analysis.invalid.length) { onReject?.(`Not in the dictionary: ${analysis.invalid.join(', ')}. Try another word.`); return; }
     onMove({ type: 'play', placements: pending });
   };
 
@@ -389,11 +388,11 @@ function ScrabbleTable({
               </div>
             ) : (
               <div className="flex flex-wrap gap-2">
-                <button onClick={submit} disabled={!pending.length || busy} className="btn btn-primary flex-1 disabled:opacity-50">{busy ? 'Checking…' : '✔ Play word'}</button>
+                <button onClick={submit} disabled={!pending.length || busy} className="btn btn-primary flex-1 disabled:opacity-50">{busy ? 'Checking…' : <><Icon name="check" size={18} strokeWidth={2.6} />Play word</>}</button>
                 <button onClick={() => { edit(() => []); setChosen(null); }} disabled={!pending.length || busy} className="btn btn-outline flex-1 disabled:opacity-50">↩ Recall</button>
-                <button onClick={() => setOrder((o) => [...o].sort(() => Math.random() - 0.5))} className="btn btn-outline flex-1">🔀 Shuffle</button>
-                <button onClick={() => { edit(() => []); setChosen(null); setExchangeMode(true); }} disabled={bagCount < 7 || busy} title={bagCount < 7 ? 'At least 7 tiles must remain in the bag' : ''} className="btn btn-outline flex-1 disabled:opacity-50">🔁 Exchange</button>
-                <button onClick={() => window.confirm('Pass your turn?') && onMove({ type: 'pass' })} disabled={busy} className="btn btn-outline flex-1 disabled:opacity-50">⏭ Pass</button>
+                <button onClick={() => setOrder((o) => [...o].sort(() => Math.random() - 0.5))} className="btn btn-outline flex-1"><Icon name="shuffle" size={16} />Shuffle</button>
+                <button onClick={() => { edit(() => []); setChosen(null); setExchangeMode(true); }} disabled={bagCount < 7 || busy} title={bagCount < 7 ? 'At least 7 tiles must remain in the bag' : ''} className="btn btn-outline flex-1 disabled:opacity-50"><Icon name="refresh" size={16} />Exchange</button>
+                <button onClick={() => window.confirm('Pass your turn?') && onMove({ type: 'pass' })} disabled={busy} className="btn btn-outline flex-1 disabled:opacity-50"><Icon name="skip" size={16} />Pass</button>
               </div>
             ))}
           </div>
@@ -408,7 +407,7 @@ function ScrabbleTable({
             {game.players.map((p, i) => (
               <li key={p.id} className={`flex justify-between gap-2 rounded px-1 font-bold ${i === game.currentPlayerIndex && !finished ? 'ring-2 ring-primary' : ''}`}>
                 <span className="min-w-0 truncate">
-                  {p.name}{p.isAI ? ' 🤖' : ''}{i === you ? ' (you)' : ''}
+                  {p.name}{p.isAI ? <span title="Bot" className="inline-flex align-[-2px] text-muted"><Icon name="robot" size={14} /><span className="sr-only"> (bot)</span></span> : ''}{i === you ? ' (you)' : ''}
                   {rackCounts && !finished && <span className="font-normal text-muted"> · {rackCounts[i]} tiles</span>}
                 </span>
                 <span className="shrink-0">{game.scores[i]}{game.endAdjustments ? ` (${game.endAdjustments[i] >= 0 ? '+' : ''}${game.endAdjustments[i]})` : ''}</span>
@@ -467,7 +466,7 @@ function Shell({ onBack, tabs, children, wide = false }: { onBack: () => void; t
     <main className={`mx-auto space-y-3 px-2 py-3 sm:space-y-4 sm:p-4 ${wide ? 'max-w-5xl' : 'max-w-2xl'}`}>
       <button onClick={onBack} className="back-link">← Back to Scrabble</button>
       <div className="card space-y-4 p-3 sm:p-5">
-        <h1>🔠 Scrabble</h1>
+        <h1 className="flex items-center gap-3"><GameGlyph slug="scrabble" name={'Scrabble'} size={36} />Scrabble</h1>
         {tabs}
         {children}
       </div>

@@ -1,6 +1,7 @@
-import { t, avatarEmoji } from '@slgh/shared';
+import { t } from '@slgh/shared';
 import { getMe } from '@/lib/session';
 import { api, query } from '@/lib/convex';
+import { gameIcon } from '@/lib/games';
 import { NavBar, type NavItem, type NavSection } from './NavBar';
 import { Icon } from './Icon';
 import { SignOutButton } from './SignOutButton';
@@ -47,8 +48,8 @@ export async function Header() {
   return (
     <NavBar
       appName={t('app.name')} sections={sections} tabs={tabs} account={account}
-      games={catalog.map((g) => ({ slug: g.slug, name: g.name }))}
-      user={me ? { name: me.username, avatar: avatarEmoji(me.avatar) } : null}
+      games={catalog.map((g) => ({ slug: g.slug, name: g.name, icon: gameIcon(g.slug) }))}
+      user={me ? { name: me.username, avatar: (me.username[0] ?? '?').toUpperCase() } : null}
       signIn={t('nav.signIn')} signUp={t('nav.signUp')} themeLabel={t('nav.theme')}
       signOut={
         <SignOutButton className="menu-item w-full menu-danger"><Icon name="logout" size={18} />{t('nav.signOut')}</SignOutButton>

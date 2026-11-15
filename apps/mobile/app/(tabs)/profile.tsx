@@ -3,7 +3,7 @@ import { useMutation, useQuery } from 'convex/react';
 import { useAuthActions } from '@convex-dev/auth/react';
 import { Pressable, Switch, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { AVATARS, USERNAME_RE, avatarEmoji, t } from '@slgh/shared';
+import { AVATARS, USERNAME_RE, avatarInfo, t } from '@slgh/shared';
 import { api } from '@/convex';
 import { authErrorKey, useAuth } from '@/auth';
 import { useColors } from '@/theme';
@@ -54,7 +54,9 @@ export default function Profile() {
   return (
     <Screen>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <Text style={{ fontSize: 56 }}>{avatarEmoji(me.avatar)}</Text><Txt size={26} bold>{me.username}</Txt>
+        <View accessibilityLabel={avatarInfo(me.avatar).name} style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: avatarInfo(me.avatar).color, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 28, fontWeight: '800', color: '#fff' }}>{(me.username[0] ?? '?').toUpperCase()}</Text>
+        </View><Txt size={26} bold>{me.username}</Txt>
       </View>
       <Banner text={err} /><Banner kind="ok" text={ok} />
       <Card>
@@ -64,10 +66,10 @@ export default function Profile() {
         <Txt bold>{t('profile.avatar')}</Txt>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {AVATARS.map((a) => (
-            <Pressable key={a.id} accessibilityRole="button" accessibilityLabel={a.id} onPress={() => setF({ ...f, avatar: a.id })}
+            <Pressable key={a.id} accessibilityRole="button" accessibilityLabel={a.name} onPress={() => setF({ ...f, avatar: a.id })}
               style={{ width: 52, height: 52, borderRadius: 10, borderWidth: f.avatar === a.id ? 4 : 2, alignItems: 'center', justifyContent: 'center',
                 borderColor: f.avatar === a.id ? c.primary : c.border, backgroundColor: c.surface }}>
-              <Text style={{ fontSize: 26 }}>{a.emoji}</Text></Pressable>))}
+              <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: a.color }} /></Pressable>))}
         </View>
         <Txt bold>{t('profile.district')}</Txt>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>

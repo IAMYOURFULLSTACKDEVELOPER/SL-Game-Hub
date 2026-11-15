@@ -26,7 +26,7 @@ export const SNAKE_MANIFEST: GameManifest = {
   id: 'snake',
   name: 'Snake',
   description: 'Guide the snake, eat, grow, and avoid crashing.',
-  thumbnail: '🐍',
+  thumbnail: '', // built-ins are drawn by the app (GameGlyph)
   minPlayers: 1,
   maxPlayers: 1,
   modes: ['single'],

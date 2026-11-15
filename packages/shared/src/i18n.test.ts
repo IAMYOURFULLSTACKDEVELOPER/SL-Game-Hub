@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { t } from './i18n';
-import { avatarEmoji, isAvatarId } from './avatars';
+import { avatarInfo, isAvatarId } from './avatars';
 
 test('translates and interpolates', () => {
   assert.equal(t('app.name'), 'SL Game Hub');
@@ -14,5 +14,6 @@ test('missing key returns the key; unknown locale falls back to English', () => 
 test('avatars', () => {
   assert.ok(isAvatarId('av_lion'));
   assert.equal(isAvatarId('av_hacker'), false);
-  assert.equal(avatarEmoji('missing'), '🙂');
+  assert.equal(avatarInfo('missing').name, 'Player');
+  assert.equal(avatarInfo('av_lion').name, 'Sun');
 });

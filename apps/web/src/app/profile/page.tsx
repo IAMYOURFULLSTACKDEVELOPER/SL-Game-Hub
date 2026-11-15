@@ -1,4 +1,5 @@
-import { t, AVATARS, avatarEmoji } from '@slgh/shared';
+import { t, AVATARS } from '@slgh/shared';
+import { Avatar } from '@/components/Avatar';
 import { requireUser } from '@/lib/session';
 import { api, query } from '@/lib/convex';
 import { updateProfile } from '../actions';
@@ -20,7 +21,7 @@ export default async function Profile({ searchParams }: { searchParams: { error?
       <section className="card reveal relative overflow-hidden">
         <div aria-hidden className="h-24" style={{ background: 'linear-gradient(120deg, #1EB53A, #0a8f8a 50%, #0072C6)' }} />
         <div className="flex flex-wrap items-end gap-4 px-5 pb-5">
-          <span aria-hidden className="avatar-ring -mt-12 h-24 w-24 bg-surface text-6xl shadow-lift">{avatarEmoji(me.avatar)}</span>
+          <span className="-mt-12 rounded-full shadow-lift" style={{ boxShadow: '0 0 0 6px rgb(var(--c-surface))' }}><Avatar id={me.avatar} size={96} /></span>
           <div><h1>{me.username}</h1><p className="flex items-center gap-1.5 text-muted"><Icon name="calendar" size={16} />{t('profile.joined')} {new Date(me.created_at).toLocaleDateString('en-GB')}</p></div>
         </div>
       </section>
@@ -42,7 +43,7 @@ export default async function Profile({ searchParams }: { searchParams: { error?
             {AVATARS.map((a) => (
               <label key={a.id} className="cursor-pointer">
                 <input type="radio" name="avatar" value={a.id} defaultChecked={a.id === me.avatar} className="peer sr-only" />
-                <span className="flex h-14 items-center justify-center rounded-2xl border-2 border-border bg-surface text-3xl transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 peer-checked:scale-105 peer-checked:border-primary peer-checked:bg-primary/15 peer-checked:shadow-glow peer-focus-visible:outline peer-focus-visible:outline-4 peer-focus-visible:outline-accent">{a.emoji}</span>
+                <span className="flex h-14 items-center justify-center rounded-2xl border-2 border-border bg-surface text-3xl transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 peer-checked:scale-105 peer-checked:border-primary peer-checked:bg-primary/15 peer-checked:shadow-glow peer-focus-visible:outline peer-focus-visible:outline-4 peer-focus-visible:outline-accent" title={a.name}><Avatar id={a.id} size={36} /><span className="sr-only">{a.name}</span></span>
               </label>))}
           </div></fieldset>
         <div><label className="flex items-center gap-3 font-semibold">
@@ -57,7 +58,7 @@ export default async function Profile({ searchParams }: { searchParams: { error?
           <div className="overflow-x-auto"><table className="w-full text-left">
             <thead><tr className="text-muted"><th className="py-1">{t('nav.games')}</th><th>{t('game.played')}</th><th>{t('game.wins')}</th><th>{t('game.bestScore')}</th></tr></thead>
             <tbody>{stats.map((s, i) => { const g = s.games;
-              return <tr key={i} className="border-t-2 border-border"><td className="py-2">{g?.icon} {g?.name}</td><td>{s.played}</td><td>{s.wins}</td><td>{s.best_score}</td></tr>; })}</tbody>
+              return <tr key={i} className="border-t-2 border-border"><td className="py-2">{g?.name}</td><td>{s.played}</td><td>{s.wins}</td><td>{s.best_score}</td></tr>; })}</tbody>
           </table></div>)}
       </section>
     </main>

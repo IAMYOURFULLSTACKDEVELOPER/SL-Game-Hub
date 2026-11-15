@@ -35,7 +35,7 @@ export const CHECKERS_MANIFEST: GameManifest = {
   id: 'checkers',
   name: 'Checkers',
   description: 'Jump and capture all your opponent\'s pieces.',
-  thumbnail: '🔴',
+  thumbnail: '', // built-ins are drawn by the app (GameGlyph)
   minPlayers: 2,
   maxPlayers: 2,
   modes: ['single', 'multi'],

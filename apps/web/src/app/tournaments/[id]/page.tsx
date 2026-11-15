@@ -1,6 +1,9 @@
 import { api, query } from '@/lib/convex';
 import { registerForTournament } from '@/app/actions';
 import Link from 'next/link';
+import { Icon } from '@/components/Icon';
+import { GameGlyph } from '@/components/GameGlyph';
+import { Avatar } from '@/components/Avatar';
 
 export default async function TournamentDetailPage({ params }: { params: { id: string } }) {
   const data = await query(api.tournaments.get, { id: params.id });
@@ -18,7 +21,7 @@ export default async function TournamentDetailPage({ params }: { params: { id: s
 
       <div>
         <h1 className="text-3xl font-bold">{tournament.name}</h1>
-        <p className="text-muted">{tournament.games.icon} {tournament.games.name}</p>
+        <p className="flex items-center gap-2 text-muted"><GameGlyph slug={tournament.games.slug} name={tournament.games.name} size={20} />{tournament.games.name}</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -49,13 +52,13 @@ export default async function TournamentDetailPage({ params }: { params: { id: s
             {tournament.prize_coins > 0 && (
               <div className="flex justify-between">
                 <span className="text-muted">Prize Pool:</span>
-                <span className="font-medium text-yellow-600">🪙 {tournament.prize_coins}</span>
+                <span className="font-medium text-yellow-600"><Icon name="coins" size={16} className="inline-block align-[-3px]" /> {tournament.prize_coins}</span>
               </div>
             )}
             {tournament.entry_fee_coins > 0 && (
               <div className="flex justify-between">
                 <span className="text-muted">Entry Fee:</span>
-                <span className="font-medium">🪙 {tournament.entry_fee_coins}</span>
+                <span className="font-medium"><Icon name="coins" size={16} className="inline-block align-[-3px]" /> {tournament.entry_fee_coins}</span>
               </div>
             )}
             {tournament.registration_starts_at && (
@@ -99,7 +102,7 @@ export default async function TournamentDetailPage({ params }: { params: { id: s
         <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
           {registrations?.map((reg: any) => (
             <div key={reg.id} className="flex items-center gap-2 p-2 bg-bg/60 rounded">
-              <span className="text-2xl">{reg.profiles.avatar}</span>
+              <Avatar id={reg.profiles.avatar} size={32} />
               <span className="font-medium">{reg.profiles.username}</span>
             </div>
           ))}

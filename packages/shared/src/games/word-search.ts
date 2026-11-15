@@ -110,7 +110,7 @@ export const WORD_SEARCH_MANIFEST: GameManifest = {
   id: 'word-search',
   name: 'Word Search',
   description: '500 themed boards across Easy, Medium, Hard and Expert. Find every hidden word in all eight directions — solo against the clock or against friends.',
-  thumbnail: '🔤',
+  thumbnail: '', // built-ins are drawn by the app (GameGlyph)
   minPlayers: 1,
   maxPlayers: 4,
   modes: ['single', 'multi'],

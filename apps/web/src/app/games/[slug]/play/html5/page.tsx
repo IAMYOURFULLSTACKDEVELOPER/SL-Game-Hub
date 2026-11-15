@@ -54,7 +54,7 @@ export default function HTML5GamePlayPage({ params }: { params: { slug: string }
           return {
             id: 'user-id',
             username: 'Player',
-            avatar: '🎮',
+            avatar: 'av_lion',
           };
         },
         onSaveData: async (data) => {

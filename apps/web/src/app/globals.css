@@ -170,17 +170,34 @@ details[open] > summary ~ * { animation: page-in .2s ease-out both; }
 .app-main { margin-left: calc(var(--rail-w) + var(--side-w)); padding-top: var(--top-h); min-height: 100dvh; }
 
 /* Game rail */
-.rail { display: flex; width: var(--rail-w); flex-direction: column; align-items: center; gap: 8px; padding: 12px 0; overflow-y: auto; scrollbar-width: none; background: rgb(var(--c-rail)); }
+.rail { display: flex; width: var(--rail-w); flex-direction: column; align-items: center; gap: 10px; padding: 12px 0; overflow-y: auto; scrollbar-width: none; background: rgb(var(--c-rail)); }
 .rail::-webkit-scrollbar { display: none; }
-.rail-item { position: relative; display: flex; width: 100%; justify-content: center; color: rgb(var(--c-text)); }
+.rail-item { position: relative; display: flex; width: 100%; flex-direction: column; align-items: center; gap: 4px; color: rgb(var(--c-text)); -webkit-tap-highlight-color: transparent; }
 .rail-item:hover { text-decoration: none; }
 .rail-icon {
   display: grid; width: 48px; height: 48px; flex-shrink: 0; place-items: center; overflow: hidden; border-radius: 50%;
-  background: rgb(var(--c-bg)); transition: border-radius .2s var(--ease-out), background-color .2s, color .2s, transform .1s;
+  position: relative; isolation: isolate;
+  background: rgb(var(--c-bg)); transition: border-radius .2s var(--ease-out), background-color .2s, color .2s, transform .2s var(--ease-spring), box-shadow .2s;
 }
 .rail-icon .game-glyph { width: 100% !important; height: 100% !important; border-radius: 0; transition: filter .2s; }
 .rail-item:hover .rail-icon, .rail-item.is-active .rail-icon, .rail-item:focus-visible .rail-icon { border-radius: 16px; }
-.rail-item:active .rail-icon { transform: translateY(1px); }
+.rail-item:hover .rail-icon, .rail-item:focus-visible .rail-icon { transform: translateY(-2px); box-shadow: 0 6px 14px rgb(0 0 0 / .35); }
+.rail-item:active .rail-icon { transform: scale(.92); box-shadow: none; transition-duration: .08s; }
+
+/* Game icons: a small crop of the game's cover art, so each one is recognisable at a glance */
+.rail-thumb { width: 100%; height: 100%; object-fit: cover; filter: saturate(.92); transition: transform .35s var(--ease-out), filter .2s; }
+.rail-item:hover .rail-thumb, .rail-item:focus-visible .rail-thumb { transform: scale(1.12); filter: saturate(1.15) brightness(1.05); }
+.rail-item.is-active .rail-thumb { filter: none; }
+/* A light sweep across the icon on hover */
+.rail-icon::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: linear-gradient(115deg, transparent 35%, rgb(255 255 255 / .38) 50%, transparent 65%); transform: translateX(-120%); }
+.rail-item:hover .rail-icon::after { transform: translateX(120%); transition: transform .6s var(--ease-out); }
+/* The name under each icon */
+.rail-label { display: -webkit-box; max-width: 64px; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  font-size: 10.5px; font-weight: 600; line-height: 1.15; text-align: center; overflow-wrap: anywhere;
+  color: rgb(var(--c-muted)); transition: color .15s; }
+.rail-item:hover .rail-label, .rail-item:focus-visible .rail-label { color: rgb(var(--c-text)); }
+.rail-item.is-active .rail-label { color: rgb(var(--c-heading)); font-weight: 700; }
 .rail-home { color: rgb(var(--c-text)); }
 .rail-item:hover .rail-home, .rail-item.is-active .rail-home { background: rgb(var(--c-primary)); }
 .rail-home .logo-die { transition: transform .35s var(--ease-spring); transform-box: fill-box; transform-origin: center; }
@@ -188,7 +205,7 @@ details[open] > summary ~ * { animation: page-in .2s ease-out both; }
 .rail-green .rail-icon { color: rgb(var(--c-success)); }
 .rail-item.rail-green:hover .rail-icon, .rail-item.rail-green.is-active .rail-icon { background: rgb(var(--c-success)); color: #fff; }
 .rail-pill {
-  position: absolute; left: 0; top: 50%; width: 4px; height: 8px; margin-top: -4px; border-radius: 0 4px 4px 0;
+  position: absolute; left: 0; top: 24px; width: 4px; height: 8px; margin-top: -4px; border-radius: 0 4px 4px 0;
   background: rgb(var(--c-heading)); opacity: 0; transform: scaleY(.5); transition: height .2s var(--ease-out), margin-top .2s var(--ease-out), opacity .2s, transform .2s;
 }
 .rail-item:hover .rail-pill { opacity: 1; transform: none; height: 20px; margin-top: -10px; }
@@ -342,6 +359,14 @@ details[open] > summary ~ * { animation: page-in .2s ease-out both; }
 .peer:checked + .variant-card .variant-dot { border-color: rgb(var(--c-primary)); }
 .peer:checked + .variant-card .variant-dot::after { transform: scale(1); }
 fieldset:disabled .variant-opt { cursor: not-allowed; opacity: .6; }
+
+/* "Your rooms": rooms you made or joined, to come back to */
+.recent-room { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 6px; transition: background-color .15s; }
+.recent-room:hover { background: rgb(var(--c-hover)); }
+.recent-room .game-glyph { border-radius: 30%; transition: border-radius .2s var(--ease-out); }
+.recent-room:hover .game-glyph { border-radius: 25%; }
+.recent-room-live { position: absolute; right: -2px; bottom: -2px; width: 14px; height: 14px; border-radius: 9999px;
+  background: rgb(var(--c-success)); border: 3px solid rgb(var(--c-surface)); }
 
 /* Auth pages: the card floats on an illustrated brand backdrop */
 .auth-stage { position: relative; display: grid; min-height: calc(100dvh - var(--top-h)); place-items: center; overflow: hidden; padding: 24px 16px;

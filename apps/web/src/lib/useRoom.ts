@@ -57,7 +57,7 @@ export function useRoom(game: RoomGame) {
   const scrabbleM = useAction(api.scrabbleNode.move);
 
   const joined = !!view?.me;
-  // The room vanished (everyone left, or a bad link): forget it.
+  // The room is gone (it sat empty for days, or a bad link): forget it.
   useEffect(() => { if (code && view === null) { store(roomKey(game), null); } }, [code, view, game]);
 
   useEffect(() => {

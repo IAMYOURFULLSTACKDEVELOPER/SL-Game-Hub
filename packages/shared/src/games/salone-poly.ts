@@ -230,7 +230,7 @@ export const SALONE_POLY_MANIFEST: GameManifest = {
   id: 'salone-poly',
   name: 'Salone-Poly',
   description: "Buy Sierra Leone's landmarks, build houses and hotels, collect rent and outlast your rivals.",
-  thumbnail: '🏝️',
+  thumbnail: '', // built-ins are drawn by the app (GameGlyph)
   minPlayers: 2,
   maxPlayers: 6,
   modes: ['single', 'multi'],
@@ -572,7 +572,7 @@ export class SalonePolyEngine implements GameEngine<SalonePolyState, SalonePolyM
     const alive = s.bankrupt.flatMap((b, i) => (b ? [] : [i]));
     if (alive.length === 1) {
       s.status = 'finished'; s.winner = alive[0]; s.phase = 'end';
-      s.log.push(youGrammar(`🏆 ${s.players[alive[0]].name} is the last player standing and wins Salone-Poly!`));
+      s.log.push(youGrammar(`${s.players[alive[0]].name} is the last player standing and wins Salone-Poly!`));
       return s;
     }
     if (managementOnly && s.phase !== 'debt') return s;
@@ -666,7 +666,7 @@ export class SalonePolyEngine implements GameEngine<SalonePolyState, SalonePolyM
     const idx = pile.shift()!;
     const card = (deck === 'luck' ? LUCK_CARDS : OSUSU_CARDS)[idx];
     s.lastCard = card;
-    s.log.push(youGrammar(`${deck === 'luck' ? '❓ Luck' : '🪙 Osusu'}: "${card.text}"`));
+    s.log.push(youGrammar(`${deck === 'luck' ? 'Luck' : 'Osusu'}: "${card.text}"`));
     if (card.action === 'jail_free') s.jailCards[p][deck]++;
     else pile.push(idx);
     const others = s.players.map((_, i) => i).filter((i) => i !== p && !s.bankrupt[i]);
@@ -707,7 +707,7 @@ export class SalonePolyEngine implements GameEngine<SalonePolyState, SalonePolyM
     const startAt = Math.max(0, active.indexOf(s.currentPlayerIndex));
     s.auction = { space, highBid: 0, highBidder: null, active, turn: startAt };
     s.phase = 'auction';
-    s.log.push(youGrammar(`🔨 Auction for ${SALONE_POLY_BOARD[space].name} (opening bid ${leones(SALONE_POLY.openingBid)}).`));
+    s.log.push(youGrammar(`Auction for ${SALONE_POLY_BOARD[space].name} (opening bid ${leones(SALONE_POLY.openingBid)}).`));
   }
 
   private nextBidder(s: SalonePolyState, advance = true) {
@@ -716,7 +716,7 @@ export class SalonePolyEngine implements GameEngine<SalonePolyState, SalonePolyM
       if (a.highBidder !== null) {
         s.money[a.highBidder] -= a.highBid;
         s.owners[a.space] = a.highBidder;
-        s.log.push(youGrammar(`🔨 ${s.players[a.highBidder].name} wins ${SALONE_POLY_BOARD[a.space].name} for ${leones(a.highBid)}.`));
+        s.log.push(youGrammar(`${s.players[a.highBidder].name} wins ${SALONE_POLY_BOARD[a.space].name} for ${leones(a.highBid)}.`));
       } else s.log.push(youGrammar(`No bids — ${SALONE_POLY_BOARD[a.space].name} stays with the Bank.`));
       s.auction = null;
       return;
@@ -729,7 +729,7 @@ export class SalonePolyEngine implements GameEngine<SalonePolyState, SalonePolyM
     const debt = s.debts[0];
     const creditor = debt?.creditor ?? null;
     s.bankrupt[p] = true;
-    s.log.push(youGrammar(`💥 ${s.players[p].name} is bankrupt${creditor !== null ? ` to ${s.players[creditor].name}` : ' to the Bank'}!`));
+    s.log.push(youGrammar(`${s.players[p].name} is bankrupt${creditor !== null ? ` to ${s.players[creditor].name}` : ' to the Bank'}!`));
     // Buildings go back to the Bank at half price; the proceeds go to the creditor
     let proceeds = s.money[p];
     s.owners.forEach((o, i) => {
@@ -761,7 +761,7 @@ export class SalonePolyEngine implements GameEngine<SalonePolyState, SalonePolyM
     const top = s.netWorths.flatMap((w, i) => (w === max && !s.bankrupt[i] ? [i] : []));
     s.status = 'finished';
     s.winner = top.length === 1 ? top[0] : null;
-    s.log.push(youGrammar(`⏰ Time is up! ${s.winner !== null ? `${s.players[s.winner].name} wins with a net worth of ${leones(max)}.` : 'It is a tie on net worth.'}`));
+    s.log.push(youGrammar(`Time is up! ${s.winner !== null ? `${s.players[s.winner].name} wins with a net worth of ${leones(max)}.` : 'It is a tie on net worth.'}`));
     return s;
   }
 

@@ -19,7 +19,8 @@ type Props = {
   appName: string;
   sections: NavSection[];
   tabs: NavItem[];
-  games: { slug: string; name: string }[];
+  /** `icon`: a small crop of the game's cover for the rail (null: the game's vector glyph) */
+  games: { slug: string; name: string; icon?: string | null }[];
   account: NavItem[];
   user: { name: string; avatar: string } | null;
   signIn: string; signUp: string; themeLabel: string;
@@ -58,7 +59,8 @@ export function NavBar({ appName, sections, tabs, games, account, user, signIn, 
   const title = game ? game.name : page?.label ?? appName;
 
   const showTip = (label: string) => (e: React.MouseEvent | React.FocusEvent) => {
-    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const el = e.currentTarget as HTMLElement;
+    const r = (el.querySelector('.rail-icon') ?? el).getBoundingClientRect(); // line up with the icon, not its label
     setTip({ label, top: r.top + r.height / 2 });
   };
   const railProps = (label: string) => ({ onMouseEnter: showTip(label), onFocus: showTip(label), onMouseLeave: () => setTip(null), onBlur: () => setTip(null), 'aria-label': label });
@@ -70,23 +72,33 @@ export function NavBar({ appName, sections, tabs, games, account, user, signIn, 
         <nav className="rail" aria-label="Games">
           <Link href="/" className={`rail-item ${path === '/' ? 'is-active' : ''}`} {...railProps('Home')} aria-current={path === '/' ? 'page' : undefined}>
             <span className="rail-pill" /><span className="rail-icon rail-home"><LogoMark size={30} flat /></span>
+            <span className="rail-label" aria-hidden="true">Home</span>
           </Link>
           <span className="rail-sep" aria-hidden="true" />
           {games.map((g) => {
             const on = game?.slug === g.slug;
             return (
               <Link key={g.slug} href={`/games/${g.slug}`} className={`rail-item ${on ? 'is-active' : ''}`} {...railProps(g.name)} aria-current={on ? 'page' : undefined}>
-                <span className="rail-pill" /><span className="rail-icon"><GameGlyph slug={g.slug} name={g.name} size={48} /></span>
+                <span className="rail-pill" />
+                <span className="rail-icon">
+                  {g.icon
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={g.icon} alt="" width={48} height={48} decoding="async" className="rail-thumb" draggable={false} />
+                    : <GameGlyph slug={g.slug} name={g.name} size={48} />}
+                </span>
+                <span className="rail-label" aria-hidden="true">{g.name}</span>
               </Link>
             );
           })}
           <span className="rail-sep" aria-hidden="true" />
           <Link href="/lobby" className={`rail-item rail-green ${isActive(path, '/lobby') ? 'is-active' : ''}`} {...railProps('Live games')}>
             <span className="rail-pill" /><span className="rail-icon"><Icon name="compass" size={24} /></span>
+            <span className="rail-label" aria-hidden="true">Live</span>
           </Link>
           {installable && (
             <button type="button" className="rail-item rail-green" onClick={() => promptInstall()} {...railProps('Install the app')}>
               <span className="rail-pill" /><span className="rail-icon"><Icon name="download" size={22} /></span>
+              <span className="rail-label" aria-hidden="true">Install</span>
             </button>
           )}
         </nav>

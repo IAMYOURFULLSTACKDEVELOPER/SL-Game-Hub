@@ -16,3 +16,5 @@ const GAME_IMAGES: Record<string, string> = {
   'salone-poly': '/games/salone-poly.webp',
 };
 export const gameImage = (g: Pick<GameRow, 'slug' | 'thumbnail_url'>) => GAME_IMAGES[g.slug] ?? g.thumbnail_url;
+/** Small square crop of each built-in game's cover (96px, ~4 KB) for the sidebar rail. Other games use their GameGlyph. */
+export const gameIcon = (slug: string) => (slug in GAME_IMAGES ? `/games/icons/${slug}.webp` : null);

@@ -8,10 +8,10 @@ import {
 import Rulebook from './Rulebook';
 import { RoomLobby, JoinRequests } from './RoomLobby';
 import { VoiceChat } from './VoiceChat';
-import { ProBar } from './ProBar';
 import { MoneyBar } from './MoneyBar';
 import { ConvexRoomProvider } from './ConvexRoomProvider';
 import { Icon } from './Icon';
+import { GameGlyph } from './GameGlyph';
 import { useRoom, type RoomApi } from '@/lib/useRoom';
 import { sfx } from '@/lib/sound';
 import { useEndSfx } from '@/lib/useGameSfx';
@@ -105,9 +105,9 @@ export default function ChessGame({ onBack }: { onBack: () => void }) {
 
   const tabs = (
     <div className="flex flex-wrap gap-2">
-      <button onClick={() => setMode('bot')} className={`btn btn-sm ${mode === 'bot' ? 'btn-primary' : 'btn-outline'}`}>🤖 vs Bot</button>
-      <button onClick={() => setMode('local')} className={`btn btn-sm ${mode === 'local' ? 'btn-primary' : 'btn-outline'}`}>👥 2 players (this device)</button>
-      <button onClick={() => setMode('online')} className={`btn btn-sm ${mode === 'online' ? 'btn-primary' : 'btn-outline'}`}>🌐 Online</button>
+      <button onClick={() => setMode('bot')} className={`btn btn-sm ${mode === 'bot' ? 'btn-primary' : 'btn-outline'}`}><Icon name="robot" size={16} />vs Bot</button>
+      <button onClick={() => setMode('local')} className={`btn btn-sm ${mode === 'local' ? 'btn-primary' : 'btn-outline'}`}><Icon name="users" size={16} />2 players (this device)</button>
+      <button onClick={() => setMode('online')} className={`btn btn-sm ${mode === 'online' ? 'btn-primary' : 'btn-outline'}`}><Icon name="globe" size={16} />Online</button>
     </div>
   );
 
@@ -142,7 +142,7 @@ export default function ChessGame({ onBack }: { onBack: () => void }) {
             </label>
           </div>
         )}
-        <button onClick={start} className="btn btn-primary w-full">♟ Start game</button>
+        <button onClick={start} className="btn btn-primary w-full"><Icon name="play" size={18} />Start game</button>
         {saved && <button onClick={() => resume(saved)} className="btn btn-outline w-full">Resume saved game</button>}
         <Rulebook title="Chess Rulebook" sections={CHESS_RULES} open />
       </Shell>
@@ -153,7 +153,7 @@ export default function ChessGame({ onBack }: { onBack: () => void }) {
   const turnName = SIDE[game.currentTurn];
   const over = game.status === 'finished' || !!result;
   const status = result
-    ?? (game.checkmate ? `Checkmate! ${SIDE[game.currentTurn === 'white' ? 'black' : 'white']} wins 🏆`
+    ?? (game.checkmate ? `Checkmate! ${SIDE[game.currentTurn === 'white' ? 'black' : 'white']} wins`
       : game.stalemate ? 'Draw (stalemate / 50-move rule)'
         : thinking ? 'Bot is thinking…'
           : `${turnName} to move${game.inCheck ? ' — CHECK!' : ''}`);
@@ -198,8 +198,8 @@ export default function ChessGame({ onBack }: { onBack: () => void }) {
         <div className="flex flex-wrap gap-2">
           <button onClick={undo} disabled={history.length < 2 || thinking} className="btn btn-outline flex-1 disabled:opacity-50">↶ Undo</button>
           <button onClick={() => window.confirm(mode === 'bot' ? 'Offer a draw? The bot accepts if material is level.' : 'Do both players agree to a draw?')
-            && (mode === 'local' || Math.abs(diff) <= 1 ? setResult('Draw agreed 🤝') : window.alert('The bot declines the draw.'))} className="btn btn-outline flex-1">🤝 Offer draw</button>
-          <button onClick={() => window.confirm(`${mode === 'bot' ? 'You' : turnName} resign?`) && setResult(`${mode === 'bot' ? SIDE[humanColor] : turnName} resigned — ${SIDE[(mode === 'bot' ? humanColor : game.currentTurn) === 'white' ? 'black' : 'white']} wins 🏆`)} className="btn btn-outline flex-1">🏳 Resign</button>
+            && (mode === 'local' || Math.abs(diff) <= 1 ? setResult('Draw agreed') : window.alert('The bot declines the draw.'))} className="btn btn-outline flex-1"><Icon name="handshake" size={16} />Offer draw</button>
+          <button onClick={() => window.confirm(`${mode === 'bot' ? 'You' : turnName} resign?`) && setResult(`${mode === 'bot' ? SIDE[humanColor] : turnName} resigned — ${SIDE[(mode === 'bot' ? humanColor : game.currentTurn) === 'white' ? 'black' : 'white']} wins`)} className="btn btn-outline flex-1"><Icon name="flag" size={16} />Resign</button>
         </div>
       )}
       <div className="flex gap-2">
@@ -233,7 +233,6 @@ function OnlineChess() {
     <div className="space-y-4">
       <VoiceChat room={room} />
       <MoneyBar room={room} />
-      <ProBar room={room} />
       {room.joined && game && <OnlineChessTable game={game} seat={v?.me?.seat ?? -1} busy={room.busy} onMove={(m) => { room.move(m); }} />}
       {playing && <JoinRequests room={room} />}
       {room.error && playing && <p role="alert" className="flash rounded-xl border border-danger/40 bg-danger/10 p-3 text-sm font-semibold text-danger">{room.error}</p>}
@@ -287,8 +286,8 @@ function OnlineChessTable({ game, seat, busy, onMove }: { game: ChessState; seat
   const who = (i: number) => (i === seat ? 'You' : `${game.players[i]?.name ?? 'Player'} (${SIDE[colorOf(i)]})`);
   const turn = game.currentPlayerIndex;
   const status = over
-    ? game.winner !== null ? `${game.checkmate ? 'Checkmate! ' : ''}${who(game.winner)} ${game.winner === seat ? 'win' : 'wins'} 🏆`
-      : game.stalemate ? 'Draw (stalemate / 50-move rule) 🤝' : 'Draw 🤝'
+    ? game.winner !== null ? `${game.checkmate ? 'Checkmate! ' : ''}${who(game.winner)} ${game.winner === seat ? 'win' : 'wins'}`
+      : game.stalemate ? 'Draw (stalemate / 50-move rule)' : 'Draw'
     : game.players[turn]?.isAI ? `${who(turn)} is thinking…`
       : `${turn === seat ? `Your move (${SIDE[game.currentTurn]})` : `${who(turn)} to move`}${game.inCheck ? ' — CHECK!' : ''}`;
 
@@ -406,7 +405,7 @@ function Shell({ onBack, children }: { onBack: () => void; children: ReactNode }
     <main className="mx-auto max-w-2xl space-y-3 px-2 py-3 sm:space-y-4 sm:p-4">
       <button onClick={onBack} className="back-link">← Back to Chess</button>
       <div className="card space-y-4 p-3 sm:p-5">
-        <h1>♟️ Chess</h1>
+        <h1 className="flex items-center gap-3"><GameGlyph slug="chess" name={'Chess'} size={36} />Chess</h1>
         {children}
       </div>
     </main>

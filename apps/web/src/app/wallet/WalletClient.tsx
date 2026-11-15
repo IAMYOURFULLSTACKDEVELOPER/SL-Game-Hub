@@ -10,6 +10,7 @@ import {
   MOMO_PROVIDERS, WALLET_LIMITS, withMonimeFee, displaySlPhone, formatLeones, parseLeones, providerName, ussdHref,
 } from '@slgh/shared/src/wallet';
 import { PageHeader } from '@/components/PageHeader';
+import { Icon } from '@/components/Icon';
 
 const message = (e: unknown) => playerMessage(e);
 const QUICK = [1_000, 2_500, 5_000, 10_000];
@@ -50,11 +51,11 @@ function PendingDeposit({ d }: {
     <div className="card space-y-3 border-primary/50 p-4">
       <p className="text-sm text-muted">
         Top up {formatLeones(d.amount)}: dial this code on the phone with your mobile money account.
-        {d.charge > d.amount && <> You pay {formatLeones(d.charge)} (includes Monime's {formatLeones(d.charge - d.amount)} fee), and the full {formatLeones(d.amount)} goes into your wallet.</>}
+        {d.charge > d.amount && <> You pay {formatLeones(d.charge)} (includes a {formatLeones(d.charge - d.amount)} mobile money fee), and the full {formatLeones(d.amount)} goes into your wallet.</>}
       </p>
       <p className="font-mono text-3xl font-extrabold tracking-wider" data-testid="ussd-code">{d.ussd_code}</p>
       <div className="flex flex-wrap gap-2">
-        {d.ussd_code && <a href={ussdHref(d.ussd_code)} className="btn btn-primary btn-sm">📞 Dial now</a>}
+        {d.ussd_code && <a href={ussdHref(d.ussd_code)} className="btn btn-primary btn-sm"><Icon name="phone" size={16} />Dial now</a>}
         {d.ussd_code && (
           <button className="btn btn-outline btn-sm" onClick={() => navigator.clipboard?.writeText(d.ussd_code!).then(() => setNote('Code copied.'))}>
             Copy code
@@ -102,13 +103,13 @@ function TopUp({ configured, feeBps }: { configured: boolean; feeBps: number }) 
           placeholder={`${WALLET_LIMITS.minDeposit / 100} – ${(WALLET_LIMITS.maxDeposit / 100).toLocaleString('en-US')}`} />
         <button className="btn btn-primary" disabled={busy || !amount}>Get USSD code</button>
       </div>
-      {feeBps > 0 && <p className="text-xs text-muted">Monime adds its {feeBps / 100}% fee on top when you pay, so the full amount reaches your wallet{parseLeones(amount) ? ` (SLE ${amount} costs ${formatLeones(withMonimeFee(parseLeones(amount)!, feeBps))})` : ''}.</p>}
+      {feeBps > 0 && <p className="text-xs text-muted">A {feeBps / 100}% mobile money fee is added when you pay, so the full amount reaches your wallet{parseLeones(amount) ? ` (SLE ${amount} costs ${formatLeones(withMonimeFee(parseLeones(amount)!, feeBps))})` : ''}.</p>}
       {error && <p className="text-sm font-semibold text-danger">{error}</p>}
     </form>
   );
 }
 
-function Withdraw({ balance }: { balance: number }) {
+function Withdraw({ balance, feeBps, pro, min }: { balance: number; feeBps: number; pro: boolean; min: number }) {
   const request = useMutation(api.wallet.requestWithdrawal);
   const [form, setForm] = useState({ amount: '', phone: '', provider: MOMO_PROVIDERS[0].id as string });
   const [error, setError] = useState('');
@@ -119,7 +120,8 @@ function Withdraw({ balance }: { balance: number }) {
     e.preventDefault();
     const minor = parseLeones(form.amount);
     if (minor === null) { setError('Enter an amount in leones, e.g. 25.'); return; }
-    if (!confirm(`Send ${formatLeones(minor)} to ${providerName(form.provider)} ${form.phone}?`)) return;
+    const fee = Math.ceil((minor * feeBps) / 10_000);
+    if (!confirm(`Withdraw ${formatLeones(minor)} to ${providerName(form.provider)} ${form.phone}? You receive ${formatLeones(minor - fee)} after the ${feeBps / 100}% fee.`)) return;
     setBusy(true); setError(''); setDone('');
     try {
       await request({ amount: minor, phone: form.phone, provider: form.provider });
@@ -143,8 +145,17 @@ function Withdraw({ balance }: { balance: number }) {
             {MOMO_PROVIDERS.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select></div>
       </div>
-      <button className="btn btn-primary" disabled={busy || balance < WALLET_LIMITS.minWithdrawal}>Withdraw to mobile money</button>
-      <p className="text-xs text-muted">Minimum {formatLeones(WALLET_LIMITS.minWithdrawal)}. Withdrawals are checked by our team before they are sent.</p>
+      <button className="btn btn-primary" disabled={busy || balance < min}>Withdraw to mobile money</button>
+      {(() => {
+        const minor = parseLeones(form.amount);
+        const fee = minor ? Math.ceil((minor * feeBps) / 10_000) : 0;
+        return minor ? <p className="text-sm font-semibold">You receive {formatLeones(minor - fee)} ({formatLeones(fee)} fee)</p> : null;
+      })()}
+      <p className="text-xs text-muted">
+        Minimum {formatLeones(min)}{pro ? '' : ' (Pro: SLE 20)'}. Withdrawal fee: {feeBps / 100}%
+        {pro ? ' (Pro rate)' : <> (<Link href="/pro" className="font-semibold text-secondary">Pro</Link> members pay 2%)</>}.
+        Withdrawals are checked by our team before they are sent.
+      </p>
       {error && <p className="text-sm font-semibold text-danger">{error}</p>}
       {done && <p className="text-sm font-semibold text-primary">{done}</p>}
     </form>
@@ -201,12 +212,12 @@ export default function WalletClient() {
 
           <section className="card space-y-4 p-5">
             <h2 className="text-xl font-bold">Withdraw</h2>
-            <Withdraw balance={w.balance} />
+            <Withdraw balance={w.balance} feeBps={w.withdrawalFeeBps} pro={w.pro} min={w.minWithdrawal} />
             {w.withdrawals.length > 0 && (
               <ul className="divide-y divide-border">
                 {w.withdrawals.map((x) => (
                   <li key={x.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-                    <span>{formatLeones(x.amount)} → {providerName(x.provider)} {displaySlPhone(x.phone)}</span>
+                    <span>{formatLeones(x.amount - x.fee)} → {providerName(x.provider)} {displaySlPhone(x.phone)}{x.fee > 0 && <span className="text-xs text-muted"> ({formatLeones(x.fee)} fee)</span>}</span>
                     <span className="flex items-center gap-2">
                       <span className="chip chip-muted">{STATUS[x.status] ?? x.status}</span>
                       {x.status === 'requested' && (

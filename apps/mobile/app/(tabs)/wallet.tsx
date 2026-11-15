@@ -73,7 +73,7 @@ export default function Wallet() {
         <Card key={d.id}>
           {d.status === 'creating' ? <Txt muted>Getting a USSD code for {formatLeones(d.amount)}…</Txt> : (
             <>
-              <Txt muted>Top up {formatLeones(d.amount)}{d.charge > d.amount ? ` (you pay ${formatLeones(d.charge)} incl. Monime's fee)` : ''}: dial</Txt>
+              <Txt muted>Top up {formatLeones(d.amount)}{d.charge > d.amount ? ` (you pay ${formatLeones(d.charge)} incl. a mobile money fee)` : ''}: dial</Txt>
               <Txt size={30} bold color={c.primary}>{d.ussd_code}</Txt>
               <Button title="📞 Dial now" onPress={() => d.ussd_code && void Linking.openURL(ussdHref(d.ussd_code))} />
               <Txt size={14} muted>Enter your mobile money PIN when asked. Your balance updates by itself once it is paid.</Txt>
@@ -109,7 +109,10 @@ export default function Wallet() {
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {MOMO_PROVIDERS.map((p) => <Chip key={p.id} label={p.name} selected={out.provider === p.id} onPress={() => setOut({ ...out, provider: p.id })} />)}
         </View>
-        <Button title="Withdraw to mobile money" onPress={withdraw} loading={busy} disabled={w.balance < WALLET_LIMITS.minWithdrawal} />
+        {parseLeones(out.amount) !== null && (
+          <Txt size={15} bold>You receive {formatLeones(parseLeones(out.amount)! - Math.ceil((parseLeones(out.amount)! * w.withdrawalFeeBps) / 10_000))} after the {w.withdrawalFeeBps / 100}% fee{w.pro ? '' : ' (Pro: 2%)'}</Txt>
+        )}
+        <Button title="Withdraw to mobile money" onPress={withdraw} loading={busy} disabled={w.balance < w.minWithdrawal} />
         {w.withdrawals.slice(0, 5).map((x) => (
           <Txt key={x.id} size={14} muted>{formatLeones(x.amount)} → {providerName(x.provider)} {displaySlPhone(x.phone)} · {x.status}</Txt>
         ))}

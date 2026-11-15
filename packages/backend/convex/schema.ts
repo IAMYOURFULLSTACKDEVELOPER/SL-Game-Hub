@@ -442,6 +442,15 @@ export default defineSchema({
     updated_at: v.number(),
   }).index('by_user', ['user_id']),
 
+  // Admin audit log: every action an admin takes (money adjustments, Pro, roles, suspensions, closing rooms).
+  admin_actions: defineTable({
+    admin_id: v.id('users'),
+    action: v.string(),
+    target_user_id: v.optional(v.id('users')),
+    amount: v.optional(v.number()),
+    details: v.string(),
+  }).index('by_target', ['target_user_id']),
+
   // SL Game Hub Pro -------------------------------------------------------------------
   // One row per payment (wallet or USSD); each adds 30 days to users.pro_until.
   pro_payments: defineTable({
@@ -452,8 +461,9 @@ export default defineSchema({
     deposit_id: v.optional(v.id('deposits')),
   }).index('by_user', ['user_id']),
 
-  // Online games each free player started today (UTC day, e.g. "2026-11-14").
-  daily_plays: defineTable({ user_id: v.id('users'), day: v.string(), count: v.number() })
+  // Per free player and UTC day (e.g. "2026-11-14"): online games started (`count`, for stats) and
+  // online rooms created (`rooms`, the free plan's daily limit; Pro is unlimited and isn't counted).
+  daily_plays: defineTable({ user_id: v.id('users'), day: v.string(), count: v.number(), rooms: v.optional(v.number()) })
     .index('by_user_day', ['user_id', 'day']),
 
   // Groups and forums for teams. Pro players create them; anyone signed in can join with the invite code.
@@ -544,6 +554,7 @@ export default defineSchema({
     monime_id: v.optional(v.string()), // pyt-...
     error: v.optional(v.string()),
     reviewed_by: v.optional(v.id('users')),
+    fee: v.optional(v.number()), // withdrawal fee kept by the hub (5%, or 2% with Pro); the player receives amount - fee
     updated_at: v.number(),
   })
     .index('by_user', ['user_id'])
@@ -609,9 +620,22 @@ export default defineSchema({
     stake: v.optional(v.number()),
     pot_id: v.optional(v.id('pots')),
     last_prize: v.optional(v.object({ names: v.array(v.string()), each: v.number() })), // last round's payout
+    // Rooms stay open after everyone leaves, so players come back instead of making new ones.
+    owner_id: v.optional(v.id('users')), // who created it
+    empty_since: v.optional(v.number()), // set while nobody is in it; empty rooms are deleted after ROOM_IDLE_DAYS
   })
     .index('by_code', ['code'])
-    .index('by_is_public', ['is_public']),
+    .index('by_is_public', ['is_public'])
+    .index('by_empty_since', ['empty_since']),
+  // "Recent rooms": every room a signed-in player created or joined, newest first, so they can rejoin it.
+  room_visits: defineTable({
+    user_id: v.id('users'),
+    room_id: v.id('play_rooms'),
+    last_at: v.number(),
+  })
+    .index('by_user_id_and_last_at', ['user_id', 'last_at'])
+    .index('by_user_id_and_room_id', ['user_id', 'room_id'])
+    .index('by_room_id', ['room_id']),
   play_members: defineTable({
     room_id: v.id('play_rooms'),
     member_id: v.string(),

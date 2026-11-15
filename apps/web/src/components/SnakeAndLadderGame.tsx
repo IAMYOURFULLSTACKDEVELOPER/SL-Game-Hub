@@ -10,10 +10,10 @@ import SnakeAndLadderRulebook from './SnakeAndLadderRulebook';
 import DiceTray from './DiceTray';
 import { RoomLobby, JoinRequests } from './RoomLobby';
 import { VoiceChat } from './VoiceChat';
-import { ProBar } from './ProBar';
 import { MoneyBar } from './MoneyBar';
 import { ConvexRoomProvider } from './ConvexRoomProvider';
 import { Icon } from './Icon';
+import { GameGlyph } from './GameGlyph';
 import { useRoom } from '@/lib/useRoom';
 import { useEndSfx } from '@/lib/useGameSfx';
 
@@ -64,9 +64,9 @@ function describe(s: SnakeAndLadderState) {
   let text = `${who} rolled ${m.roll}`;
   if (m.bounced) text += `, bounced back off 100 to ${m.landed}`;
   else text += ` and moved to ${m.landed}`;
-  if (m.kind === 'ladder') text += ` — climbed a ladder to ${m.to}! 🪜`;
-  if (m.kind === 'snake') text += ` — bitten by a snake, slid down to ${m.to}! 🐍`;
-  if (s.status === 'finished') return `${text} 🏆`;
+  if (m.kind === 'ladder') text += ` — climbed a ladder to ${m.to}!`;
+  if (m.kind === 'snake') text += ` — bitten by a snake, slid down to ${m.to}!`;
+  if (s.status === 'finished') return `${text} Game over.`;
   if (m.extraTurn) text += '. Rolled a 6 — roll again!';
   return text;
 }
@@ -249,7 +249,7 @@ function LocalLadder() {
 
       {finished && !busy ? (
         <div className="rounded-lg border-2 border-accent p-4 text-center">
-          <h2 className="text-xl font-bold">🏆 {game.players[game.winner!].name} ({RINGS[game.winner!].name}) wins!</h2>
+          <h2 className="flex items-center justify-center gap-2 text-xl font-bold"><Icon name="trophy" size={22} className="shrink-0 text-accent" />{game.players[game.winner!].name} ({RINGS[game.winner!].name}) wins!</h2>
           <button onClick={start} className="btn btn-primary mt-2">Play Again</button>
         </div>
       ) : (
@@ -349,7 +349,6 @@ function OnlineLadder() {
     <div className="space-y-4">
       <VoiceChat room={room} />
       <MoneyBar room={room} />
-      <ProBar room={room} />
       {room.joined && board && (
         <>
           <LadderBoard players={board.players} display={display} sliding={sliding} dice={dice} current={ringNow} />
@@ -360,7 +359,7 @@ function OnlineLadder() {
 
           {finished ? (
             <div className="rounded-lg border-2 border-accent p-4 text-center">
-              <h2 className="text-xl font-bold">🏆 {board.winner === seat ? 'You win!' : `${board.players[board.winner!].name} (${RINGS[board.winner!].name}) wins!`}</h2>
+              <h2 className="flex items-center justify-center gap-2 text-xl font-bold"><Icon name="trophy" size={22} className="shrink-0 text-accent" />{board.winner === seat ? 'You win!' : `${board.players[board.winner!].name} (${RINGS[board.winner!].name}) wins!`}</h2>
               <p className="text-sm text-muted">The host can start a new game below.</p>
             </div>
           ) : seat < 0 ? (
@@ -458,7 +457,7 @@ function PlayerList({ players, display, current, me = -1 }: { players: Players; 
         <li key={p.id} className={`flex items-center justify-between gap-2 rounded-lg border-2 p-2 text-sm font-bold ${i === current ? 'border-primary' : 'border-border'}`}>
           <span className="flex min-w-0 items-center gap-2">
             <span className="sl-ring h-5 w-5 shrink-0" style={{ backgroundColor: RINGS[i].color }} />
-            <span className="truncate">{p.name}{p.isAI && ' 🤖'}{i === me && ' (you)'}</span>
+            <span className="truncate">{p.name}{p.isAI && <span title="Bot" className="inline-flex align-[-2px] text-muted"><Icon name="robot" size={14} /><span className="sr-only"> (bot)</span></span>}{i === me && ' (you)'}</span>
           </span>
           <span className="shrink-0">{display[i] === 0 ? 'Start' : `Square ${display[i]}`}</span>
         </li>
@@ -481,7 +480,7 @@ function Shell({ onBack, children }: { onBack: () => void; children: ReactNode }
     <main className="mx-auto max-w-2xl space-y-3 px-2 py-3 sm:space-y-4 sm:p-4">
       <button onClick={onBack} className="back-link">← Back to Snake &amp; Ladder</button>
       <div className="card space-y-4 p-3 sm:p-5">
-        <h1>🐍 {SNAKE_AND_LADDER_MANIFEST.name} 🪜</h1>
+        <h1 className="flex items-center gap-3"><GameGlyph slug="snake-and-ladder" name={SNAKE_AND_LADDER_MANIFEST.name} size={36} />{SNAKE_AND_LADDER_MANIFEST.name}</h1>
         {children}
       </div>
     </main>

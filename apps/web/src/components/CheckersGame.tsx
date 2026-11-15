@@ -5,10 +5,10 @@ import { CheckersEngine, CHECKERS_RULES, createPlayer, type CheckersState, type 
 import Rulebook from './Rulebook';
 import { RoomLobby, JoinRequests } from './RoomLobby';
 import { VoiceChat } from './VoiceChat';
-import { ProBar } from './ProBar';
 import { MoneyBar } from './MoneyBar';
 import { ConvexRoomProvider } from './ConvexRoomProvider';
 import { Icon } from './Icon';
+import { GameGlyph } from './GameGlyph';
 import { useRoom, type RoomApi } from '@/lib/useRoom';
 import { sfx } from '@/lib/sound';
 import { useEndSfx } from '@/lib/useGameSfx';
@@ -76,9 +76,9 @@ export default function CheckersGame({ onBack }: { onBack: () => void }) {
 
   const tabs = (
     <div className="flex flex-wrap gap-2">
-      <button onClick={() => setMode('bot')} className={`btn btn-sm ${mode === 'bot' ? 'btn-primary' : 'btn-outline'}`}>🤖 vs Bot</button>
-      <button onClick={() => setMode('local')} className={`btn btn-sm ${mode === 'local' ? 'btn-primary' : 'btn-outline'}`}>👥 2 players (this device)</button>
-      <button onClick={() => setMode('online')} className={`btn btn-sm ${mode === 'online' ? 'btn-primary' : 'btn-outline'}`}>🌐 Online</button>
+      <button onClick={() => setMode('bot')} className={`btn btn-sm ${mode === 'bot' ? 'btn-primary' : 'btn-outline'}`}><Icon name="robot" size={16} />vs Bot</button>
+      <button onClick={() => setMode('local')} className={`btn btn-sm ${mode === 'local' ? 'btn-primary' : 'btn-outline'}`}><Icon name="users" size={16} />2 players (this device)</button>
+      <button onClick={() => setMode('online')} className={`btn btn-sm ${mode === 'online' ? 'btn-primary' : 'btn-outline'}`}><Icon name="globe" size={16} />Online</button>
     </div>
   );
 
@@ -106,7 +106,7 @@ export default function CheckersGame({ onBack }: { onBack: () => void }) {
             </select>
           </label>
         )}
-        <button onClick={start} className="btn btn-primary w-full">🔴 Start game</button>
+        <button onClick={start} className="btn btn-primary w-full"><Icon name="play" size={18} />Start game</button>
         {saved && <button onClick={() => { setMode(saved.mode); setDifficulty(saved.difficulty); setHistory(saved.history); setResult(saved.result); }} className="btn btn-outline w-full">Resume saved game</button>}
         <Rulebook title="Checkers Rulebook" sections={CHECKERS_RULES} open />
       </Shell>
@@ -115,7 +115,7 @@ export default function CheckersGame({ onBack }: { onBack: () => void }) {
 
   const over = game.status === 'finished' || !!result;
   const status = result ?? (game.status === 'finished'
-    ? game.winner === null ? 'Draw — 40 moves each without a capture 🤝' : `🏆 ${NAME[game.winner === 0 ? 'red' : 'black']} wins!`
+    ? game.winner === null ? 'Draw — 40 moves each without a capture' : `${NAME[game.winner === 0 ? 'red' : 'black']} wins!`
     : botTurn ? 'Bot is thinking…'
       : `${NAME[game.currentTurn]} to move${game.jumpingFrom != null ? ' — keep jumping!' : game.mustJump ? ' — you must capture!' : ''}`);
   const movable = new Set(legal.map((m) => m.from));
@@ -138,8 +138,8 @@ export default function CheckersGame({ onBack }: { onBack: () => void }) {
   return (
     <Shell onBack={onBack}>
       <div className="flex justify-between text-sm font-bold">
-        <span>⚫ Black: {game.blackPieces} pieces</span>
-        <span>🔴 Red: {game.redPieces} pieces</span>
+        <span className="flex items-center gap-1.5"><span aria-hidden className="inline-block h-3.5 w-3.5 rounded-full bg-[#1f2124] ring-1 ring-white/40" />Black: {game.blackPieces} pieces</span>
+        <span className="flex items-center gap-1.5"><span aria-hidden className="inline-block h-3.5 w-3.5 rounded-full bg-[#d83c3e]" />Red: {game.redPieces} pieces</span>
       </div>
       <CheckersBoard game={game} flipped={false} selected={selected} targets={targets} movable={movable} lastMove={lastMove} over={over} onSquare={click} />
       <p className="text-center text-lg font-bold" aria-live="polite">{status}</p>
@@ -148,12 +148,12 @@ export default function CheckersGame({ onBack }: { onBack: () => void }) {
           <button onClick={undo} disabled={history.length < 2 || botTurn} className="btn btn-outline flex-1 disabled:opacity-50">↶ Undo</button>
           <button onClick={() => {
             if (!window.confirm(mode === 'bot' ? 'Offer a draw? The bot accepts if pieces are level.' : 'Do both players agree to a draw?')) return;
-            if (mode === 'local' || game.redPieces === game.blackPieces) setResult('Draw agreed 🤝'); else window.alert('The bot declines the draw.');
-          }} className="btn btn-outline flex-1">🤝 Offer draw</button>
+            if (mode === 'local' || game.redPieces === game.blackPieces) setResult('Draw agreed'); else window.alert('The bot declines the draw.');
+          }} className="btn btn-outline flex-1"><Icon name="handshake" size={16} />Offer draw</button>
           <button onClick={() => {
             const loser = mode === 'bot' ? 'red' : game.currentTurn;
-            if (window.confirm(`${NAME[loser]} resigns?`)) setResult(`${NAME[loser]} resigned — ${NAME[loser === 'red' ? 'black' : 'red']} wins 🏆`);
-          }} className="btn btn-outline flex-1">🏳 Resign</button>
+            if (window.confirm(`${NAME[loser]} resigns?`)) setResult(`${NAME[loser]} resigned — ${NAME[loser === 'red' ? 'black' : 'red']} wins`);
+          }} className="btn btn-outline flex-1"><Icon name="flag" size={16} />Resign</button>
         </div>
       )}
       <div className="flex gap-2">
@@ -179,7 +179,6 @@ function OnlineCheckers() {
     <div className="space-y-4">
       <VoiceChat room={room} />
       <MoneyBar room={room} />
-      <ProBar room={room} />
       {room.joined && game && <OnlineCheckersTable game={game} seat={v?.me?.seat ?? -1} busy={room.busy} onMove={(m) => { room.move(m); }} />}
       {playing && <JoinRequests room={room} />}
       {room.error && playing && <p role="alert" className="flash rounded-xl border border-danger/40 bg-danger/10 p-3 text-sm font-semibold text-danger">{room.error}</p>}
@@ -227,7 +226,7 @@ function OnlineCheckersTable({ game, seat, busy, onMove }: { game: CheckersState
   const who = (i: number) => (i === seat ? 'You' : `${game.players[i]?.name ?? 'Player'} (${NAME[colorOf(i)]})`);
   const turn = game.currentPlayerIndex;
   const status = over
-    ? game.winner === null ? 'Draw — 40 moves each without a capture 🤝' : `🏆 ${who(game.winner)} ${game.winner === seat ? 'win' : 'wins'}!`
+    ? game.winner === null ? 'Draw — 40 moves each without a capture' : `${who(game.winner)} ${game.winner === seat ? 'win' : 'wins'}!`
     : game.players[turn]?.isAI ? `${who(turn)} is thinking…`
       : turn === seat ? `Your move (${NAME[game.currentTurn]})${game.jumpingFrom != null ? ' — keep jumping!' : game.mustJump ? ' — you must capture!' : ''}`
         : `${who(turn)} to move`;
@@ -236,7 +235,7 @@ function OnlineCheckersTable({ game, seat, busy, onMove }: { game: CheckersState
   const [top, bottom] = flipped ? [0, 1] : [1, 0];
   const tag = (i: number) => (
     <p className="flex items-center gap-2 text-sm font-bold">
-      <span aria-hidden>{i === 0 ? '🔴' : '⚫'}</span>
+      <span aria-hidden className={`inline-block h-3.5 w-3.5 shrink-0 rounded-full ${i === 0 ? 'bg-[#d83c3e]' : 'bg-[#1f2124] ring-1 ring-white/40'}`} />
       <span className="min-w-0 truncate">{game.players[i]?.name ?? NAME[colorOf(i)]}{i === seat ? ' (you)' : ''}</span>
       <span className="shrink-0 font-normal text-muted">{i === 0 ? game.redPieces : game.blackPieces} pieces</span>
       {!over && turn === i && <span className="chip chip-primary ml-auto shrink-0">To move</span>}
@@ -282,7 +281,7 @@ function CheckersBoard({ game, flipped, selected, targets, movable, lastMove, ov
               {selected === i && <span className="absolute inset-0 bg-emerald-400/40" />}
               {p && (
                 <span className={`checkers-disc relative z-10 ${p.startsWith('red') ? 'checkers-red' : 'checkers-black'} ${game.mustJump && movable.has(i) && !over ? 'ring-4 ring-yellow-300' : ''}`}>
-                  {p.endsWith('king') && <span className="text-[clamp(0.9rem,4vw,1.6rem)] text-yellow-300 drop-shadow">♛</span>}
+                  {p.endsWith('king') && <span className="flex h-[55%] w-[55%] text-yellow-300 drop-shadow" aria-label="King"><Icon name="crown" size={24} className="h-full w-full" strokeWidth={2.4} /></span>}
                 </span>
               )}
               {target && <span className={`absolute z-20 rounded-full ${target.isJump ? 'h-1/3 w-1/3 bg-red-400/90' : 'h-1/4 w-1/4 bg-emerald-400/90'}`} />}
@@ -301,7 +300,7 @@ function Shell({ onBack, children }: { onBack: () => void; children: ReactNode }
     <main className="mx-auto max-w-2xl space-y-3 px-2 py-3 sm:space-y-4 sm:p-4">
       <button onClick={onBack} className="back-link">← Back to Checkers</button>
       <div className="card space-y-4 p-3 sm:p-5">
-        <h1>🔴 Checkers</h1>
+        <h1 className="flex items-center gap-3"><GameGlyph slug="checkers" name={'Checkers'} size={36} />Checkers</h1>
         {children}
       </div>
     </main>

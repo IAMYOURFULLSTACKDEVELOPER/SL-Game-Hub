@@ -1,6 +1,7 @@
 import { api, query } from '@/lib/convex';
 import Link from 'next/link';
 import { PageHeader } from '@/components/PageHeader';
+import { Avatar } from '@/components/Avatar';
 
 const TYPES = ['global', 'per_game', 'weekly', 'monthly', 'per_district'] as const;
 
@@ -95,7 +96,7 @@ function LeaderboardEntries({ entries }: { entries: { id: string; score: number;
         >
           <div className="flex items-center gap-3">
             <span className="font-bold text-lg w-8">#{entry.rank || index + 1}</span>
-            <span className="text-2xl">{entry.profiles.avatar}</span>
+            <Avatar id={entry.profiles.avatar} size={32} />
             <span className="font-medium">{entry.profiles.username}</span>
           </div>
           <span className="font-bold text-lg">{entry.score}</span>

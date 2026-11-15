@@ -12,7 +12,7 @@ export interface GameManifest {
   id: string;            // slug, e.g. "chess"
   name: string;
   description: string;
-  thumbnail: string;     // URL or emoji for built-ins
+  thumbnail: string;     // URL; '' for built-ins (the app draws their icon)
   minPlayers: number;
   maxPlayers: number;
   modes: GameMode[];

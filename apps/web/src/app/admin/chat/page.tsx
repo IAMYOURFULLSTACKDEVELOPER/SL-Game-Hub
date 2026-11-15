@@ -1,5 +1,6 @@
 import { api, query } from '@/lib/convex';
 import { requireAdmin } from '@/lib/session';
+import { Avatar } from '@/components/Avatar';
 import { deleteChatMessage, muteUser, blockUser } from '@/app/actions';
 
 export default async function AdminChatPage() {
@@ -22,7 +23,7 @@ export default async function AdminChatPage() {
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="text-2xl">{msg.profiles.avatar}</span>
+                      <Avatar id={msg.profiles.avatar} size={32} />
                       <span className="font-medium">{msg.profiles.username}</span>
                       <span className="text-muted">in {msg.chat_rooms.name}</span>
                       <span className="text-xs text-muted">
@@ -52,7 +53,7 @@ export default async function AdminChatPage() {
             {mutedUsers.map((mute: any) => (
               <div key={mute.id} className="p-4 border rounded flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <span className="text-2xl">{mute.profiles.avatar}</span>
+                  <Avatar id={mute.profiles.avatar} size={32} />
                   <div>
                     <div className="font-medium">{mute.profiles.username}</div>
                     <div className="text-sm text-muted">

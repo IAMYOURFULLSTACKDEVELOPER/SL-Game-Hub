@@ -1,6 +1,7 @@
 import { api, query } from '@/lib/convex';
 import { requireUser } from '@/lib/session';
 import { PageHeader } from '@/components/PageHeader';
+import { Icon } from '@/components/Icon';
 
 export default async function AchievementsPage() {
   await requireUser();
@@ -65,14 +66,14 @@ function AchievementCard({ achievement, earned, earnedAt }: { achievement: any; 
   return (
     <div className={`p-4 rounded-lg border ${earned ? 'bg-primary/10 border-primary/30' : 'bg-bg/60 border-border opacity-75'}`}>
       <div className="flex items-start gap-3">
-        <span className="text-4xl">{achievement.icon}</span>
+        <span className={`icon-badge h-12 w-12 ${earned ? 'icon-badge-gold' : ''}`}><Icon name="medal" size={24} /></span>
         <div className="flex-1">
           <h3 className="font-bold">{achievement.name}</h3>
           <p className="text-sm text-muted">{achievement.description}</p>
           <div className="flex items-center gap-2 mt-2 text-xs">
             <span className="px-2 py-1 bg-text/10 rounded">{achievement.type}</span>
             {achievement.reward_coins > 0 && (
-              <span className="text-yellow-600">🪙 {achievement.reward_coins}</span>
+              <span className="inline-flex items-center gap-1 text-accent"><Icon name="coins" size={14} />{achievement.reward_coins}</span>
             )}
           </div>
           {earned && earnedAt && (
@@ -93,7 +94,7 @@ function BadgeCard({ badge, owned, equipped }: { badge: any; owned: boolean; equ
       owned ? 'bg-primary/10 border-primary/30' :
       'bg-bg/60 border-border opacity-50'
     }`}>
-      <span className="text-5xl block mb-2">{badge.icon}</span>
+      <span className="icon-badge mx-auto mb-2 h-14 w-14"><Icon name="shield" size={28} /></span>
       <h3 className="font-bold">{badge.name}</h3>
       <p className="text-xs text-muted mb-2">{badge.description}</p>
       <span className={`px-2 py-1 text-xs rounded ${

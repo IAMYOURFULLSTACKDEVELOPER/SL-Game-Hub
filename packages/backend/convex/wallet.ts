@@ -5,9 +5,10 @@ import type { Doc, Id } from './_generated/dataModel';
 import { internal } from './_generated/api';
 import {
   WALLET_LIMITS, formatLeones, isMomoProvider, normalizeSlPhone, providerName, CURRENCY, MONIME_FEE_BPS_DEFAULT, withMonimeFee,
+  WITHDRAWAL_FEE_BPS, withdrawalFee, minWithdrawalFor,
 } from '@slgh/shared/src/wallet';
 import { currentUser, requireActiveUser, requireAdmin } from './lib';
-import { grantPro } from './pro';
+import { grantPro, isPro } from './pro';
 import type { walletTxType } from './schema';
 
 // Real-money wallet. Amounts are minor units (100 = SLE 1). Money only enters through a Monime
@@ -76,6 +77,9 @@ export const summary = query({
       eligible: walletAllowed(me),
       configured: monimeConfigured(),
       feeBps: monimeFeeBps(),
+      pro: isPro(me),
+      withdrawalFeeBps: isPro(me) ? WITHDRAWAL_FEE_BPS.pro : WITHDRAWAL_FEE_BPS.free,
+      minWithdrawal: minWithdrawalFor(isPro(me)),
       balance: w?.balance ?? 0,
       held: w?.held ?? 0,
       deposits: deposits.filter((d) => d.purpose !== 'pro').map((d) => ({
@@ -83,7 +87,7 @@ export const summary = query({
         expires_at: d.expires_at ?? null, error: d.error ?? null, created_at: d._creationTime,
       })),
       withdrawals: withdrawals.map((w) => ({
-        id: w._id, amount: w.amount, phone: w.phone, provider: w.provider, status: w.status,
+        id: w._id, amount: w.amount, fee: w.fee ?? 0, phone: w.phone, provider: w.provider, status: w.status,
         error: w.error ?? null, created_at: w._creationTime,
       })),
       transactions: transactions.map((t) => ({
@@ -128,15 +132,22 @@ export const requestWithdrawal = mutation({
   args: { amount: v.number(), phone: v.string(), provider: v.string() },
   handler: async (ctx, a) => {
     const me = await requireWalletUser(ctx);
-    checkAmount(a.amount, WALLET_LIMITS.minWithdrawal, WALLET_LIMITS.maxWithdrawal, 'A withdrawal');
+    const pro = isPro(me);
+    if (Number.isInteger(a.amount) && a.amount > 0 && a.amount < minWithdrawalFor(pro)) {
+      throw new ConvexError(pro
+        ? `The smallest withdrawal is ${formatLeones(minWithdrawalFor(true))}.`
+        : `The smallest withdrawal is ${formatLeones(minWithdrawalFor(false))}. Pro members can withdraw from ${formatLeones(minWithdrawalFor(true))}.`);
+    }
+    checkAmount(a.amount, minWithdrawalFor(pro), WALLET_LIMITS.maxWithdrawal, 'A withdrawal');
     const phone = normalizeSlPhone(a.phone);
     if (!phone) throw new ConvexError('Enter a Sierra Leone mobile number, e.g. 076 123 456.');
     if (!isMomoProvider(a.provider)) throw new ConvexError('Choose Orange Money or Africell Money.');
+    const fee = withdrawalFee(a.amount, pro); // 5%, or 2% with Pro
     const id = await ctx.db.insert('withdrawals', {
-      user_id: me._id, amount: a.amount, phone, provider: a.provider, status: 'requested', updated_at: Date.now(),
+      user_id: me._id, amount: a.amount, fee, phone, provider: a.provider, status: 'requested', updated_at: Date.now(),
     });
     await post(ctx, me._id, 'withdrawal_hold', { amount: -a.amount, held: a.amount },
-      `Withdrawal to ${providerName(a.provider)} ${phone} (waiting for approval)`, id);
+      `Withdrawal to ${providerName(a.provider)} ${phone}: you receive ${formatLeones(a.amount - fee)} after the ${formatLeones(fee)} fee (waiting for approval)`, id);
     return id;
   },
 });
@@ -170,7 +181,7 @@ export const adminOverview = query({
     const withdrawalRow = async (w: Doc<'withdrawals'>) => {
       const u = await ctx.db.get(w.user_id);
       return {
-        id: w._id, amount: w.amount, phone: w.phone, provider: w.provider, status: w.status,
+        id: w._id, amount: w.amount, fee: w.fee ?? 0, phone: w.phone, provider: w.provider, status: w.status,
         error: w.error ?? null, has_payout: !!w.monime_id, created_at: w._creationTime, updated_at: w.updated_at,
         username: u?.username ?? '?', banned: u?.banned ?? false,
       };
@@ -187,6 +198,8 @@ export const adminOverview = query({
       balances: wallets.reduce((s, w) => s + w.balance, 0),
       held: wallets.reduce((s, w) => s + w.held, 0),
       fees: settled.reduce((s, p) => s + (p.fee ?? 0), 0),
+      withdrawalFees: (await ctx.db.query('withdrawals').withIndex('by_status', (q) => q.eq('status', 'completed')).collect())
+        .reduce((s, w) => s + (w.fee ?? 0), 0),
       proRevenue: proPayments.reduce((s, p) => s + p.amount, 0),
       proActive: (await ctx.db.query('users').collect()).filter((u) => (u.pro_until ?? 0) > Date.now()).length,
       requested: await queue('requested'),
@@ -328,7 +341,7 @@ export const applyPayoutStatus = internalMutation({
     if (status === 'completed') {
       await ctx.db.patch(w._id, { status: 'completed', updated_at: Date.now() });
       await post(ctx, w.user_id, 'withdrawal_paid', { held: -w.amount },
-        `Paid ${formatLeones(w.amount)} to ${providerName(w.provider)} ${w.phone}`, w._id);
+        `Paid ${formatLeones(w.amount - (w.fee ?? 0))} to ${providerName(w.provider)} ${w.phone}${w.fee ? ` (${formatLeones(w.fee)} fee)` : ''}`, w._id);
     } else if (status === 'failed') {
       await ctx.db.patch(w._id, { status: 'failed', error: error?.slice(0, 300) ?? 'Payout failed', updated_at: Date.now() });
       await post(ctx, w.user_id, 'withdrawal_refund', { amount: w.amount, held: -w.amount }, 'Withdrawal failed, money returned', w._id);

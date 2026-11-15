@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '@slgh/backend/convex/_generated/api';
-import { avatarEmoji } from '@slgh/shared/src/avatars';
+import { Avatar } from '@/components/Avatar';
 import { playerMessage } from '@slgh/shared/src/errors';
 
 const when = (ms: number) => new Date(ms).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -37,7 +37,7 @@ export default function ThreadClient({ id }: { id: string }) {
         {t.posts.map((p, i) => (
           <li key={p.id} className="card space-y-2 p-4">
             <p className="flex items-center gap-2 text-sm">
-              <span aria-hidden className="text-lg">{avatarEmoji(p.avatar)}</span>
+              <Avatar id={p.avatar} size={24} />
               <b>{p.username}</b><span className="text-muted">{when(p.created_at)}</span>
               {p.canDelete && (
                 <button type="button" className="btn btn-ghost btn-sm ml-auto text-danger" disabled={busy}

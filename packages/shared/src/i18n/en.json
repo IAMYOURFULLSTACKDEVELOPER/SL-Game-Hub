@@ -163,7 +163,10 @@
     "totalPlayers": "Players",
     "totalGames": "Games",
     "openReports": "Open reports",
-    "role": "Role"
+    "role": "Role",
+    "rooms": "Live rooms",
+    "chat": "Chat",
+    "log": "Audit log"
   },
   "common": {
     "loading": "Loading…",

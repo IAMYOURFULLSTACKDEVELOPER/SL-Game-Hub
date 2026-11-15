@@ -10,6 +10,8 @@ import { useMutation, useQuery } from 'convex/react';
 import { errorKeyFor, playerMessage } from '@slgh/shared/src/errors';
 import { api } from '@slgh/backend/convex/_generated/api';
 import { formatLeones, parseLeones } from '@slgh/shared/src/wallet';
+import { Icon } from './Icon';
+import { GameGlyph } from './GameGlyph';
 import DiceTray from './DiceTray';
 import { ConvexClientProvider } from './ConvexClientProvider';
 import { useEndSfx } from '@/lib/useGameSfx';
@@ -127,7 +129,7 @@ function Board({ state, myId, canRoll, onRoll, rollMode, children }: {
             <div className="flex items-center justify-between gap-2 text-sm font-bold">
               <span className="flex items-center gap-2">
                 <span className="h-3 w-3 rounded-full" style={{ backgroundColor: COLORS[i] }} />
-                {p.name}{myId === p.id && ' (you)'}{p.isAI && ' 🤖'}
+                {p.name}{myId === p.id && ' (you)'}{p.isAI && <span title="Bot" className="inline-flex align-[-2px] text-muted"><Icon name="robot" size={14} /><span className="sr-only"> (bot)</span></span>}
               </span>
               <span>{state.scores[i]} / {state.target}</span>
             </div>
@@ -140,7 +142,7 @@ function Board({ state, myId, canRoll, onRoll, rollMode, children }: {
 
       {!finished && (showShakePanel ? (
         <div className="rounded-lg border-2 border-dashed border-primary p-3 text-center font-bold" aria-live="polite">
-          {shaking ? '🎲 Rattling… stop shaking to throw!' : animating ? 'Rolling…' : '📳 Shake your phone to roll'}
+          {shaking ? 'Rattling… stop shaking to throw!' : animating ? 'Rolling…' : 'Shake your phone to roll'}
         </div>
       ) : (
         <>
@@ -148,13 +150,13 @@ function Board({ state, myId, canRoll, onRoll, rollMode, children }: {
             <p className="text-center text-sm text-muted">This device can&apos;t detect shaking — tap the button to roll instead.</p>
           )}
           <button onClick={onRoll} disabled={!canRoll || animating} className="btn btn-primary w-full disabled:opacity-50">
-            {canRoll ? 'Roll Dice 🎲' : `Waiting for ${current.name}…`}
+            {canRoll ? <><Icon name="dice" size={18} />Roll dice</> : `Waiting for ${current.name}…`}
           </button>
         </>
       ))}
       {finished && !animating && (
         <div className="rounded-lg border-2 border-accent p-4 text-center">
-          <h2 className="text-xl font-bold">🏆 {state.players[state.winner!].name} wins!</h2>
+          <h2 className="flex items-center justify-center gap-2 text-xl font-bold"><Icon name="trophy" size={22} className="shrink-0 text-accent" />{state.players[state.winner!].name} wins!</h2>
           <p className="text-muted">Reached {state.scores[state.winner!]} points.</p>
         </div>
       )}
@@ -365,7 +367,7 @@ function OnlineDice({ rollMode }: { rollMode: RollMode }) {
           {([false, true] as const).map((m) => (
             <button key={String(m)} role="radio" aria-checked={forMoney === m} onClick={() => setForMoney(m)}
               className={`btn btn-sm ${forMoney === m ? 'btn-primary' : 'btn-secondary'}`}>
-              {m ? '💰 For money' : '🎉 Just for fun'}
+              <Icon name={m ? 'coins' : 'party'} size={16} />{m ? 'For money' : 'Just for fun'}
             </button>
           ))}
         </div>
@@ -393,7 +395,7 @@ function OnlineDice({ rollMode }: { rollMode: RollMode }) {
             {peekStake !== null ? `Join · stake ${money(peekStake)}` : 'Join'}
           </button>
         </div>
-        {peekStake !== null && <p className="text-sm text-muted">💰 This is a money room: joining puts {money(peekStake)} from your wallet into the pot.</p>}
+        {peekStake !== null && <p className="text-sm text-muted"><Icon name="coins" size={16} className="mr-1 inline-block align-[-3px]" />This is a money room: joining puts {money(peekStake)} from your wallet into the pot.</p>}
         {error && <p className="font-semibold text-red-500">{error}</p>}
       </div>
     );
@@ -413,12 +415,12 @@ function OnlineDice({ rollMode }: { rollMode: RollMode }) {
   const potPanel = stake !== null && live?.pot && (
     <div className="space-y-2 rounded-lg border-2 border-accent/60 p-3">
       <p className="flex flex-wrap justify-between gap-2 font-semibold">
-        <span>💰 Stake {money(stake)} each</span>
+        <span className="flex items-center gap-1.5"><Icon name="coins" size={18} className="text-accent" />Stake {money(stake)} each</span>
         <span>Pot: {money(live.pot.total)}{live.pot.feeBps > 0 && <span className="text-xs text-muted"> ({live.pot.feeBps / 100}% fee)</span>}</span>
       </p>
       {potOpen && (meStaked ? (
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span>✅ Your stake is in for this round.</span>
+          <span className="flex items-center gap-1.5"><Icon name="check" size={16} className="text-success" strokeWidth={2.6} />Your stake is in for this round.</span>
           <button onClick={takeBack} className="btn btn-ghost btn-sm">Take it back</button>
         </div>
       ) : (
@@ -441,7 +443,7 @@ function OnlineDice({ rollMode }: { rollMode: RollMode }) {
           {members.slice(0, MAX).map((m, i) => (
             <li key={m.id} className="flex items-center gap-2">
               <span className="h-3 w-3 rounded-full" style={{ backgroundColor: COLORS[i] }} />
-              {m.name}{m.id === myId && ' (you)'}{m.host && ' 👑'}{stake !== null && (m.staked ? ' 💰' : ' (not staked)')}
+              {m.name}{m.id === myId && ' (you)'}{m.host && <span title="Host" className="inline-flex text-accent"><Icon name="crown" size={14} /><span className="sr-only"> (host)</span></span>}{stake !== null && (m.staked ? <span title="Staked" className="inline-flex text-accent"><Icon name="coins" size={14} /><span className="sr-only"> (staked)</span></span> : ' (not staked)')}
             </li>
           ))}
         </ul>
@@ -471,7 +473,7 @@ function OnlineDice({ rollMode }: { rollMode: RollMode }) {
       <Board state={state} myId={myId} canRoll={myTurn && !rollSent} onRoll={roll} rollMode={rollMode}>
         {finished && stake !== null && live?.lastPrize != null && (
           <p className="rounded-lg bg-accent/15 p-3 text-center font-semibold">
-            {iWon ? `🎉 You won ${money(live.lastPrize)}! It is in your wallet: stake again below or leave with it.`
+            {iWon ? `You won ${money(live.lastPrize)}! It is in your wallet: stake again below or leave with it.`
               : `${state.players[state.winner!].name} won ${money(live.lastPrize)}.`}
           </p>
         )}
@@ -515,7 +517,7 @@ export default function DiceGame({ onBack }: { onBack: () => void }) {
       <button onClick={onBack} className="back-link">← Back to Dice</button>
       <div className="card space-y-4 p-3 sm:p-5">
         <div>
-          <h1>🎲 {DICE_MANIFEST.name}</h1>
+          <h1 className="flex items-center gap-3"><GameGlyph slug="dice" name={DICE_MANIFEST.name} size={36} />{DICE_MANIFEST.name}</h1>
           <p className="text-sm text-muted">
             Roll two dice and add them to your score. Doubles score double, snake eyes (1 + 1) cost 10 points. First to the target wins!
           </p>
@@ -534,7 +536,7 @@ export default function DiceGame({ onBack }: { onBack: () => void }) {
             {(['tap', 'shake'] as const).map((m) => (
               <button key={m} role="radio" aria-checked={rollMode === m} onClick={() => chooseRollMode(m)}
                 className={`btn ${rollMode === m ? 'btn-primary' : 'btn-secondary'}`}>
-                {m === 'tap' ? '👆 Tap to roll' : '📳 Shake to roll'}
+                <Icon name={m === 'tap' ? 'pointer' : 'vibrate'} size={18} />{m === 'tap' ? 'Tap to roll' : 'Shake to roll'}
               </button>
             ))}
           </div>

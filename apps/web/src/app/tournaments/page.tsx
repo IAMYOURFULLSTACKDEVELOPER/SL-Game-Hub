@@ -1,6 +1,8 @@
 import { api, query } from '@/lib/convex';
 import Link from 'next/link';
 import { PageHeader } from '@/components/PageHeader';
+import { Icon } from '@/components/Icon';
+import { GameGlyph } from '@/components/GameGlyph';
 
 const STATUSES = ['upcoming', 'registration', 'in_progress', 'completed', 'cancelled'] as const;
 
@@ -63,7 +65,7 @@ function TournamentCard({ tournament }: { tournament: any }) {
       <div className="flex items-start justify-between mb-4">
         <div>
           <h2 className="text-xl font-bold">{tournament.name}</h2>
-          <p className="text-muted">{tournament.games.icon} {tournament.games.name}</p>
+          <p className="flex items-center gap-2 text-muted"><GameGlyph slug={tournament.games.slug} name={tournament.games.name} size={20} />{tournament.games.name}</p>
         </div>
         <span className={`px-2 py-1 text-xs rounded-full ${
           tournament.status === 'upcoming' ? 'bg-blue-100 text-blue-800' :
@@ -91,13 +93,13 @@ function TournamentCard({ tournament }: { tournament: any }) {
         {tournament.prize_coins > 0 && (
           <div className="flex justify-between">
             <span className="text-muted">Prize:</span>
-            <span className="font-medium text-yellow-600">🪙 {tournament.prize_coins}</span>
+            <span className="font-medium text-yellow-600"><Icon name="coins" size={16} className="inline-block align-[-3px]" /> {tournament.prize_coins}</span>
           </div>
         )}
         {tournament.entry_fee_coins > 0 && (
           <div className="flex justify-between">
             <span className="text-muted">Entry Fee:</span>
-            <span className="font-medium">🪙 {tournament.entry_fee_coins}</span>
+            <span className="font-medium"><Icon name="coins" size={16} className="inline-block align-[-3px]" /> {tournament.entry_fee_coins}</span>
           </div>
         )}
         {tournament.starts_at && (

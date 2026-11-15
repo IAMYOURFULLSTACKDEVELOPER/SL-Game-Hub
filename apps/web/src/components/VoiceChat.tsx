@@ -62,7 +62,7 @@ export function VoiceChat({ room }: { room: RoomApi }) {
         )}
         <button type="button" className="btn btn-sm btn-ghost" onClick={voice.leave}><Icon name="logout" size={16} />Leave voice</button>
         <span className="text-xs font-semibold text-muted">
-          {!voice.canTalk ? <>🎧 Listening only · <Link href="/pro" className="font-semibold text-secondary">Go Pro to talk</Link></>
+          {!voice.canTalk ? <><Icon name="headphones" size={14} className="inline-block align-[-2px]" /> Listening only · <Link href="/pro" className="font-semibold text-secondary">Go Pro to talk</Link></>
             : voice.muted ? 'You are muted' : alone ? 'Waiting for others to join voice' : 'Your microphone is on'}
         </span>
       </div>
@@ -92,7 +92,7 @@ export function VoiceChat({ room }: { room: RoomApi }) {
                 <span className="flex items-center gap-1 text-xs text-muted">
                   {mine && voice.muted ? <><MicIcon off size={12} />muted</>
                     : silenced ? <><SpeakerOff />muted by you</>
-                      : !m.talk ? '🎧 listening'
+                      : !m.talk ? <><Icon name="headphones" size={12} />listening</>
                       : status === 'connected' ? <><Bars level={level} on={talking} />{talking ? 'speaking' : 'quiet'}</>
                         : status === 'failed' ? 'can’t connect' : 'connecting…'}
                 </span>
@@ -116,7 +116,7 @@ export function VoiceChat({ room }: { room: RoomApi }) {
       {failed.length > 0 && (
         <p className="rounded-xl bg-danger/10 p-2.5 text-sm text-danger">
           Can’t reach {failed.map((m) => m.name).join(', ')}.{' '}
-          {voice.relay ? 'Retrying… a weak signal can cause this.' : 'Their network (or yours) blocks direct calls, and this site has no voice relay set up yet.'}
+          {voice.relay ? 'Retrying… a weak signal can cause this.' : 'Their network or yours is blocking the call. Try Wi-Fi or another network.'}
         </p>
       )}
       {voice.error && <p role="alert" className="text-sm font-semibold text-danger">{voice.error}</p>}

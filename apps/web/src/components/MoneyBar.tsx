@@ -5,6 +5,7 @@ import { api } from '@slgh/backend/convex/_generated/api';
 import { formatLeones } from '@slgh/shared/src/wallet';
 import type { RoomApi } from '@/lib/useRoom';
 import { sfx } from '@/lib/sound';
+import { Icon } from './Icon';
 
 /** Money rooms: the pot, your stake, and the last payout. Shown above the lobby and the game (nothing in free rooms). */
 export function MoneyBar({ room }: { room: RoomApi }) {
@@ -20,7 +21,7 @@ export function MoneyBar({ room }: { room: RoomApi }) {
   return (
     <div className="space-y-2 rounded-2xl border border-accent/50 bg-accent/10 p-3" aria-live="polite">
       <p className="flex flex-wrap items-center justify-between gap-2 font-semibold">
-        <span>💰 Playing for money: {formatLeones(money.stake)} each</span>
+        <span className="flex items-center gap-1.5"><Icon name="coins" size={18} className="text-accent" />Playing for money: {formatLeones(money.stake)} each</span>
         {money.pot && (
           <span>
             Pot {formatLeones(money.pot.total)}
@@ -29,11 +30,11 @@ export function MoneyBar({ room }: { room: RoomApi }) {
         )}
       </p>
       {last && !playing && (
-        <p className="text-sm">🏆 {last.names.join(' and ')} {last.names.length > 1 ? 'shared the pot' : 'won'}: {formatLeones(last.each)}{last.names.length > 1 ? ' each' : ''}.</p>
+        <p className="flex flex-wrap items-center gap-1.5 text-sm"><Icon name="trophy" size={16} className="text-accent" />{last.names.join(' and ')} {last.names.length > 1 ? 'shared the pot' : 'won'}: {formatLeones(last.each)}{last.names.length > 1 ? ' each' : ''}.</p>
       )}
       {potOpen && !playing && (me?.staked ? (
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span>✅ Your stake is in for the next game ({stakers} {stakers === 1 ? 'player' : 'players'} in).</span>
+          <span className="flex items-center gap-1.5"><Icon name="check" size={16} className="text-success" strokeWidth={2.6} />Your stake is in for the next game ({stakers} {stakers === 1 ? 'player' : 'players'} in).</span>
           <button type="button" className="btn btn-ghost btn-sm" disabled={room.busy} onClick={() => room.unstake()}>Take it back</button>
         </div>
       ) : (

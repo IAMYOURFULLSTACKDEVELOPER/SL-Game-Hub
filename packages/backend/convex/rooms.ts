@@ -9,12 +9,14 @@ import { SPECS, ROOM_GAME_NAMES, moveV, roomGameV, type RoomMove } from './roomG
 import { WALLET_LIMITS, formatLeones } from '@slgh/shared/src/wallet';
 import { requireWalletUser } from './wallet';
 import { currentUser } from './lib';
-import { countGame, gamesLeft, isPro } from './pro';
-import { FREE_DAILY_ONLINE_GAMES } from '@slgh/shared/src/pro';
+import { countGame, roomsLeft, spendRoomAllowance, isPro } from './pro';
+import { FREE_DAILY_ROOMS, ROOM_IDLE_DAYS } from '@slgh/shared/src/pro';
 import { lockPot, openPot, heldEntries, settleShared, stakeIn, unstake, voidPot } from './pots';
 
 // Online rooms for every multiplayer game (see roomGames.ts). Players must be signed in (a free account is
-// fine): each member is tied to their account so free players' daily online games can be counted (pro.ts).
+// fine). Free players can create FREE_DAILY_ROOMS rooms a day (Pro: unlimited); joining and playing are unlimited.
+// Rooms outlive their players: when the last one leaves, the room is reset to its lobby and kept for
+// ROOM_IDLE_DAYS, and everyone who was in it sees it under "Your rooms" (room_visits) to come back to.
 // Each browser also makes a private `secret` and sends it with every call; it proves which seat is theirs.
 // Other players only ever see the public `member_id`, so nobody can act or peek as someone else.
 // The server owns the game: it validates and applies every move, makes every roll and shuffle,
@@ -33,6 +35,8 @@ const STALE_MS = 3 * HEARTBEAT_MS;
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O or 1/I to mix up when reading a code aloud
 const MAX_PENDING_REQUESTS = 20; // per room, so a listed room can't be flooded
 const REQUEST_TTL_MS = 60 * 60_000; // unanswered or answered requests are cleared after an hour
+const ROOM_IDLE_MS = ROOM_IDLE_DAYS * 24 * 60 * 60_000;
+const RECENT_ROOMS = 12; // shown under "Your rooms"
 
 const difficultyV = v.union(v.literal('easy'), v.literal('medium'), v.literal('hard'));
 const tradeSideV = v.object({ spaces: v.array(v.number()), cash: v.number(), jailCards: v.number() });
@@ -113,18 +117,40 @@ async function scheduleBot(ctx: MutationCtx, room: Room) {
 const pendingRequests = (ctx: QueryCtx, roomId: Id<'play_rooms'>) =>
   ctx.db.query('play_requests').withIndex('by_room_id_and_status', (q) => q.eq('room_id', roomId).eq('status', 'pending')).take(MAX_PENDING_REQUESTS);
 
+/** Remember that this player was in the room, for their "Your rooms" list. */
+async function recordVisit(ctx: MutationCtx, userId: Id<'users'> | undefined, roomId: Id<'play_rooms'>) {
+  if (!userId) return;
+  const now = Date.now();
+  const visit = await ctx.db.query('room_visits')
+    .withIndex('by_user_id_and_room_id', (q) => q.eq('user_id', userId).eq('room_id', roomId)).unique();
+  if (visit) await ctx.db.patch(visit._id, { last_at: now });
+  else await ctx.db.insert('room_visits', { user_id: userId, room_id: roomId, last_at: now });
+}
+
+/** Clear a room's join requests and voice messages (it emptied, or is being deleted). */
+async function clearRoomExtras(ctx: MutationCtx, roomId: Id<'play_rooms'>) {
+  const requests = await ctx.db.query('play_requests').withIndex('by_room_id_and_status', (q) => q.eq('room_id', roomId)).take(100);
+  for (const r of requests) await ctx.db.delete(r._id);
+  const signals = await ctx.db.query('voice_signals').withIndex('by_room_id_and_to', (q) => q.eq('room_id', roomId)).take(500);
+  for (const x of signals) await ctx.db.delete(x._id);
+}
+
 /** Someone left: free their seat. Mid-game a bot takes over (or, in races, they drop out) so the others can finish. */
 async function removeMember(ctx: MutationCtx, room: Room, member: Doc<'play_members'>) {
   await ctx.db.delete(member._id);
   if (room.pot_id && member.user_id) await unstake(ctx, room.pot_id, member.user_id, roomLabel(room)); // only while the pot is open
   const rest = await membersOf(ctx, room._id);
   if (rest.length === 0) {
-    if (room.pot_id) await voidPot(ctx, room.pot_id, roomLabel(room)); // nobody left to win: every stake goes back
-    const requests = await ctx.db.query('play_requests').withIndex('by_room_id_and_status', (q) => q.eq('room_id', room._id)).take(100);
-    for (const r of requests) await ctx.db.delete(r._id);
-    const signals = await ctx.db.query('voice_signals').withIndex('by_room_id_and_to', (q) => q.eq('room_id', room._id)).take(500);
-    for (const x of signals) await ctx.db.delete(x._id);
-    await ctx.db.delete(room._id);
+    // Nobody left: keep the room so its players can come back, but reset it to the lobby.
+    let potId = room.pot_id;
+    if (potId) {
+      await voidPot(ctx, potId, roomLabel(room)); // nobody left to win: every stake goes back
+      potId = await openPot(ctx, room.game, room.code, room.stake!); // a fresh pot for whoever comes back
+    }
+    await clearRoomExtras(ctx, room._id);
+    await ctx.db.patch(room._id, {
+      state: undefined, offer: undefined, is_public: false, pot_id: potId, version: room.version + 1, empty_since: Date.now(),
+    });
     return;
   }
   if (member.host) await ctx.db.patch(rest[0]._id, { host: true }); // the longest-waiting player takes over
@@ -172,7 +198,7 @@ export const view = query({
       game: room.game,
       version: room.version,
       isPublic: !!room.is_public,
-      me: me && { id: me.member_id, host: me.host, seat, pro: isPro(meUser), gamesLeft: meUser ? await gamesLeft(ctx, meUser) : null },
+      me: me && { id: me.member_id, host: me.host, seat, pro: isPro(meUser) },
       members: members.map((m) => ({
         id: m.member_id, name: m.name, host: m.host, lastSeen: m.last_seen, voice: !!m.voice, talk: !!m.voice_talk,
         staked: !!m.user_id && staked.has(m.user_id),
@@ -195,8 +221,9 @@ export const create = mutation({
   args: { game: roomGameV, name: v.string(), secret: v.string(), stake: v.optional(v.number()) },
   handler: async (ctx, { game, name, secret, stake }) => {
     checkSecret(secret);
-    let userId: Id<'users'> | undefined = (await currentUser(ctx))?._id;
-    if (!userId) throw new ConvexError('errors.signInRequired');
+    const user = await currentUser(ctx);
+    if (!user) throw new ConvexError('errors.signInRequired');
+    let userId: Id<'users'> = user._id;
     if (stake !== undefined) {
       if (SPECS[game].noMoney) throw new ConvexError('This game can only be played for fun.');
       if (!Number.isInteger(stake) || stake < WALLET_LIMITS.minStake || stake > WALLET_LIMITS.maxStake) {
@@ -204,18 +231,20 @@ export const create = mutation({
       }
       userId = (await requireWalletUser(ctx))._id;
     }
+    await spendRoomAllowance(ctx, user); // free players: FREE_DAILY_ROOMS a day
     let code = '';
     for (let tries = 0; tries < 20 && (!code || await roomByCode(ctx, code)); tries++) {
       code = Array.from({ length: 6 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
     }
     const now = Date.now();
     const potId = stake !== undefined ? await openPot(ctx, game, code, stake) : undefined;
-    const roomId = await ctx.db.insert('play_rooms', { code, game, version: 0, created_at: now, stake, pot_id: potId });
+    const roomId = await ctx.db.insert('play_rooms', { code, game, version: 0, created_at: now, stake, pot_id: potId, owner_id: user._id });
     const memberId = `m${now.toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`;
     await ctx.db.insert('play_members', {
       room_id: roomId, member_id: memberId, secret, name: cleanName(name), host: true, joined_at: now, last_seen: now, user_id: userId,
     });
-    if (potId && userId) await stakeIn(ctx, potId, userId, `${ROOM_GAME_NAMES[game]} room ${code}`);
+    if (potId) await stakeIn(ctx, potId, userId, `${ROOM_GAME_NAMES[game]} room ${code}`);
+    await recordVisit(ctx, userId, roomId);
     return { code, memberId };
   },
 });
@@ -231,6 +260,7 @@ export const join = mutation({
     const now = Date.now();
     if (existing) {
       await ctx.db.patch(existing._id, { name: cleanName(name), last_seen: now });
+      await recordVisit(ctx, existing.user_id, room._id);
       return { code: room.code, memberId: existing.member_id };
     }
     if ((room.state as State | undefined)?.status === 'playing') throw new ConvexError('This game has already started. Ask the host to start a new one, then join.');
@@ -243,10 +273,13 @@ export const join = mutation({
       if (members.some((m) => m.user_id === userId)) throw new ConvexError('You are already in this room on another device.');
     }
     const memberId = `m${now.toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`;
+    // The first one back in an empty room hosts it.
     await ctx.db.insert('play_members', {
-      room_id: room._id, member_id: memberId, secret, name: cleanName(name), host: false, joined_at: now, last_seen: now, user_id: userId,
+      room_id: room._id, member_id: memberId, secret, name: cleanName(name), host: members.length === 0, joined_at: now, last_seen: now, user_id: userId,
     });
+    if (room.empty_since !== undefined) await ctx.db.patch(room._id, { empty_since: undefined });
     if (room.pot_id && userId) await stakeIn(ctx, room.pot_id, userId, roomLabel(room));
+    await recordVisit(ctx, userId, room._id);
     const request = await myRequest(ctx, room._id, secret); // they were let in from Live games: done with it
     if (request) await ctx.db.delete(request._id);
     return { code: room.code, memberId };
@@ -293,6 +326,52 @@ export const unstakeMe = mutation({
   handler: async (ctx, { code, secret }) => {
     const { room, potId, userId } = await requireStaker(ctx, code, secret);
     await unstake(ctx, potId, userId, roomLabel(room));
+  },
+});
+
+// ---------- Your rooms: rooms you created or joined, to come back to ----------
+
+/** The signed-in player's recent rooms (newest first) and how many rooms they can still create today. */
+export const recent = query({
+  args: { game: v.optional(roomGameV) },
+  handler: async (ctx, { game }) => {
+    const me = await currentUser(ctx);
+    if (!me) return null;
+    const visits = await ctx.db.query('room_visits').withIndex('by_user_id_and_last_at', (q) => q.eq('user_id', me._id)).order('desc').take(40);
+    const rooms = [];
+    for (const visit of visits) {
+      if (rooms.length >= RECENT_ROOMS) break;
+      const room = await ctx.db.get(visit.room_id);
+      if (!room || (game && room.game !== game)) continue;
+      const members = await membersOf(ctx, room._id);
+      const s = room.state as State | undefined;
+      rooms.push({
+        id: room._id,
+        code: room.code,
+        game: room.game,
+        mine: room.owner_id === me._id,
+        host: members.find((m) => m.host)?.name ?? null,
+        players: members.length,
+        maxPlayers: SPECS[room.game].max,
+        playing: s?.status === 'playing',
+        stake: room.stake ?? null,
+        lastAt: visit.last_at,
+        expiresAt: room.empty_since !== undefined ? room.empty_since + ROOM_IDLE_MS : null,
+      });
+    }
+    return { rooms, roomsLeft: await roomsLeft(ctx, me), freeDailyRooms: FREE_DAILY_ROOMS };
+  },
+});
+
+/** Take a room off your "Your rooms" list. The room itself stays for anyone else who was in it. */
+export const forgetRecent = mutation({
+  args: { roomId: v.id('play_rooms') },
+  handler: async (ctx, { roomId }) => {
+    const me = await currentUser(ctx);
+    if (!me) return;
+    const visit = await ctx.db.query('room_visits')
+      .withIndex('by_user_id_and_room_id', (q) => q.eq('user_id', me._id).eq('room_id', roomId)).unique();
+    if (visit) await ctx.db.delete(visit._id);
   },
 });
 
@@ -420,21 +499,8 @@ export const start = mutation({
       humans = humans.filter((m) => m.user_id && staked.has(m.user_id));
       if (humans.length < 2) throw new ConvexError('At least 2 players must put their stake in before the game can start.');
     }
-    // Free players get FREE_DAILY_ONLINE_GAMES online games a day; Pro is unlimited.
-    const outOfGames: string[] = [];
-    for (const m of humans) {
-      const u = m.user_id ? await ctx.db.get(m.user_id) : null;
-      if (u && !isPro(u) && (await gamesLeft(ctx, u)) === 0) outOfGames.push(m.member_id);
-    }
-    if (outOfGames.length) {
-      const names = humans.filter((m) => outOfGames.includes(m.member_id)).map((m) => m.name).join(', ');
-      // Money rooms can't leave anyone out: their stake is already in the pot.
-      if (room.pot_id) throw new ConvexError(`${names} ${outOfGames.length === 1 ? 'has' : 'have'} played today's ${FREE_DAILY_ONLINE_GAMES} free games. Go Pro to keep playing, or take your stake back.`);
-      humans = humans.filter((m) => !outOfGames.includes(m.member_id)); // they watch this game instead
-    }
     const botCount = spec.bots && !room.pot_id ? Math.max(0, Math.min(Math.floor(bots), spec.max - humans.length)) : 0;
     if (humans.length + botCount < 2) {
-      if (outOfGames.length) throw new ConvexError(`Not enough players: some have used today's ${FREE_DAILY_ONLINE_GAMES} free games. Add a bot, or go Pro for unlimited games.`);
       throw new ConvexError(spec.bots ? 'Add a bot or wait for a friend: you need at least 2 players.' : 'Wait for a friend: you need at least 2 players.');
     }
     const players: Player[] = [
@@ -601,5 +667,19 @@ export const sweep = internalMutation({
     for (const r of oldRequests) await ctx.db.delete(r._id);
     const oldSignals = await ctx.db.query('voice_signals').withIndex('by_created_at', (q) => q.lt('created_at', Date.now() - 2 * 60_000)).take(500);
     for (const x of oldSignals) await ctx.db.delete(x._id);
+    // Rooms nobody has been in for ROOM_IDLE_DAYS are deleted (gt(0) skips rooms with people in them).
+    const idle = await ctx.db.query('play_rooms')
+      .withIndex('by_empty_since', (q) => q.gt('empty_since', 0).lt('empty_since', Date.now() - ROOM_IDLE_MS)).take(50);
+    for (const room of idle) await deleteRoom(ctx, room);
   },
 });
+
+/** Delete an empty room for good: its pot (no stakes are left in it), extras and everyone's "Your rooms" entry. */
+async function deleteRoom(ctx: MutationCtx, room: Room) {
+  if ((await membersOf(ctx, room._id)).length) return; // someone came back
+  if (room.pot_id) await voidPot(ctx, room.pot_id, roomLabel(room));
+  await clearRoomExtras(ctx, room._id);
+  const visits = await ctx.db.query('room_visits').withIndex('by_room_id', (q) => q.eq('room_id', room._id)).take(500);
+  for (const x of visits) await ctx.db.delete(x._id);
+  await ctx.db.delete(room._id);
+}

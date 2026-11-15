@@ -10,6 +10,7 @@ import { sfx } from '@/lib/sound';
 import type { GameVariant } from '@slgh/shared';
 import { Icon } from './Icon';
 import { VariantPicker } from './VariantPicker';
+import { RecentRooms, RoomsLeft } from './RecentRooms';
 
 type Difficulty = 'easy' | 'medium' | 'hard';
 
@@ -61,7 +62,9 @@ export function RoomLobby({ room, title, maxSeats, timer = false, bots: allowBot
   const [forMoney, setForMoney] = useState(false);
   const [stakeInput, setStakeInput] = useState('5');
   const canPlayForMoney = room.game !== 'snake';
-  const account = useQuery(api.users.me); // online play needs an account (free is fine): daily games are counted per player
+  const account = useQuery(api.users.me); // online play needs an account (free is fine): free players make 10 rooms a day
+  const recent = useQuery(api.rooms.recent, account && !room.joined ? { game: room.game } : 'skip');
+  const outOfRooms = recent?.roomsLeft === 0;
   const wallet = useQuery(api.wallet.summary, canPlayForMoney && account ? {} : 'skip');
   // The "List in Live games" box flips at once; the server's answer then takes over.
   const [listedNow, setListedNow] = useState<boolean | null>(null);
@@ -94,19 +97,22 @@ export function RoomLobby({ room, title, maxSeats, timer = false, bots: allowBot
         {account === null && (
           <p className="rounded-2xl border border-primary/30 bg-primary/5 p-3 text-sm">
             <Link href={`/login?next=${encodeURIComponent(typeof window === 'undefined' ? '/games' : location.pathname + location.search)}`} className="font-semibold text-secondary">Sign in</Link>
-            {' '}or <Link href="/signup" className="font-semibold text-secondary">create a free account</Link> to play online. Free accounts get 10 online games a day; games against bots on this device are unlimited.
+            {' '}or <Link href="/signup" className="font-semibold text-secondary">create a free account</Link> to play online. Free accounts can make 10 rooms a day and come back to them any time; games against bots on this device are unlimited.
           </p>
         )}
         {errorBox}
         {linked ? (
           <div className="card space-y-3 p-4">
-            <p className="font-semibold">You were invited to {title} room <span className="font-mono tracking-widest">{linked}</span> ({humans} {humans === 1 ? 'player' : 'players'} waiting).</p>
+            <p className="font-semibold">
+              {recent?.rooms.some((r) => r.code === linked) ? 'Welcome back to' : 'You were invited to'} {title} room <span className="font-mono tracking-widest">{linked}</span>{' '}
+              ({humans === 0 ? 'nobody is in it yet' : `${humans} ${humans === 1 ? 'player' : 'players'} waiting`}).
+            </p>
             {money && (moneyBlock === 'signin' ? (
-              <p className="text-sm">💰 This room is played for money. <Link href={`/login?next=${encodeURIComponent(typeof window === 'undefined' ? '/games' : `${location.pathname}?room=${linked}`)}`} className="font-semibold text-primary underline">Sign in</Link> to join.</p>
+              <p className="text-sm"><Icon name="coins" size={16} className="mr-1 inline-block align-[-3px] text-accent" />This room is played for money. <Link href={`/login?next=${encodeURIComponent(typeof window === 'undefined' ? '/games' : `${location.pathname}?room=${linked}`)}`} className="font-semibold text-primary underline">Sign in</Link> to join.</p>
             ) : moneyBlock === 'age' ? (
-              <p className="text-sm text-muted">💰 This room is played for money, which is only for players aged 18 and over.</p>
+              <p className="text-sm text-muted"><Icon name="coins" size={16} className="mr-1 inline-block align-[-3px]" />This room is played for money, which is only for players aged 18 and over.</p>
             ) : (
-              <p className="text-sm">💰 Played for money: joining puts <b>{formatLeones(money.stake)}</b> from your wallet into the pot (you have {wallet ? formatLeones(wallet.balance) : '…'}).</p>
+              <p className="text-sm"><Icon name="coins" size={16} className="mr-1 inline-block align-[-3px] text-accent" />Played for money: joining puts <b>{formatLeones(money.stake)}</b> from your wallet into the pot (you have {wallet ? formatLeones(wallet.balance) : '…'}).</p>
             ))}
             <div className="flex flex-wrap gap-2">
               <button className="btn btn-primary flex-1" disabled={!nameOk || room.busy || (!!money && !!moneyBlock)} onClick={() => {
@@ -117,6 +123,11 @@ export function RoomLobby({ room, title, maxSeats, timer = false, bots: allowBot
             </div>
           </div>
         ) : (
+          <>
+          <RecentRooms data={recent} now={now} disabled={!nameOk || room.busy} onRejoin={(r) => {
+            if (r.stake !== null && !confirm(`Rejoin and put ${formatLeones(r.stake)} into the pot? The winner takes the pot; leaving mid-game forfeits your stake.`)) return;
+            room.join(r.code, name.trim());
+          }} />
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="card flex flex-col p-4">
               <p className="flex items-center gap-2 text-base font-bold text-heading"><span className="icon-badge icon-badge-blue h-8 w-8"><Icon name="plus" size={16} /></span>Start a room</p>
@@ -126,7 +137,7 @@ export function RoomLobby({ room, title, maxSeats, timer = false, bots: allowBot
                   <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Play for">
                     {([false, true] as const).map((m) => (
                       <button key={String(m)} type="button" role="radio" aria-checked={forMoney === m} onClick={() => setForMoney(m)}
-                        className={`btn btn-sm ${forMoney === m ? 'btn-primary' : 'btn-secondary'}`}>{m ? '💰 For money' : '🎉 Free'}</button>
+                        className={`btn btn-sm ${forMoney === m ? 'btn-primary' : 'btn-secondary'}`}><Icon name={m ? 'coins' : 'party'} size={16} />{m ? 'For money' : 'Free'}</button>
                     ))}
                   </div>
                   {forMoney && (moneyBlock === 'signin' ? (
@@ -142,7 +153,8 @@ export function RoomLobby({ room, title, maxSeats, timer = false, bots: allowBot
                   ))}
                 </div>
               )}
-              <button className="btn btn-primary mt-auto w-full" disabled={!nameOk || room.busy || (forMoney && !!moneyBlock)} onClick={() => {
+              <div className="mb-3"><RoomsLeft data={recent} /></div>
+              <button className="btn btn-primary mt-auto w-full" disabled={!nameOk || room.busy || outOfRooms || (forMoney && !!moneyBlock)} onClick={() => {
                 if (!forMoney) { room.create(name.trim()); return; }
                 const stake = parseLeones(stakeInput);
                 if (stake === null || stake < WALLET_LIMITS.minStake) { room.setError(`Enter a stake of at least ${formatLeones(WALLET_LIMITS.minStake)}.`); return; }
@@ -160,6 +172,7 @@ export function RoomLobby({ room, title, maxSeats, timer = false, bots: allowBot
               </div>
             </form>
           </div>
+          </>
         )}
         {!nameOk && <p className="hint">Enter your name first.</p>}
       </div>
@@ -202,7 +215,7 @@ export function RoomLobby({ room, title, maxSeats, timer = false, bots: allowBot
               <li key={m.id} className="pop-in flex items-center gap-3 rounded-md p-2 transition-colors hover:bg-hover" style={{ ['--i' as string]: i }}>
                 <span className="user-avatar text-sm font-bold text-heading">{m.name[0]?.toUpperCase()}<span className="status-dot" style={online ? undefined : { background: 'rgb(var(--c-muted))' }} /></span>
                 <span className="min-w-0 flex-1 truncate font-semibold">{m.name}{m.id === me.id ? ' (you)' : ''}</span>
-                {m.host && <span className="chip chip-accent" title="Host">👑 Host</span>}
+                {m.host && <span className="chip chip-accent" title="Host"><Icon name="crown" size={12} />Host</span>}
                 <span className="sr-only">{online ? 'Online' : 'Reconnecting'}</span>
               </li>
             );

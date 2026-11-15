@@ -107,7 +107,7 @@ export const sendPayout = internalAction({
     if (!w || w.status !== 'processing' || w.monime_id) return;
     try {
       const p = await monime<Payout>('POST', '/v1/payouts', {
-        amount: { currency: CURRENCY, value: w.amount },
+        amount: { currency: CURRENCY, value: w.amount - (w.fee ?? 0) }, // the withdrawal fee stays with the hub
         destination: { type: 'momo', providerId: w.provider, phoneNumber: w.phone },
         metadata: { withdrawal_id: withdrawalId },
         ...(source() ? { source: { financialAccountId: source() } } : {}),
@@ -118,8 +118,11 @@ export const sendPayout = internalAction({
       }
     } catch (e) {
       const err = e instanceof MonimeError ? e : new MonimeError(0, String(e));
-      console.error(`withdrawal ${withdrawalId}:`, err.message);
-      await ctx.runMutation(internal.wallet.payoutError, { withdrawalId, error: err.message.slice(0, 300), definitive: err.definitive });
+      console.error(`withdrawal ${withdrawalId}:`, err.message); // technical detail stays in the server logs
+      await ctx.runMutation(internal.wallet.payoutError, {
+        withdrawalId, definitive: err.definitive,
+        error: err.definitive ? 'The transfer was refused, so the money went back to the player.' : 'The transfer could not be sent yet. Try again in a few minutes.',
+      });
     }
   },
 });

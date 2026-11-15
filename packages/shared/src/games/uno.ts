@@ -71,7 +71,7 @@ export const UNO_MANIFEST: GameManifest = {
   id: 'uno',
   name: 'UNO',
   description: 'Match colours and numbers, use action cards to outsmart your opponents.',
-  thumbnail: '🃏',
+  thumbnail: '', // built-ins are drawn by the app (GameGlyph)
   minPlayers: 2,
   maxPlayers: 4,
   modes: ['single', 'multi'],

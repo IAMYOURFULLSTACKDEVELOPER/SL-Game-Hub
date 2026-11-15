@@ -2,6 +2,7 @@ import { api, query } from '@/lib/convex';
 import { requireUser } from '@/lib/session';
 import { purchaseCosmetic, equipCosmetic, claimDailyBonus } from '@/app/actions';
 import { PageHeader } from '@/components/PageHeader';
+import { Icon } from '@/components/Icon';
 
 export default async function ShopPage() {
   await requireUser();
@@ -20,8 +21,8 @@ export default async function ShopPage() {
             <h2 className="text-2xl font-bold">Your Balance</h2>
             <p className="text-muted">Earn coins by playing games, winning tournaments, and completing achievements</p>
           </div>
-          <div className="text-4xl font-bold text-accent">
-            🪙 {balance}
+          <div className="flex items-center gap-2 text-4xl font-bold text-accent">
+            <Icon name="coins" size={34} />{balance}
           </div>
         </div>
       </div>
@@ -90,7 +91,7 @@ export default async function ShopPage() {
                 uc.is_equipped ? 'bg-secondary/10 border-secondary/30 ring-2 ring-secondary' : 'bg-bg/60'
               }`}
             >
-              <span className="text-5xl block mb-2">{uc.cosmetics.icon}</span>
+              <span className="icon-badge mx-auto mb-2 h-14 w-14"><Icon name="sparkles" size={28} /></span>
               <h3 className="font-bold">{uc.cosmetics.name}</h3>
               <p className="text-xs text-muted capitalize">{uc.cosmetics.type}</p>
               {uc.is_equipped && (
@@ -112,7 +113,7 @@ function CosmeticCard({ cosmetic, owned, equipped }: { cosmetic: any; owned: boo
       'bg-bg/60'
     }`}>
       <div className="text-center mb-3">
-        <span className="text-5xl block mb-2">{cosmetic.icon}</span>
+        <span className="icon-badge mx-auto mb-2 h-14 w-14"><Icon name="sparkles" size={28} /></span>
         <h3 className="font-bold">{cosmetic.name}</h3>
         {cosmetic.description && (
           <p className="text-sm text-muted">{cosmetic.description}</p>
@@ -129,7 +130,7 @@ function CosmeticCard({ cosmetic, owned, equipped }: { cosmetic: any; owned: boo
           {cosmetic.rarity}
         </span>
         {!owned && (
-          <span className="font-bold text-yellow-600">🪙 {cosmetic.price_coins}</span>
+          <span className="inline-flex items-center gap-1 font-bold text-accent"><Icon name="coins" size={16} />{cosmetic.price_coins}</span>
         )}
       </div>
 

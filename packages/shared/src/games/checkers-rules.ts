@@ -21,7 +21,7 @@ export const CHECKERS_RULES: RuleSection[] = [
     'Men capture forwards only; kings capture forwards and backwards.',
   ] },
   { title: 'Kings', rules: [
-    'When a man reaches the far row (the opponent’s back row) it is crowned a king (shown with a ♛ crown).',
+    'When a man reaches the far row (the opponent’s back row) it is crowned a king (shown with a crown).',
     'A king moves and captures diagonally both forwards and backwards, one square at a time.',
     'A man that is crowned during a jump ends its turn there.',
   ] },

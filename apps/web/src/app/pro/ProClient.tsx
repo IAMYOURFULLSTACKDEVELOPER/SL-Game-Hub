@@ -9,6 +9,7 @@ import { PRO_PERKS, PRO_DAYS } from '@slgh/shared/src/pro';
 import { formatLeones, ussdHref } from '@slgh/shared/src/wallet';
 import { playerMessage } from '@slgh/shared/src/errors';
 import { PageHeader } from '@/components/PageHeader';
+import { Icon } from '@/components/Icon';
 import { sfx } from '@/lib/sound';
 
 const day = (ms: number) => new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -42,14 +43,14 @@ export default function ProClient() {
       <section className="card space-y-2 p-5">
         {s.pro ? (
           <>
-            <p className="text-xl font-bold">⭐ You're Pro until {day(s.proUntil!)}</p>
+            <p className="flex items-center gap-2 text-xl font-bold"><span className="icon-badge icon-badge-gold h-8 w-8"><Icon name="star" size={16} /></span>You're Pro until {day(s.proUntil!)}</p>
             <p className="text-muted">{daysLeft} {daysLeft === 1 ? 'day' : 'days'} left. Paying again adds {PRO_DAYS} more days on top.</p>
           </>
         ) : (
           <>
             <p className="text-xl font-bold">You're on the free plan</p>
             <p className="text-muted">
-              {s.gamesLeft} of {s.freeDailyGames} free online games left today. Games against bots on this device are always unlimited.
+              You can make {s.roomsLeft} more of your {s.freeDailyRooms} free online rooms today. Rejoining your rooms and playing in them is always unlimited, and so are games against bots.
             </p>
           </>
         )}
@@ -58,7 +59,7 @@ export default function ProClient() {
       <section className="card p-5">
         <h2 className="mb-3 text-xl font-bold">What you get</h2>
         <ul className="space-y-2">
-          {PRO_PERKS.map((p) => <li key={p} className="flex gap-2"><span aria-hidden>✅</span>{p}</li>)}
+          {PRO_PERKS.map((p) => <li key={p} className="flex gap-2"><Icon name="check" size={18} className="mt-0.5 text-success" strokeWidth={2.6} />{p}</li>)}
         </ul>
       </section>
 
@@ -78,10 +79,10 @@ export default function ProClient() {
 
         {pending?.status === 'pending' && pending.ussd_code ? (
           <div className="space-y-3 rounded-2xl border border-primary/40 p-4">
-            <p className="text-sm text-muted">Dial this code on the phone with your mobile money account to pay {formatLeones(pending.charge)} ({price} plus Monime's fee):</p>
+            <p className="text-sm text-muted">Dial this code on the phone with your mobile money account to pay {formatLeones(pending.charge)} ({price} plus a small mobile money fee):</p>
             <p className="font-mono text-3xl font-extrabold tracking-wider">{pending.ussd_code}</p>
             <div className="flex flex-wrap gap-2">
-              <a href={ussdHref(pending.ussd_code)} className="btn btn-primary btn-sm">📞 Dial now</a>
+              <a href={ussdHref(pending.ussd_code)} className="btn btn-primary btn-sm"><Icon name="phone" size={16} />Dial now</a>
               <button className="btn btn-outline btn-sm" disabled={busy} onClick={() => void run(async () => {
                 const st = await refresh({ id: pending.id as Id<'deposits'> });
                 if (st === 'pending' || st === 'processing') setNote({ ok: false, text: 'Not paid yet. It can take a minute after you approve on your phone.' });
@@ -94,7 +95,7 @@ export default function ProClient() {
           <p className="text-muted">Getting your USSD code…</p>
         ) : s.ussdAvailable ? (
           <button className={`btn w-full ${s.canUseWallet ? 'btn-outline' : 'btn-primary'}`} disabled={busy} onClick={() => void run(() => buyUssd({}))}>
-            Pay {formatLeones(s.ussdCharge)} with mobile money (USSD, includes Monime's fee)
+            Pay {formatLeones(s.ussdCharge)} with mobile money (USSD, includes a small mobile money fee)
           </button>
         ) : !s.canUseWallet && (
           <p className="text-muted">Paying by mobile money isn't switched on yet. Check back soon.</p>

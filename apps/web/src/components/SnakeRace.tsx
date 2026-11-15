@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { SnakeEngine, createPlayer, type SnakeState, type SnakeMove } from '@slgh/shared';
 import { RoomLobby, JoinRequests } from './RoomLobby';
 import { VoiceChat } from './VoiceChat';
-import { ProBar } from './ProBar';
 import { ConvexRoomProvider } from './ConvexRoomProvider';
 import { Icon } from './Icon';
 import { SnakeBoard, SnakePad, useSnakeKeys } from './SnakeBoard';
@@ -56,7 +55,6 @@ function OnlineSnake() {
   return (
     <div className="space-y-4">
       <VoiceChat room={room} />
-      <ProBar room={room} />
       {room.joined && v && state && <Race key={`${v.code}:${state.createdAt}`} race={`${v.code}:${state.createdAt}`} state={state} seat={v.me?.seat ?? -1} room={room} />}
       {playing && <JoinRequests room={room} />}
       {room.error && playing && <p role="alert" className="flash rounded-xl border border-danger/40 bg-danger/10 p-3 text-sm font-semibold text-danger">{room.error}</p>}
@@ -207,7 +205,7 @@ function Race({ race, state, seat, room }: { race: string; state: RaceState; sea
             {!alive && (
               <div className="absolute inset-0 grid place-items-center bg-black/60 p-4 text-center text-white">
                 <div>
-                  <p className="text-5xl" aria-hidden>💥</p>
+                  <span className="mx-auto mb-1 inline-grid h-14 w-14 place-items-center rounded-full bg-danger text-white"><Icon name="boom" size={30} /></span>
                   <p className="font-display text-2xl font-bold">Crashed with {myScore} points</p>
                   <p className="mt-1 text-sm">{stillIn > 0 ? `Watching the others: ${stillIn} still racing.` : 'Waiting for the result…'}</p>
                 </div>
@@ -232,7 +230,7 @@ function Race({ race, state, seat, room }: { race: string; state: RaceState; sea
       {/* the result */}
       {finished && (
         <div className="flash space-y-1 rounded-3xl border border-accent/40 bg-accent/10 p-5 text-center">
-          <p className="text-4xl" aria-hidden>{state.winner !== null && state.winner === seat ? '🏆' : '🐍'}</p>
+          <span className={`icon-badge mx-auto h-14 w-14 ${state.winner !== null && state.winner === seat ? 'icon-badge-gold' : ''}`}><Icon name={state.winner !== null && state.winner === seat ? 'trophy' : 'snake'} size={28} /></span>
           <h2>{state.winner === null ? 'It’s a tie!' : state.winner === seat ? 'You win!' : `${nameOf(state.winner)} wins!`}</h2>
           <p className="text-muted">
             {state.winner === null ? `Joint top score: ${Math.max(0, ...state.scores)} points.` : `${state.scores[state.winner] ?? 0} points.`}
@@ -252,7 +250,7 @@ function Race({ race, state, seat, room }: { race: string; state: RaceState; sea
                 <span className="w-4 shrink-0 text-center text-sm font-bold text-muted">{rank + 1}</span>
                 <span className="avatar-ring h-8 w-8 shrink-0 font-display text-sm font-bold">{nameOf(i)[0]?.toUpperCase()}</span>
                 <span className={`min-w-0 flex-1 truncate font-semibold ${out && playing ? 'text-muted' : ''}`}>
-                  {nameOf(i)}{i === seat ? ' (you)' : ''}{finished && state.winner === i ? ' 🏆' : ''}
+                  {nameOf(i)}{i === seat ? ' (you)' : ''}{finished && state.winner === i ? <span title="Winner" className="inline-flex align-[-2px] text-accent"><Icon name="trophy" size={14} /><span className="sr-only"> (winner)</span></span> : ''}
                 </span>
                 {playing && <span className={`chip ${out ? 'chip-muted' : 'chip-primary'}`}>{out ? 'Crashed' : 'Racing'}</span>}
                 <span className="w-12 shrink-0 text-right font-display text-lg font-bold tabular-nums">{state.scores[i] ?? 0}</span>

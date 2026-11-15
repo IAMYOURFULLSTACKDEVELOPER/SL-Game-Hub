@@ -50,7 +50,7 @@ export default function GamePreviewPage({ params }: { params: { slug: string } }
         onGetPlayerInfo: () => ({
           id: 'preview-admin',
           username: 'Preview User',
-          avatar: '🎮',
+          avatar: 'av_lion',
         }),
         onSaveData: async (data) => {
           addLog(`Data saved: ${data.key}`);

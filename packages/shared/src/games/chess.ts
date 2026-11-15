@@ -50,7 +50,7 @@ export const CHESS_MANIFEST: GameManifest = {
   id: 'chess',
   name: 'Chess',
   description: 'The classic game of kings. Capture the opponent\'s king to win.',
-  thumbnail: '♔',
+  thumbnail: '', // built-ins are drawn by the app (GameGlyph)
   minPlayers: 2,
   maxPlayers: 2,
   modes: ['single', 'multi'],

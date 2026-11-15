@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
-import { formatLeones, parseLeones, normalizeSlPhone, displaySlPhone, ussdHref, splitPot, withMonimeFee } from './wallet';
+import { formatLeones, parseLeones, normalizeSlPhone, displaySlPhone, ussdHref, splitPot, withMonimeFee, withdrawalFee, minWithdrawalFor } from './wallet';
 import { verifyMonimeSignature } from './monime-signature';
 
 test('formats leones from minor units', () => {
@@ -72,4 +72,16 @@ test('adds the Monime fee on top so the hub receives the full amount', () => {
       assert.ok(charge - amount * (1 + f) <= (amount * f * f) / (1 - f) + 1, `${amount}@${bps}: barely more than adding the fee on top`);
     }
   }
+});
+
+test('withdrawal fee: 5% on the free plan, 2% with Pro', () => {
+  assert.equal(withdrawalFee(10_000, false), 500); // SLE 100 -> SLE 5 fee, the player receives SLE 95
+  assert.equal(withdrawalFee(10_000, true), 200); // Pro: SLE 2 fee, receives SLE 98
+  assert.equal(withdrawalFee(1_000, false), 50);
+  assert.equal(withdrawalFee(1_001, true), 21, 'rounded up to the cent');
+});
+
+test('smallest withdrawal: SLE 60 on the free plan, SLE 20 with Pro', () => {
+  assert.equal(minWithdrawalFor(false), 6_000);
+  assert.equal(minWithdrawalFor(true), 2_000);
 });

@@ -6,6 +6,7 @@ import { playerMessage } from '@slgh/shared/src/errors';
 import { api } from '@slgh/backend/convex/_generated/api';
 import type { Id } from '@slgh/backend/convex/_generated/dataModel';
 import { PageHeader } from '@/components/PageHeader';
+import { Avatar } from '@/components/Avatar';
 
 type Room = { id: Id<'chat_rooms'>; name: string; description: string | null };
 
@@ -79,7 +80,7 @@ export default function ChatClient() {
                 ) : (
                   messages.map((msg) => (
                     <div key={msg.id} className="flex items-start gap-3">
-                      <span className="text-2xl">{msg.profiles.avatar}</span>
+                      <Avatar id={msg.profiles.avatar} size={36} />
                       <div className="flex-1">
                         <div className="flex items-baseline gap-2">
                           <span className="font-medium">{msg.profiles.username}</span>

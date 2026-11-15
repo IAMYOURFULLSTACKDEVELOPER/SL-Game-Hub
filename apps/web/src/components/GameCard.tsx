@@ -42,7 +42,7 @@ export function GameCard({ g, i = 0, variant = 'grid' }: { g: GameRow; i?: numbe
         {img
           // eslint-disable-next-line @next/next/no-img-element
           ? <img src={img} alt="" width={480} height={270} loading="lazy" decoding="async" className="h-full w-full object-cover" />
-          : <span aria-hidden className="grid h-full place-items-center text-6xl">{g.icon}</span>}
+          : <span aria-hidden className="grid h-full place-items-center"><GameGlyph slug={g.slug} name={g.name} size={72} /></span>}
         {!g.coming_soon && <span className="game-play" aria-hidden><Icon name="play" size={18} /></span>}
       </div>
       {variant === 'list' && <span className="m-3 hidden max-sm:block"><GameGlyph slug={g.slug} name={g.name} size={48} /></span>}

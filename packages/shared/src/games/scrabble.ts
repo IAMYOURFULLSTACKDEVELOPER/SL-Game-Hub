@@ -61,7 +61,7 @@ export const SCRABBLE_MANIFEST: GameManifest = {
   id: 'scrabble',
   name: 'Scrabble',
   description: 'Build words on the 15 × 15 board, use premium squares and score big. 2-4 players or play against bots.',
-  thumbnail: '🔠',
+  thumbnail: '', // built-ins are drawn by the app (GameGlyph)
   minPlayers: 2,
   maxPlayers: 4,
   modes: ['single', 'multi'],

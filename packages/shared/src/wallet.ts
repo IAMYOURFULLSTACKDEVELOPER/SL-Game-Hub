@@ -9,7 +9,7 @@ export const WALLET_LIMITS = {
   maxDeposit: 500_000, //      SLE 5,000 per USSD code
   minStake: 100, //            SLE 1
   maxStake: 100_000, //        SLE 1,000
-  minWithdrawal: 1_000, //     SLE 10
+  minWithdrawal: 6_000, //     SLE 60 on the free plan (Pro: see minWithdrawalFor)
   maxWithdrawal: 500_000, //   SLE 5,000
   maxPendingDeposits: 3,
 } as const;
@@ -51,6 +51,16 @@ export const displaySlPhone = (msisdn: string) =>
 
 /** A tel: link that opens the phone dialer with a USSD code (the # must be escaped). */
 export const ussdHref = (code: string) => `tel:${code.replace(/#/g, '%23')}`;
+
+/** Smallest withdrawal: SLE 60 on the free plan, SLE 20 with Pro. */
+export const PRO_MIN_WITHDRAWAL = 2_000;
+export const minWithdrawalFor = (pro: boolean) => (pro ? PRO_MIN_WITHDRAWAL : WALLET_LIMITS.minWithdrawal);
+
+/** Fee on withdrawals to mobile money, in basis points: 5% on the free plan, 2% with Pro. */
+export const WITHDRAWAL_FEE_BPS = { free: 500, pro: 200 } as const;
+/** The withdrawal fee for `amount` (rounded up to the cent). The player receives `amount - fee`. */
+export const withdrawalFee = (amount: number, pro: boolean) =>
+  Math.ceil((amount * (pro ? WITHDRAWAL_FEE_BPS.pro : WITHDRAWAL_FEE_BPS.free)) / 10_000);
 
 /** Monime keeps this share of every payment it collects (basis points: 100 = 1%). */
 export const MONIME_FEE_BPS_DEFAULT = 100;

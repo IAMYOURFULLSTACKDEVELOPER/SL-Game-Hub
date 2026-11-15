@@ -2,7 +2,7 @@ import { requireUser } from '@/lib/session';
 import { ConvexIsland } from '@/components/ConvexIsland';
 import ProClient from './ProClient';
 
-export const metadata = { title: 'Pro', description: 'SL Game Hub Pro: unlimited online games, team groups and voice chat.' };
+export const metadata = { title: 'Pro', description: 'SL Game Hub Pro: unlimited online rooms, team groups and voice chat.' };
 
 export default async function ProPage() {
   await requireUser();

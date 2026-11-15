@@ -23,7 +23,7 @@ export const DICE_MANIFEST: GameManifest = {
   id: 'dice',
   name: 'Dice',
   description: 'Roll two dice and race to the target score. Doubles score double, snake eyes cost 10 points.',
-  thumbnail: '🎲',
+  thumbnail: '', // built-ins are drawn by the app (GameGlyph)
   minPlayers: 2,
   maxPlayers: 8,
   modes: ['single', 'multi'],

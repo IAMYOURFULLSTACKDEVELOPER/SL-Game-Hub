@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '@slgh/backend/convex/_generated/api';
 import type { Id } from '@slgh/backend/convex/_generated/dataModel';
-import { avatarEmoji } from '@slgh/shared/src/avatars';
+import { Avatar } from '@/components/Avatar';
 import { playerMessage } from '@slgh/shared/src/errors';
 
 const when = (ms: number) => new Date(ms).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -95,7 +95,7 @@ export default function GroupClient({ id }: { id: string }) {
         <ul className="grid gap-2 sm:grid-cols-2">
           {g.members.map((m) => (
             <li key={m.userId} className="flex items-center gap-2 rounded-xl border border-border p-2">
-              <span aria-hidden className="text-xl">{avatarEmoji(m.avatar)}</span>
+              <Avatar id={m.avatar} size={32} />
               <span className="min-w-0 flex-1 truncate font-semibold">{m.username}</span>
               {m.role === 'owner' ? <span className="chip chip-muted">Owner</span> : g.isOwner && (
                 <button type="button" className="btn btn-ghost btn-sm text-danger" disabled={busy}

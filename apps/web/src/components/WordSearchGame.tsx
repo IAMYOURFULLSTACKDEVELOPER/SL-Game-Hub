@@ -9,10 +9,10 @@ import {
 import Rulebook from './Rulebook';
 import { RoomLobby, JoinRequests } from './RoomLobby';
 import { VoiceChat } from './VoiceChat';
-import { ProBar } from './ProBar';
 import { MoneyBar } from './MoneyBar';
 import { ConvexRoomProvider } from './ConvexRoomProvider';
 import { Icon } from './Icon';
+import { GameGlyph } from './GameGlyph';
 import { useRoom } from '@/lib/useRoom';
 import { sfx } from '@/lib/sound';
 import { useEndSfx } from '@/lib/useGameSfx';
@@ -121,7 +121,7 @@ function LocalWordSearch({ onBack, tabs }: { onBack: () => void; tabs: ReactNode
   useEffect(() => {
     if (game?.status === 'playing' && game.timeLimitSec && elapsed >= game.timeLimitSec) {
       setGame(engine.expire(game));
-      setMessage('⏰ Time is up!');
+      setMessage('Time is up!');
     }
   }, [elapsed, game]);
 
@@ -156,10 +156,10 @@ function LocalWordSearch({ onBack, tabs }: { onBack: () => void; tabs: ReactNode
       if (next.status !== 'finished') sfx(r.word ? 'success' : 'error');
       if (r.word) {
         setMessage(next.status === 'finished'
-          ? `🎉 ${g.players.length > 1 ? `${who} found ${r.word}. ` : ''}Puzzle complete! +${r.points}`
-          : `✅ ${g.players.length > 1 ? `${who}: ` : ''}${r.word} +${r.points}`);
+          ? `${g.players.length > 1 ? `${who} found ${r.word}. ` : ''}Puzzle complete! +${r.points}`
+          : `${g.players.length > 1 ? `${who}: ` : ''}${r.word} +${r.points}`);
       } else {
-        setMessage(g.players.length > 1 ? `❌ Not a hidden word. ${next.players[next.currentPlayerIndex].name}'s turn.` : '❌ Not a hidden word — try again.');
+        setMessage(g.players.length > 1 ? `Not a hidden word. ${next.players[next.currentPlayerIndex].name}'s turn.` : 'Not a hidden word — try again.');
       }
       return next;
     });
@@ -186,7 +186,7 @@ function LocalWordSearch({ onBack, tabs }: { onBack: () => void; tabs: ReactNode
     if (!game) return;
     const next = engine.useHint(game);
     setGame(next);
-    if (next.hint) setMessage(`💡 ${next.hint.word} starts at the flashing letter (-25).`);
+    if (next.hint) setMessage(`Hint: ${next.hint.word} starts at the flashing letter (-25).`);
   };
 
   const resize = (n: number) => setSeats((s) => Array.from({ length: n }, (_, i) => s[i] ?? { name: `Player ${i + 1}`, ai: i > 0 }));
@@ -231,7 +231,7 @@ function LocalWordSearch({ onBack, tabs }: { onBack: () => void; tabs: ReactNode
 
         {saved && <button onClick={() => begin(saved.state, { elapsed: saved.elapsed, daily: saved.daily })} className="btn btn-outline w-full">Resume saved game (Board {saved.state.boardNumber ?? 'Custom'})</button>}
 
-        <button onClick={startDaily} className="btn btn-primary w-full">📅 Daily Challenge — {today.key} (Board {today.board}, {WORD_SEARCH_LEVELS[getWordSearchBoard(today.board).difficulty].label})</button>
+        <button onClick={startDaily} className="btn btn-primary w-full"><Icon name="calendar" size={18} />Daily Challenge — {today.key} (Board {today.board}, {WORD_SEARCH_LEVELS[getWordSearchBoard(today.board).difficulty].label})</button>
 
         <section className="space-y-3">
           <h2>Choose a board (1-{WORD_SEARCH_BOARD_COUNT})</h2>
@@ -254,7 +254,7 @@ function LocalWordSearch({ onBack, tabs }: { onBack: () => void; tabs: ReactNode
             {boards.map((b) => (
               <button key={b.number} onClick={() => setBoardNo(b.number)} title={`${b.theme} — ${b.bank.length} words`}
                 className={`rounded border-2 px-1 py-1 text-xs font-bold ${boardNo === b.number ? 'border-primary bg-primary text-onPrimary' : 'border-border'}`}>
-                {b.number}{bests[b.number] ? ' ★' : ''}
+                {b.number}{bests[b.number] ? <Icon name="star" size={10} className="ml-0.5 inline-block align-[-1px] text-accent" /> : ''}
               </button>
             ))}
           </div>
@@ -268,7 +268,7 @@ function LocalWordSearch({ onBack, tabs }: { onBack: () => void; tabs: ReactNode
         </section>
 
         <details className="rounded-lg border-2 border-border p-3">
-          <summary className="cursor-pointer font-bold">✏️ Custom puzzle</summary>
+          <summary className="flex cursor-pointer items-center gap-2 font-bold"><Icon name="pencil" size={16} />Custom puzzle</summary>
           <div className="mt-2 space-y-2">
             <textarea value={customText} onChange={(e) => setCustomText(e.target.value)} rows={3} className="input min-h-[80px] py-2"
               placeholder="Type your words separated by spaces or commas, e.g. APPLE BANANA ORANGE MANGO GRAPES" />
@@ -295,8 +295,8 @@ function LocalWordSearch({ onBack, tabs }: { onBack: () => void; tabs: ReactNode
   const scores = game.boardNumber ? readJSON<ScoreEntry[]>(`word_search_scores_${game.boardNumber}`, []).slice(0, 5) : [];
   const winnerText = game.status === 'finished'
     ? multi
-      ? game.winner === null ? 'It’s a tie!' : `🏆 ${game.players[game.winner].name} wins!`
-      : game.timedOut ? `Time’s up — you found ${found} of ${game.words.length}.` : `🎉 Completed in ${fmt(elapsed)}!`
+      ? game.winner === null ? 'It’s a tie!' : `${game.players[game.winner].name} wins!`
+      : game.timedOut ? `Time’s up — you found ${found} of ${game.words.length}.` : `Completed in ${fmt(elapsed)}!`
     : '';
 
   return (
@@ -307,8 +307,8 @@ function LocalWordSearch({ onBack, tabs }: { onBack: () => void; tabs: ReactNode
           <p className="text-sm text-muted">{level.label} ({level.tagline}) · {game.gridSize} × {game.gridSize}</p>
         </div>
         <div className="flex items-center gap-4 text-lg font-bold">
-          <span aria-label="Timer" className={remaining !== null && remaining <= 30 ? 'text-red-600' : ''}>⏱ {remaining !== null ? fmt(remaining) : fmt(elapsed)}</span>
-          <span aria-label="Score">⭐ {multi ? game.scores[game.currentPlayerIndex] : game.scores[0]}</span>
+          <span aria-label="Timer" className={remaining !== null && remaining <= 30 ? 'text-red-600' : ''}><Icon name="clock" size={16} className="mr-1 inline-block align-[-3px]" />{remaining !== null ? fmt(remaining) : fmt(elapsed)}</span>
+          <span aria-label="Score"><Icon name="star" size={16} className="mr-1 inline-block align-[-3px] text-accent" />{multi ? game.scores[game.currentPlayerIndex] : game.scores[0]}</span>
         </div>
       </header>
 
@@ -319,7 +319,7 @@ function LocalWordSearch({ onBack, tabs }: { onBack: () => void; tabs: ReactNode
             {game.words.map((w) => (
               <li key={w.word} className={`rounded px-2 py-0.5 text-sm font-bold ${w.found ? 'line-through opacity-60' : ''}`}
                 style={w.found ? { background: `${COLORS[w.foundBy ?? 0]}33` } : undefined}>
-                {paused ? '•••' : w.word}{w.hinted && !w.found ? ' 💡' : ''}
+                {paused ? '•••' : w.word}{w.hinted && !w.found ? <Icon name="bulb" size={13} className="ml-0.5 inline-block align-[-2px] text-accent" /> : ''}
               </li>
             ))}
           </ul>
@@ -337,7 +337,7 @@ function LocalWordSearch({ onBack, tabs }: { onBack: () => void; tabs: ReactNode
               <ul className="space-y-1">
                 {game.players.map((p, i) => (
                   <li key={p.id} className={`flex items-center justify-between rounded px-1 font-bold ${i === game.currentPlayerIndex && game.status === 'playing' ? 'ring-2 ring-primary' : ''}`}>
-                    <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-full" style={{ background: COLORS[i] }} />{p.name}{p.isAI ? ' 🤖' : ''}</span>
+                    <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-full" style={{ background: COLORS[i] }} />{p.name}{p.isAI ? <span title="Bot" className="inline-flex align-[-2px] text-muted"><Icon name="robot" size={14} /><span className="sr-only"> (bot)</span></span> : ''}</span>
                     <span>{game.scores[i]} · {game.wordsFoundBy[i]}w</span>
                   </li>
                 ))}
@@ -352,13 +352,13 @@ function LocalWordSearch({ onBack, tabs }: { onBack: () => void; tabs: ReactNode
               </dl>
             )}
           </div>
-          <button onClick={hint} disabled={game.status !== 'playing' || paused || botTurn} className="btn btn-outline btn-sm w-full disabled:opacity-50">💡 Hint (-25)</button>
+          <button onClick={hint} disabled={game.status !== 'playing' || paused || botTurn} className="btn btn-outline btn-sm w-full disabled:opacity-50"><Icon name="bulb" size={16} />Hint (-25)</button>
           {multi && game.status === 'playing' && !current.isAI && (
             <button onClick={() => { const n = engine.passTurn(game); setGame(n); setMessage(`${n.players[n.currentPlayerIndex].name}'s turn.`); }} className="btn btn-outline btn-sm w-full">Pass turn</button>
           )}
           {scores.length > 0 && (
             <div className="rounded-lg border-2 border-border p-2">
-              <h2 className="mb-1 text-base">🏆 Leaderboard</h2>
+              <h2 className="mb-1 flex items-center gap-1.5 text-base"><Icon name="trophy" size={16} className="text-accent" />Leaderboard</h2>
               <ol className="ml-4 list-decimal">
                 {scores.map((s, i) => <li key={i}>{s.name} — {s.score} ({fmt(s.time)})</li>)}
               </ol>
@@ -368,12 +368,12 @@ function LocalWordSearch({ onBack, tabs }: { onBack: () => void; tabs: ReactNode
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <button onClick={() => setPaused((p) => !p)} disabled={game.status !== 'playing'} className="btn btn-outline flex-1 disabled:opacity-50">{paused ? '▶ Resume' : '⏸ Pause'}</button>
-        <button onClick={() => (game.boardNumber ? startBoard(game.boardNumber, undefined, null) : startCustom())} className="btn btn-outline flex-1">🔄 New round</button>
+        <button onClick={() => setPaused((p) => !p)} disabled={game.status !== 'playing'} className="btn btn-outline flex-1 disabled:opacity-50">{paused ? <><Icon name="play" size={14} />Resume</> : <><Icon name="pause" size={14} />Pause</>}</button>
+        <button onClick={() => (game.boardNumber ? startBoard(game.boardNumber, undefined, null) : startCustom())} className="btn btn-outline flex-1"><Icon name="refresh" size={16} />New round</button>
         {game.boardNumber && game.boardNumber < WORD_SEARCH_BOARD_COUNT && game.status === 'finished' && (
           <button onClick={() => { setBoardNo(game.boardNumber! + 1); startBoard(game.boardNumber! + 1); }} className="btn btn-primary flex-1">Next board ▶</button>
         )}
-        <button onClick={() => { setGame(null); setSaved(game.status === 'playing' ? { state: game, elapsed, daily } : null); }} className="btn btn-outline flex-1">✖ Quit</button>
+        <button onClick={() => { setGame(null); setSaved(game.status === 'playing' ? { state: game, elapsed, daily } : null); }} className="btn btn-outline flex-1"><Icon name="close" size={16} />Quit</button>
       </div>
       <Rulebook title="Word Search Rulebook" sections={WORD_SEARCH_RULES} />
     </Shell>
@@ -399,7 +399,6 @@ function OnlineWordSearch() {
     <div className="space-y-4">
       <VoiceChat room={room} />
       <MoneyBar room={room} />
-      <ProBar room={room} />
       {room.joined && v && state && (
         <WordRace key={`${v.code}:${state.createdAt}`} state={state} seat={v.me?.seat ?? -1}
           onSelect={(start, end) => { void room.move({ type: 'select', start, end }); }} />
@@ -436,11 +435,11 @@ function WordRace({ state, seat, onSelect }: { state: WordSearchState; seat: num
     const mine = r.playerIndex === seat;
     if (r.word) {
       setFlash({ cells: r.positions, ok: true });
-      setNews({ text: mine ? `✅ You found ${r.word}! +${r.points}` : `${state.players[r.playerIndex]?.name ?? 'Someone'} found ${r.word} +${r.points}`, who: r.playerIndex });
+      setNews({ text: mine ? `You found ${r.word}! +${r.points}` : `${state.players[r.playerIndex]?.name ?? 'Someone'} found ${r.word} +${r.points}`, who: r.playerIndex });
       if (state.status === 'playing') sfx(mine ? 'success' : 'pop');
     } else if (mine) {
       setFlash({ cells: r.positions, ok: false });
-      setNews({ text: '❌ Not a hidden word. Keep looking!', who: -1 });
+      setNews({ text: 'Not a hidden word. Keep looking!', who: -1 });
       sfx('error');
     }
   }, [state.selections, state.lastResult, state.status, state.players, seat]);
@@ -479,7 +478,7 @@ function WordRace({ state, seat, onSelect }: { state: WordSearchState; seat: num
 
       {finished && (
         <div className="flash space-y-1 rounded-3xl border border-accent/40 bg-accent/10 p-5 text-center">
-          <p className="text-4xl" aria-hidden>{state.winner !== null && state.winner === seat ? '🏆' : '🔤'}</p>
+          <span className={`icon-badge mx-auto h-14 w-14 ${state.winner !== null && state.winner === seat ? 'icon-badge-gold' : ''}`}><Icon name={state.winner !== null && state.winner === seat ? 'trophy' : 'flag'} size={28} /></span>
           <h2>{state.winner === null ? 'It’s a tie!' : state.winner === seat ? 'You win!' : `${nameOf(state.winner)} wins!`}</h2>
           <p className="text-muted">
             All {state.words.length} words found.
@@ -509,7 +508,7 @@ function WordRace({ state, seat, onSelect }: { state: WordSearchState; seat: num
               <li key={state.players[i].id} className={`flex items-center justify-between gap-2 rounded px-1 font-bold ${i === seat ? 'ring-2 ring-primary' : ''}`}>
                 <span className="flex min-w-0 items-center gap-1">
                   <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />
-                  <span className="truncate">{nameOf(i)}{i === seat ? ' (you)' : ''}{finished && state.winner === i ? ' 🏆' : ''}</span>
+                  <span className="truncate">{nameOf(i)}{i === seat ? ' (you)' : ''}{finished && state.winner === i ? <span title="Winner" className="inline-flex align-[-2px] text-accent"><Icon name="trophy" size={14} /><span className="sr-only"> (winner)</span></span> : ''}</span>
                 </span>
                 <span className="shrink-0 tabular-nums">{state.scores[i] ?? 0} · {state.wordsFoundBy[i] ?? 0}w</span>
               </li>
@@ -605,7 +604,7 @@ function Grid({ game, paused, flash, disabled, onSelect }: {
           );
         })}
       </div>
-      {paused && <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/60 text-2xl font-bold text-white">⏸ Paused</div>}
+      {paused && <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/60 gap-2 text-2xl font-bold text-white"><Icon name="pause" size={24} />Paused</div>}
     </div>
   );
 }
@@ -615,7 +614,7 @@ function Shell({ onBack, children, wide = false }: { onBack: () => void; childre
     <main className={`mx-auto space-y-3 px-2 py-3 sm:space-y-4 sm:p-4 ${wide ? 'max-w-5xl' : 'max-w-2xl'}`}>
       <button onClick={onBack} className="back-link">← Back to Word Search</button>
       <div className="card space-y-4 p-3 sm:p-5">
-        <h1>🔤 Word Search</h1>
+        <h1 className="flex items-center gap-3"><GameGlyph slug="word-search" name={'Word Search'} size={36} />Word Search</h1>
         {children}
       </div>
     </main>

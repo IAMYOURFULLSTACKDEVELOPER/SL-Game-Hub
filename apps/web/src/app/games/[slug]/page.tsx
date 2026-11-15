@@ -55,7 +55,7 @@ export default async function GameDetail({ params }: { params: { slug: string } 
           {img
             // eslint-disable-next-line @next/next/no-img-element
             ? <img src={img} alt="" width={960} height={410} decoding="async" className="h-full w-full object-cover" />
-            : <span aria-hidden className="grid h-full place-items-center text-8xl">{g.icon}</span>}
+            : <span aria-hidden className="grid h-full place-items-center"><GameGlyph slug={g.slug} name={g.name} size={120} /></span>}
         </div>
         <div className="relative px-5 pb-5">
           <div className="-mt-10 flex flex-wrap items-end justify-between gap-3">

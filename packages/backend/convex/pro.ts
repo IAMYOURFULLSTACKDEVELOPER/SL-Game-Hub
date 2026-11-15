@@ -3,14 +3,15 @@ import { query, mutation } from './_generated/server';
 import type { MutationCtx, QueryCtx } from './_generated/server';
 import type { Doc, Id } from './_generated/dataModel';
 import { internal } from './_generated/api';
-import { PRO_PRICE, FREE_DAILY_ONLINE_GAMES, isProActive, extendPro, dayKey } from '@slgh/shared/src/pro';
+import { PRO_PRICE, FREE_DAILY_ROOMS, isProActive, extendPro, dayKey } from '@slgh/shared/src/pro';
 import { formatLeones } from '@slgh/shared/src/wallet';
 import { currentUser, requireActiveUser } from './lib';
 import { chargeFor, monimeConfigured, post, requireWalletUser } from './wallet';
 
 // SL Game Hub Pro: SLE 10 for 30 days, paid from the wallet (players aged 18+) or by a Monime USSD
 // code (anyone, e.g. a parent pays). Paying again adds 30 more days; nothing renews by itself.
-// Pro gives unlimited online games (free players get 10 a day), creating groups, and talking in voice chat.
+// Pro gives unlimited online rooms (free players create 10 a day; joining and playing are unlimited for everyone),
+// creating groups, and talking in voice chat.
 
 export const isPro = (u: Pick<Doc<'users'>, 'pro_until'> | null | undefined) => isProActive(u?.pro_until);
 
@@ -26,13 +27,26 @@ export async function grantPro(ctx: MutationCtx, userId: Id<'users'>, method: 'w
 const playsRow = (ctx: QueryCtx, userId: Id<'users'>, day = dayKey()) =>
   ctx.db.query('daily_plays').withIndex('by_user_day', (q) => q.eq('user_id', userId).eq('day', day)).unique();
 
-/** Free online games left today for a player (null = unlimited, i.e. Pro). */
-export async function gamesLeft(ctx: QueryCtx, user: Doc<'users'>) {
+/** Online rooms a player can still create today (null = unlimited, i.e. Pro). */
+export async function roomsLeft(ctx: QueryCtx, user: Doc<'users'>) {
   if (isPro(user)) return null;
-  return Math.max(0, FREE_DAILY_ONLINE_GAMES - ((await playsRow(ctx, user._id))?.count ?? 0));
+  return Math.max(0, FREE_DAILY_ROOMS - ((await playsRow(ctx, user._id))?.rooms ?? 0));
 }
 
-/** Counts one online game for each player (Pro players aren't counted). */
+/** Uses one of today's free rooms, or explains the limit. Pro players aren't counted. */
+export async function spendRoomAllowance(ctx: MutationCtx, user: Doc<'users'>) {
+  if (isPro(user)) return;
+  const day = dayKey();
+  const row = await playsRow(ctx, user._id, day);
+  const used = row?.rooms ?? 0;
+  if (used >= FREE_DAILY_ROOMS) {
+    throw new ConvexError(`You've made today's ${FREE_DAILY_ROOMS} free rooms. Rejoin one of your recent rooms, or go Pro to make as many as you like.`);
+  }
+  if (row) await ctx.db.patch(row._id, { rooms: used + 1 });
+  else await ctx.db.insert('daily_plays', { user_id: user._id, day, count: 0, rooms: 1 });
+}
+
+/** Counts one online game for each free player, for the admin stats (Pro players aren't counted). */
 export async function countGame(ctx: MutationCtx, userIds: Id<'users'>[]) {
   const day = dayKey();
   for (const id of new Set(userIds)) {
@@ -44,7 +58,7 @@ export async function countGame(ctx: MutationCtx, userIds: Id<'users'>[]) {
   }
 }
 
-/** Everything the Pro page and the "games left" notices need. */
+/** Everything the Pro page and the "rooms left" notices need. */
 export const status = query({
   args: {},
   handler: async (ctx) => {
@@ -56,8 +70,8 @@ export const status = query({
     return {
       pro: isPro(me),
       proUntil: me.pro_until ?? null,
-      gamesLeft: await gamesLeft(ctx, me),
-      freeDailyGames: FREE_DAILY_ONLINE_GAMES,
+      roomsLeft: await roomsLeft(ctx, me),
+      freeDailyRooms: FREE_DAILY_ROOMS,
       price: PRO_PRICE,
       canUseWallet: me.age_band === '18_plus' && !me.banned,
       walletBalance: wallet?.balance ?? 0,

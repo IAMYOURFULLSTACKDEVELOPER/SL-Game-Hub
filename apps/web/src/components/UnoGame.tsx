@@ -9,10 +9,10 @@ import { VariantPicker, variantName } from './VariantPicker';
 import Rulebook from './Rulebook';
 import { RoomLobby, JoinRequests } from './RoomLobby';
 import { VoiceChat } from './VoiceChat';
-import { ProBar } from './ProBar';
 import { MoneyBar } from './MoneyBar';
 import { ConvexRoomProvider } from './ConvexRoomProvider';
 import { Icon } from './Icon';
+import { GameGlyph } from './GameGlyph';
 import { Portal } from './Portal';
 import { useRoom } from '@/lib/useRoom';
 import { sfx } from '@/lib/sound';
@@ -164,7 +164,6 @@ function OnlineUno() {
     <div className="space-y-4">
       <VoiceChat room={room} />
       <MoneyBar room={room} />
-      <ProBar room={room} />
       {room.joined && state && <UnoTable view={state} busy={room.busy} onMove={(m) => { room.move(m); }} />}
       {playing && <JoinRequests room={room} />}
       {room.error && playing && <p role="alert" className="flash rounded-xl border border-danger/40 bg-danger/10 p-3 text-sm font-semibold text-danger">{room.error}</p>}
@@ -283,7 +282,7 @@ function UnoTable({ view: v, onMove, busy = false }: { view: UnoView; onMove: (m
           {v.hand.length === 2 && v.playable.length > 0 && (
             <button type="button" aria-pressed={unoArmed} onClick={() => { setUnoArmed((a) => !a); sfx(unoArmed ? 'toggleOff' : 'toggleOn'); }}
               className={`uno-call ${unoArmed ? 'is-armed' : ''}`}>
-              {unoArmed ? 'UNO! ✓' : 'Call UNO!'}
+              {unoArmed ? <>UNO! <Icon name="check" size={16} strokeWidth={2.8} /></> : 'Call UNO!'}
             </button>
           )}
         </div>
@@ -314,7 +313,7 @@ function UnoTable({ view: v, onMove, busy = false }: { view: UnoView; onMove: (m
       {/* results */}
       {over && (
         <div className="flash space-y-3 rounded-3xl border border-accent/40 bg-accent/10 p-5 text-center">
-          <p className="text-4xl" aria-hidden>{v.seat >= 0 && v.winner === v.seat ? '🏆' : '🃏'}</p>
+          <span className={`icon-badge mx-auto h-14 w-14 ${v.seat >= 0 && v.winner === v.seat ? 'icon-badge-gold' : ''}`}><Icon name={v.seat >= 0 && v.winner === v.seat ? 'trophy' : 'flag'} size={28} /></span>
           <h2>{v.seat >= 0 && v.winner === v.seat ? 'You win!' : `${v.players[v.winner!].name} wins!`}</h2>
           <p className="text-muted">{v.scores?.[v.winner!] ?? 0} points from the cards left in other hands.</p>
           {v.revealed && (
@@ -517,7 +516,7 @@ function Shell({ onBack, children }: { onBack: () => void; children: ReactNode }
     <main className="mx-auto max-w-3xl space-y-3 px-2 py-3 sm:space-y-4 sm:p-4">
       <button onClick={onBack} className="back-link">← Back to UNO</button>
       <div className="card space-y-4 p-3 sm:p-5">
-        <h1>🃏 UNO</h1>
+        <h1 className="flex items-center gap-3"><GameGlyph slug="uno" name={'UNO'} size={36} />UNO</h1>
         {children}
       </div>
     </main>

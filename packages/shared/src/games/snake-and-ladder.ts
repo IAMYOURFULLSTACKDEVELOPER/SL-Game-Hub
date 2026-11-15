@@ -52,7 +52,7 @@ export const SNAKE_AND_LADDER_MANIFEST: GameManifest = {
   id: 'snake-and-ladder',
   name: 'Snake & Ladder',
   description: 'Roll the dice and race to square 100.',
-  thumbnail: '🎲',
+  thumbnail: '', // built-ins are drawn by the app (GameGlyph)
   minPlayers: 2,
   maxPlayers: 6,
   modes: ['single', 'multi'],

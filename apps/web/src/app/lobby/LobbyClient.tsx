@@ -7,22 +7,24 @@ import { api } from '@slgh/backend/convex/_generated/api';
 import { ConvexRoomProvider } from '@/components/ConvexRoomProvider';
 import { PageHeader } from '@/components/PageHeader';
 import { Icon } from '@/components/Icon';
+import { GameGlyph } from '@/components/GameGlyph';
 import { errorText, mySecret, savedName, type RoomGame } from '@/lib/useRoom';
 import { sfx } from '@/lib/sound';
 import { formatLeones } from '@slgh/shared/src/wallet';
+import { RecentRooms, RoomsLeft } from '@/components/RecentRooms';
 
 // Live games: every online room whose host chose to list it. Players ask to join; the host
 // says yes or no from their room, and a yes hands this browser the room link. No account needed.
 
-const GAMES: Record<RoomGame, { name: string; icon: string; href: string }> = {
-  uno: { name: 'UNO', icon: '🃏', href: '/games/uno/play' },
-  'salone-poly': { name: 'Salone-Poly', icon: '🏝️', href: '/games/salone-poly/play' },
-  chess: { name: 'Chess', icon: '♟️', href: '/games/chess/play' },
-  checkers: { name: 'Checkers', icon: '🔴', href: '/games/checkers/play' },
-  'snake-and-ladder': { name: 'Snake & Ladder', icon: '🎲', href: '/games/snake-and-ladder/play' },
-  scrabble: { name: 'Scrabble', icon: '🔠', href: '/games/scrabble/play' },
-  'word-search': { name: 'Word Search', icon: '🔤', href: '/games/word-search/play' },
-  snake: { name: 'Snake', icon: '🐍', href: '/games/snake/play' },
+const GAMES: Record<RoomGame, { name: string; href: string }> = {
+  uno: { name: 'UNO', href: '/games/uno/play' },
+  'salone-poly': { name: 'Salone-Poly', href: '/games/salone-poly/play' },
+  chess: { name: 'Chess', href: '/games/chess/play' },
+  checkers: { name: 'Checkers', href: '/games/checkers/play' },
+  'snake-and-ladder': { name: 'Snake & Ladder', href: '/games/snake-and-ladder/play' },
+  scrabble: { name: 'Scrabble', href: '/games/scrabble/play' },
+  'word-search': { name: 'Word Search', href: '/games/word-search/play' },
+  snake: { name: 'Snake', href: '/games/snake/play' },
 };
 const ASKED_KEY = 'slgh-asked-rooms';
 const NAME_KEY = 'slgh-player-name';
@@ -42,6 +44,9 @@ type Listed = { id: string; game: RoomGame; host: string; players: number; maxPl
 
 function Lobby() {
   const rooms = useQuery(api.rooms.publicList) as Listed[] | undefined;
+  const mine = useQuery(api.rooms.recent, {}); // null when signed out
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 30_000); return () => clearInterval(t); }, []);
   const [secret, setSecret] = useState('');
   const [name, setName] = useState('');
   const [filter, setFilter] = useState<RoomGame | 'all'>('all');
@@ -59,6 +64,13 @@ function Lobby() {
     <main className="mx-auto max-w-3xl space-y-5 p-4">
       <PageHeader icon="globe" tone="blue" title="Live games" subtitle="Open online games. Ask to join one and the host lets you in." />
 
+      {!!mine?.rooms.length && (
+        <div className="space-y-2">
+          <RecentRooms data={mine} now={now} showGame />
+          <div className="px-1"><RoomsLeft data={mine} /></div>
+        </div>
+      )}
+
       <div className="card space-y-3 p-4">
         <div>
           <label className="label" htmlFor="lobby-name">Your name</label>
@@ -69,7 +81,7 @@ function Lobby() {
           {(['all', ...(Object.keys(GAMES) as RoomGame[])] as const).map((f) => (
             <button key={f} role="radio" aria-checked={filter === f} onClick={() => setFilter(f)}
               className={`btn btn-sm ${filter === f ? 'btn-primary' : 'btn-outline'}`}>
-              {f === 'all' ? 'All games' : `${GAMES[f].icon} ${GAMES[f].name}`}
+              {f === 'all' ? 'All games' : <><GameGlyph slug={f} name={GAMES[f].name} size={18} className="rounded-md" />{GAMES[f].name}</>}
             </button>
           ))}
         </div>
@@ -79,12 +91,12 @@ function Lobby() {
         <p className="py-8 text-center text-muted"><span className="loading-dots">Looking for games</span></p>
       ) : shown.length === 0 ? (
         <div className="card space-y-3 p-6 text-center">
-          <p className="text-4xl" aria-hidden>🎲</p>
+          <span className="icon-badge icon-badge-blue mx-auto h-14 w-14"><Icon name="dice" size={28} /></span>
           <p className="font-semibold">No open games right now.</p>
           <p className="text-muted">Start one and list it here: open a game, choose <b>Online</b>, create a room and tick <b>List in Live games</b>.</p>
           <div className="flex flex-wrap justify-center gap-2">
             {(Object.keys(GAMES) as RoomGame[]).map((g) => (
-              <Link key={g} href={`${GAMES[g].href}?online=1`} className="btn btn-outline">{GAMES[g].icon} {GAMES[g].name}</Link>
+              <Link key={g} href={`${GAMES[g].href}?online=1`} className="btn btn-outline"><GameGlyph slug={g} name={GAMES[g].name} size={20} className="rounded-md" />{GAMES[g].name}</Link>
             ))}
           </div>
         </div>
@@ -129,11 +141,11 @@ function RoomCard({ room: r, index, secret, name, asked, onAsked }: {
   return (
     <li className="card pop-in space-y-3 p-4" style={{ ['--i' as string]: index }}>
       <div className="flex items-center gap-3">
-        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-2xl" aria-hidden>{g.icon}</span>
+        <GameGlyph slug={r.game} name={g.name} size={48} className="rounded-[30%]" />
         <div className="min-w-0 flex-1">
           <p className="font-display text-lg font-bold">{g.name}</p>
           <p className="truncate text-sm text-muted">Hosted by {r.host}</p>
-          {r.stake !== null && <p className="text-sm font-semibold">💰 {formatLeones(r.stake)} stake · winner takes the pot</p>}
+          {r.stake !== null && <p className="flex items-center gap-1.5 text-sm font-semibold"><Icon name="coins" size={16} className="text-accent" />{formatLeones(r.stake)} stake · winner takes the pot</p>}
         </div>
         <div className="text-right text-sm">
           <span className={`chip ${r.playing ? 'chip-accent' : 'chip-muted'}`}>{r.playing ? 'Playing' : 'Waiting'}</span>
@@ -143,7 +155,7 @@ function RoomCard({ room: r, index, secret, name, asked, onAsked }: {
 
       {approved ? (
         <div className="flex flex-wrap items-center gap-2 rounded-xl bg-primary/10 p-3">
-          <span className="flex-1 font-semibold">🎉 {r.host} let you in!{r.playing && ' You can join when the current game ends.'}</span>
+          <span className="flex flex-1 items-center gap-1.5 font-semibold"><Icon name="party" size={18} className="text-accent" />{r.host} let you in!{r.playing && ' You can join when the current game ends.'}</span>
           <Link href={`${g.href}?room=${status!.code}`} className="btn btn-primary btn-sm" onClick={() => onAsked(false)}>Join now</Link>
         </div>
       ) : status?.status === 'pending' ? (

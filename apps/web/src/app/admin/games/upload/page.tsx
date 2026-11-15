@@ -256,7 +256,7 @@ export default function GameUploadPage() {
               </div>
             )}
             {validation.valid && validation.errors.length === 0 && (
-              <p className="text-green-700 font-medium">✓ Validation passed</p>
+              <p className="text-green-700 font-medium">Validation passed</p>
             )}
           </div>
         )}

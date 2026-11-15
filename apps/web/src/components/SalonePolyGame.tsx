@@ -10,10 +10,10 @@ import Rulebook from './Rulebook';
 import DiceTray from './DiceTray';
 import { RoomLobby, JoinRequests } from './RoomLobby';
 import { VoiceChat } from './VoiceChat';
-import { ProBar } from './ProBar';
 import { MoneyBar } from './MoneyBar';
 import { ConvexRoomProvider } from './ConvexRoomProvider';
-import { Icon } from './Icon';
+import { Icon, type IconName } from './Icon';
+import { GameGlyph } from './GameGlyph';
 import { Portal } from './Portal';
 import { useRoom } from '@/lib/useRoom';
 import { sfx } from '@/lib/sound';
@@ -40,7 +40,7 @@ const CELL: [number, number][] = (() => {
 const SIDE = (i: number) => (i < 10 ? 'bottom' : i < 20 ? 'left' : i < 30 ? 'top' : 'right');
 const UNITS = 1.6 * 2 + 9;
 const centre = (k: number) => ((k === 0 ? 0.8 : k === 10 ? UNITS - 0.8 : 1.6 + (k - 1) + 0.5) / UNITS) * 100;
-const ICON: Record<number, string> = { 2: '🪙', 17: '🪙', 33: '🪙', 7: '❓', 22: '❓', 36: '❓', 4: '🧾', 38: '🧺', 5: '⛴️', 15: '🚐', 25: '✈️', 35: '🚢', 12: '⚡', 28: '💧' };
+const ICON: Record<number, IconName> = { 2: 'coins', 17: 'coins', 33: 'coins', 7: 'help', 22: 'help', 36: 'help', 4: 'receipt', 38: 'basket', 5: 'ship', 15: 'bus', 25: 'plane', 35: 'ship', 12: 'bolt', 28: 'drop' };
 
 type Mode = 'bots' | 'pass' | 'online';
 
@@ -203,12 +203,11 @@ function OnlinePoly() {
     <div className="space-y-4">
       <VoiceChat room={room} />
       <MoneyBar room={room} />
-      <ProBar room={room} />
       {room.joined && s && (
         <PolyTable s={s} me={me} busy={room.busy} onMove={(m) => { room.move(m as Parameters<typeof room.move>[0]); }} onTrade={trade}
           banner={offer && s.status === 'playing' && (offer.to === me ? (
             <div className="flash space-y-2 rounded-2xl border border-accent/50 bg-accent/10 p-3">
-              <p className="font-semibold">🤝 {s.players[offer.from].name} offers you a trade</p>
+              <p className="flex items-center gap-1.5 font-semibold"><Icon name="handshake" size={18} className="text-accent" />{s.players[offer.from].name} offers you a trade</p>
               <p className="whitespace-pre-line text-sm">{describeTrade(offer.give, offer.get, s.players[offer.from].name, 'you')}</p>
               <div className="flex gap-2">
                 <button className="btn btn-primary btn-sm flex-1" onClick={() => room.respondTrade(true)}>Accept</button>
@@ -253,7 +252,7 @@ function PolyTable({ s, me, onMove, onTrade, busy = false, banner }: {
   const debt = s.phase === 'debt' && s.debts.length ? s.debts[0] : null;
   const name = (i: number) => (i === me ? 'You' : s.players[i].name);
   const status = over
-    ? s.winner !== null ? `🏆 ${s.players[s.winner].name} wins Salone-Poly!` : 'Game over: a tie on net worth.'
+    ? s.winner !== null ? `${s.players[s.winner].name} wins Salone-Poly!` : 'Game over: a tie on net worth.'
     : s.phase === 'auction' && s.auction ? `Auction for ${SALONE_POLY_BOARD[s.auction.space].name}: ${s.auction.highBidder !== null ? `${leones(s.auction.highBid)} by ${name(s.auction.highBidder)}` : 'no bids yet'}`
       : s.phase === 'debt' && debt ? `${name(debt.debtor)} ${debt.debtor === me ? 'owe' : 'owes'} ${leones(debt.amount)} ${debt.creditor !== null ? `to ${name(debt.creditor)}` : 'to the bank'}`
         : s.phase === 'buy' && pending ? `${name(s.currentPlayerIndex)} landed on ${pending.name}`
@@ -271,7 +270,7 @@ function PolyTable({ s, me, onMove, onTrade, busy = false, banner }: {
             size={28} height={64} duration={0.95} tilt={22} />
           {s.lastCard && (
             <div key={`${s.lastCard.text}-${rolls}`} className={`poly-card ${s.lastCard.deck === 'luck' ? 'is-luck' : 'is-osusu'}`}>
-              <span className="font-display font-bold">{s.lastCard.deck === 'luck' ? '❓ Luck' : '🪙 Osusu'}</span>
+              <span className="flex items-center gap-1.5 font-display font-bold"><Icon name={s.lastCard.deck === 'luck' ? 'help' : 'coins'} size={16} />{s.lastCard.deck === 'luck' ? 'Luck' : 'Osusu'}</span>
               <span>{s.lastCard.text}</span>
             </div>
           )}
@@ -285,7 +284,7 @@ function PolyTable({ s, me, onMove, onTrade, busy = false, banner }: {
       {mine && !over && (
         <div className="flash flex flex-wrap justify-center gap-2">
           {(s.phase === 'roll' || s.phase === 'jail') && can({ type: 'roll' }) && (
-            <button className="btn btn-primary btn-lg" onClick={() => onMove({ type: 'roll' })}>🎲 {s.phase === 'jail' ? 'Roll for a double' : 'Roll the dice'}</button>
+            <button className="btn btn-primary btn-lg" onClick={() => onMove({ type: 'roll' })}><Icon name="dice" size={20} />{s.phase === 'jail' ? 'Roll for a double' : 'Roll the dice'}</button>
           )}
           {s.phase === 'jail' && can({ type: 'pay_jail' }) && <button className="btn btn-outline" onClick={() => onMove({ type: 'pay_jail' })}>Pay {leones(SALONE_POLY.jailFine)} fine</button>}
           {s.phase === 'jail' && can({ type: 'use_jail_card' }) && <button className="btn btn-outline" onClick={() => onMove({ type: 'use_jail_card' })}>Use bail card</button>}
@@ -306,7 +305,7 @@ function PolyTable({ s, me, onMove, onTrade, busy = false, banner }: {
           )}
           {s.phase === 'end' && <button className="btn btn-primary btn-lg" onClick={() => onMove({ type: 'end_turn' })}>End turn</button>}
           {(s.phase === 'end' || s.phase === 'roll' || s.phase === 'jail' || s.phase === 'debt') && s.players.some((_, i) => i !== me && !s.bankrupt[i]) && (
-            <button className="btn btn-outline" onClick={() => setTrading(true)}>🤝 Trade</button>
+            <button className="btn btn-outline" onClick={() => setTrading(true)}><Icon name="handshake" size={18} />Trade</button>
           )}
         </div>
       )}
@@ -316,7 +315,7 @@ function PolyTable({ s, me, onMove, onTrade, busy = false, banner }: {
 
       {over && (
         <div className="flash space-y-2 rounded-3xl border border-accent/40 bg-accent/10 p-5 text-center">
-          <p className="text-4xl" aria-hidden>{me >= 0 && s.winner === me ? '🏆' : '🏝️'}</p>
+          <span className={`icon-badge mx-auto h-14 w-14 ${me >= 0 && s.winner === me ? 'icon-badge-gold' : ''}`}><Icon name={me >= 0 && s.winner === me ? 'trophy' : 'flag'} size={28} /></span>
           <h2>{s.winner !== null ? (s.winner === me ? 'You win!' : `${s.players[s.winner].name} wins!`) : 'Game over'}</h2>
           <ul className="text-sm">
             {s.players.map((p, i) => <li key={p.id}>{p.name}: {leones(s.netWorths?.[i] ?? netWorth(s, i))}{s.bankrupt[i] ? ' (bankrupt)' : ''}</li>)}
@@ -335,7 +334,7 @@ function PolyTable({ s, me, onMove, onTrade, busy = false, banner }: {
       {trading && me >= 0 && (
         <TradeSheet s={s} me={me} onClose={() => setTrading(false)} onPropose={async (m) => {
           const r = await onTrade(m);
-          setNote(r === 'accepted' ? '🤝 Trade done!' : r === 'declined' ? `${s.players[m.with].name} said no.` : r === 'pending' ? `Offer sent to ${s.players[m.with].name}.` : null);
+          setNote(r === 'accepted' ? 'Trade done!' : r === 'declined' ? `${s.players[m.with].name} said no.` : r === 'pending' ? `Offer sent to ${s.players[m.with].name}.` : null);
           if (r === 'accepted') sfx('success'); else if (r === 'declined') sfx('error');
           setTimeout(() => setNote(null), 3500);
           setTrading(false);
@@ -383,7 +382,7 @@ function Tile({ sp, s, onTap, selected }: { sp: BoardSpace; s: SalonePolyState; 
       </span>}
       {corner ? <CornerArt id={sp.id} /> : (
         <>
-          {ICON[sp.id] && <span className="poly-icon" aria-hidden>{ICON[sp.id]}</span>}
+          {ICON[sp.id] && <span className="poly-icon" aria-hidden><Icon name={ICON[sp.id]} size={14} className="h-[1em] w-[1em]" /></span>}
           <span className="poly-name">{sp.name}</span>
           {sp.price !== undefined && <span className="poly-price">{leones(sp.price)}</span>}
           {sp.tax !== undefined && <span className="poly-price">Pay {leones(sp.tax)}</span>}
@@ -396,10 +395,10 @@ function Tile({ sp, s, onTap, selected }: { sp: BoardSpace; s: SalonePolyState; 
 }
 
 function CornerArt({ id }: { id: number }) {
-  if (id === 0) return <span className="poly-corner"><b className="text-primary">START</b><span className="poly-name">Collect {leones(SALONE_POLY.goSalary)}</span><span className="text-xl text-primary" aria-hidden>➜</span></span>;
-  if (id === 10) return <span className="poly-corner"><span className="text-xl" aria-hidden>🔒</span><b>JAIL</b><span className="poly-name">Just visiting</span></span>;
-  if (id === 20) return <span className="poly-corner"><span className="text-xl" aria-hidden>☕</span><b>ATTAYA</b><span className="poly-name">Free rest stop</span></span>;
-  return <span className="poly-corner"><span className="text-xl" aria-hidden>🚓</span><b>GO TO JAIL</b></span>;
+  if (id === 0) return <span className="poly-corner"><b className="text-primary">START</b><span className="poly-name">Collect {leones(SALONE_POLY.goSalary)}</span><Icon name="arrowRight" size={18} className="h-[2em] w-[2em] text-primary" strokeWidth={2.6} /></span>;
+  if (id === 10) return <span className="poly-corner"><Icon name="lock" size={18} className="h-[2.2em] w-[2.2em]" /><b>JAIL</b><span className="poly-name">Just visiting</span></span>;
+  if (id === 20) return <span className="poly-corner"><Icon name="coffee" size={18} className="h-[2.2em] w-[2.2em]" /><b>ATTAYA</b><span className="poly-name">Free rest stop</span></span>;
+  return <span className="poly-corner"><Icon name="siren" size={18} className="h-[2.2em] w-[2.2em] text-danger" /><b>GO TO JAIL</b></span>;
 }
 
 function Logo() {
@@ -442,7 +441,7 @@ function Players({ s, me, who }: { s: SalonePolyState; me: number; who: number }
               })}
             </div>
             <div className="mt-1 flex flex-wrap gap-1 text-[11px] font-semibold">
-              {s.inJail[i] && <span className="chip chip-accent">🔒 Jail</span>}
+              {s.inJail[i] && <span className="chip chip-accent"><Icon name="lock" size={11} />Jail</span>}
               {s.jailCards[i].luck + s.jailCards[i].osusu > 0 && <span className="chip chip-secondary">Bail ×{s.jailCards[i].luck + s.jailCards[i].osusu}</span>}
               {s.bankrupt[i] && <span className="chip chip-muted">Bankrupt</span>}
             </div>
@@ -514,7 +513,7 @@ function SpaceSheet({ s, space, me, can, onMove, onClose }: {
       <div className="pop-in w-full max-w-sm overflow-hidden rounded-3xl bg-surface shadow-lift" onClick={(e) => e.stopPropagation()}>
         <div className="p-4 text-white" style={{ background: color }}>
           <p className="text-xs font-semibold uppercase tracking-wide opacity-85">{sp.group ? SALONE_POLY_GROUPS[sp.group].label : sp.type.replace(/_/g, ' ')}</p>
-          <p className="font-display text-2xl font-bold">{ICON[space] ? `${ICON[space]} ` : ''}{sp.name}</p>
+          <p className="flex items-center gap-2 font-display text-2xl font-bold">{ICON[space] && <Icon name={ICON[space]} size={24} />}{sp.name}</p>
         </div>
         <div className="space-y-2 p-4 text-sm">
           {sp.rent && (
@@ -587,7 +586,7 @@ function TradeSheet({ s, me, onClose, onPropose }: { s: SalonePolyState; me: num
     <Portal><div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-3 backdrop-blur-sm sm:items-center" onClick={onClose} role="dialog" aria-modal="true" aria-label="Trade">
       <div className="pop-in max-h-[90vh] w-full max-w-lg space-y-3 overflow-y-auto rounded-3xl bg-surface p-4 shadow-lift" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-2">
-          <p className="font-display text-xl font-bold">🤝 Trade</p>
+          <p className="flex items-center gap-2 font-display text-xl font-bold"><Icon name="handshake" size={22} />Trade</p>
           <select className="field" value={withP} aria-label="Trade with" onChange={(e) => { setWith(Number(e.target.value)); setGet(EMPTY); }}>
             {partners.map((i) => <option key={i} value={i}>with {s.players[i].name}</option>)}
           </select>
@@ -616,7 +615,7 @@ function Countdown({ endsAt }: { endsAt: number }) {
   const [left, setLeft] = useState(() => Math.max(0, endsAt - Date.now()));
   useEffect(() => { const t = setInterval(() => setLeft(Math.max(0, endsAt - Date.now())), 1000); return () => clearInterval(t); }, [endsAt]);
   const sec = Math.ceil(left / 1000);
-  return <p className={`text-center text-sm font-bold tabular-nums ${sec < 60 ? 'text-danger' : 'text-muted'}`}>⏰ {Math.floor(sec / 60)}:{String(sec % 60).padStart(2, '0')} left</p>;
+  return <p className={`text-center text-sm font-bold tabular-nums ${sec < 60 ? 'text-danger' : 'text-muted'}`}><Icon name="clock" size={14} className="mr-1 inline-block align-[-2px]" />{Math.floor(sec / 60)}:{String(sec % 60).padStart(2, '0')} left</p>;
 }
 
 /* ---------- motion and sound ---------- */
@@ -662,7 +661,7 @@ function useTableEvents(s: SalonePolyState) {
     if (bought.length) setTimeout(() => { sfx('coin'); bought.forEach((i) => coinBurstFrom(tile(i), 12)); }, 900);
     const built = s.buildings.map((b, i) => (b > p.buildings[i] ? i : -1)).filter((i) => i >= 0);
     built.forEach((i) => coinBurstFrom(tile(i), 8));
-    if (fresh.some((l) => /^(❓ Luck|🪙 Osusu|💰 Osusu)/.test(l))) setTimeout(() => sfx('card'), 900);
+    if (fresh.some((l) => /^(Luck|Osusu): /.test(l))) setTimeout(() => sfx('card'), 900);
     if (s.buildings.reduce((x, y) => x + y, 0) > p.buildings.reduce((x, y) => x + y, 0)) sfx('success');
   }, [s]);
   return rolls;
@@ -673,7 +672,7 @@ function Shell({ onBack, children }: { onBack: () => void; children: ReactNode }
     <main className="mx-auto max-w-3xl space-y-3 px-2 py-3 sm:space-y-4 sm:p-4">
       <button onClick={onBack} className="back-link">← Back to Salone-Poly</button>
       <div className="card space-y-4 p-3 sm:p-5">
-        <h1>🏝️ Salone-Poly</h1>
+        <h1 className="flex items-center gap-3"><GameGlyph slug="salone-poly" name={'Salone-Poly'} size={36} />Salone-Poly</h1>
         {children}
       </div>
     </main>

@@ -1,10 +1,11 @@
 import type { RuleSection } from '@slgh/shared';
+import { Icon } from './Icon';
 
 /** Collapsible rulebook used on every game's detail and play screens */
 export default function Rulebook({ title, sections, open = false }: { title: string; sections: RuleSection[]; open?: boolean }) {
   return (
     <details open={open} className="rounded-lg border-2 border-border p-4">
-      <summary className="cursor-pointer text-lg font-bold">📖 {title}</summary>
+      <summary className="flex cursor-pointer items-center gap-2 text-lg font-bold"><Icon name="book" size={20} className="text-muted" />{title}</summary>
       <div className="mt-3 space-y-4">
         {sections.map((s, i) => (
           <section key={s.title} className="space-y-2">

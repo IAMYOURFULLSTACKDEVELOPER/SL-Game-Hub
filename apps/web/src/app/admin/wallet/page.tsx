@@ -16,7 +16,8 @@ export default async function AdminWallet({ searchParams }: { searchParams: { er
   const row = (x: W, actions: React.ReactNode) => (
     <li key={x.id} className="card flex flex-wrap items-center justify-between gap-3 p-3">
       <span>
-        <b>{formatLeones(x.amount)}</b> to {providerName(x.provider)} {displaySlPhone(x.phone)} · <b>{x.username}</b>
+        Send <b>{formatLeones(x.amount - x.fee)}</b> to {providerName(x.provider)} {displaySlPhone(x.phone)} · <b>{x.username}</b>
+        {x.fee > 0 && <span className="text-xs text-muted"> (withdrew {formatLeones(x.amount)}, fee {formatLeones(x.fee)})</span>}
         {x.banned && <b className="ml-2 text-danger">{t('admin.suspended')}</b>}
         <span className="block text-xs text-muted">Asked {when(x.created_at)}</span>
         {x.error && <span className="block text-sm text-danger">{x.error}</span>}
@@ -44,20 +45,15 @@ export default async function AdminWallet({ searchParams }: { searchParams: { er
   return (
     <div className="space-y-8">
       <h1>Money</h1>
-      {!w.configured && <p className="card p-3 text-danger">Monime is not connected: set MONIME_ACCESS_TOKEN and MONIME_SPACE_ID on the Convex deployment.</p>}
-      {w.configured && !w.webhook && (
-        <p className="card p-3 text-sm text-muted">
-          No Monime webhook yet (MONIME_WEBHOOK_SECRET). Payments and payouts still complete, but they are confirmed by the
-          player's "I've paid" button or the 5-minute background check instead of instantly.
-        </p>
-      )}
+      {!w.configured && <p className="card p-3 text-danger">Mobile money payments are not set up yet.</p>}
       {error && <p role="alert" className="card p-3 text-danger">{error}</p>}
 
-      <section className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <section className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {([
           ['Players’ balances', formatLeones(w.balances)],
           ['Held in games & withdrawals', formatLeones(w.held)],
           ['Fees from money games', formatLeones(w.fees)],
+          ['Withdrawal fees', formatLeones(w.withdrawalFees)],
           ['Pro revenue', formatLeones(w.proRevenue)],
           ['Active Pro players', String(w.proActive)],
         ] as const).map(([k, n]) => (
@@ -67,7 +63,7 @@ export default async function AdminWallet({ searchParams }: { searchParams: { er
 
       <section className="space-y-2">
         <h2 className="font-bold">Withdrawals waiting for approval ({w.requested.length})</h2>
-        <p className="text-sm text-muted">"Approve &amp; send" pays the player straight away through Monime to the number shown. "Decline" returns the money to their wallet.</p>
+        <p className="text-sm text-muted">"Approve &amp; send" pays the player straight away to the number shown. "Decline" returns the money to their wallet.</p>
         {!w.requested.length ? <p className="card p-4 text-muted">None waiting.</p> : (
           <ul className="space-y-2">{w.requested.map((x) => row(x, buttons(x, 'Approve & send', true)))}</ul>
         )}
@@ -85,7 +81,7 @@ export default async function AdminWallet({ searchParams }: { searchParams: { er
       <section className="space-y-2">
         <h2 className="font-bold">Recent withdrawals</h2>
         {table(['When', 'Player', 'Amount', 'To', 'Result'], w.withdrawalHistory.map((x) => [
-          when(x.updated_at), x.username, formatLeones(x.amount), `${providerName(x.provider)} ${displaySlPhone(x.phone)}`,
+          when(x.updated_at), x.username, `${formatLeones(x.amount - x.fee)}${x.fee ? ` (+${formatLeones(x.fee)} fee)` : ''}`, `${providerName(x.provider)} ${displaySlPhone(x.phone)}`,
           <span key="s" className={x.status === 'completed' ? 'font-semibold text-primary' : 'text-muted'}>{STATUS[x.status] ?? x.status}{x.error ? ` (${x.error})` : ''}</span>,
         ]), 'No finished withdrawals yet.')}
       </section>
