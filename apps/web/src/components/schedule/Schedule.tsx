@@ -9,6 +9,7 @@ import { playerMessage } from '@slgh/shared/src/errors';
 import { Icon } from '@/components/Icon';
 import { GameGlyph } from '@/components/GameGlyph';
 import { sfx } from '@/lib/sound';
+import { FriendPicker, InviteToEvent } from '@/components/social/Social';
 
 // Scheduled games: the list (with "going / maybe / can't", open or join the room, add to calendar)
 // and the form to schedule a room or a tournament. Used on /schedule and on a group's Games tab.
@@ -68,7 +69,10 @@ function GameCard({ g, now }: { g: Game; now: number }) {
   const rsvp = useMutation(api.schedule.rsvp);
   const cancel = useMutation(api.schedule.cancel);
   const [error, setError] = useState('');
+  const [inviting, setInviting] = useState(false);
   const cancelled = g.status === 'cancelled';
+  const over = g.startsAt + 3 * 3600_000 < now;
+  const canInvite = !cancelled && !over && (g.isHost || g.myRsvp === 'going');
   const soon = g.startsAt - now < 30 * 60_000;
   const answer = async (status: 'going' | 'maybe' | 'no') => {
     setError('');
@@ -97,14 +101,17 @@ function GameCard({ g, now }: { g: Game; now: number }) {
           <h3 className="truncate text-base">{g.title}</h3>
           <p className="text-xs text-muted">
             {cancelled ? <b className="text-danger">Cancelled</b> : <b className={soon ? 'text-primary' : ''}>{countdown(g.startsAt, now)}</b>}
-            {' · '}{day(g.startsAt)} · by {g.host.username}
+            {' · '}{day(g.startsAt)} · by <Link href={`/u/${g.host.username}`} className="font-semibold text-text hover:underline">{g.host.username}</Link>
             {g.maxPlayers ? ` · up to ${g.maxPlayers} players` : ''}
           </p>
           {g.note && <p className="text-sm">{g.note}</p>}
           <p className="text-xs text-muted">
-            <b className="text-text">{g.going}</b> going{g.maybe ? `, ${g.maybe} maybe` : ''}
+            <b className="text-text">{g.going}</b> going{g.maybe ? `, ${g.maybe} maybe` : ''}{g.invited ? `, ${g.invited} invited` : ''}
             {g.goingNames.length > 0 && `: ${g.goingNames.join(', ')}${g.going > g.goingNames.length ? '…' : ''}`}
           </p>
+          {g.myRsvp === 'invited' && !cancelled && (
+            <p className="flex items-center gap-1.5 text-sm font-semibold text-primary"><Icon name="send" size={14} />You&apos;re invited. Are you coming?</p>
+          )}
         </div>
       </div>
 
@@ -123,6 +130,11 @@ function GameCard({ g, now }: { g: Game; now: number }) {
           {g.kind === 'room' && g.isHost && !g.roomCode && (
             <Link href={openHref} className={`btn btn-sm ${soon ? 'btn-primary' : 'btn-outline'}`}><Icon name="play" size={14} />Open the room</Link>
           )}
+          {canInvite && (
+            <button type="button" className={`btn btn-sm ${inviting ? 'btn-primary' : 'btn-outline'}`} aria-expanded={inviting} onClick={() => setInviting((x) => !x)}>
+              <Icon name="userPlus" size={14} />Invite friends
+            </button>
+          )}
           <span className="ml-auto flex gap-1">
             <a className="btn btn-sm btn-ghost" href={icsHref(g)} download={`${g.title.replace(/[^\w]+/g, '-')}.ics`} aria-label="Add to calendar" title="Add to calendar"><Icon name="calendar" size={16} /></a>
             <a className="btn btn-sm btn-ghost" href={`https://wa.me/?text=${encodeURIComponent(share)}`} target="_blank" rel="noopener noreferrer" aria-label="Share on WhatsApp" title="Share"><Icon name="mail" size={16} /></a>
@@ -132,6 +144,7 @@ function GameCard({ g, now }: { g: Game; now: number }) {
           </span>
         </div>
       )}
+      {inviting && canInvite && <InviteToEvent eventId={g.id} onDone={() => setInviting(false)} />}
       {error && <p role="alert" className="px-3 pb-2 text-sm font-semibold text-danger">{error}</p>}
     </li>
   );
@@ -154,6 +167,8 @@ export function ScheduleForm({ groups, groupId, onDone }: { groups: { id: Id<'gr
   const [note, setNote] = useState('');
   const [share, setShare] = useState<string>(groupId ?? 'public');
   const [max, setMax] = useState(8);
+  const [friends, setFriends] = useState<Id<'users'>[]>([]);
+  const [pickFriends, setPickFriends] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const gameName = SCHEDULE_GAMES.find((x) => x.slug === game)?.name ?? '';
@@ -169,9 +184,10 @@ export function ScheduleForm({ groups, groupId, onDone }: { groups: { id: Id<'gr
         startsAt: new Date(start).getTime(), note: note || undefined,
         ...(share !== 'public' ? { groupId: share as Id<'groups'> } : {}),
         ...(kind === 'tournament' ? { maxPlayers: max } : {}),
+        ...(friends.length ? { invite: friends } : {}),
       });
       sfx('toggleOn');
-      setTitle(''); setNote('');
+      setTitle(''); setNote(''); setFriends([]); setPickFriends(false);
       onDone?.();
     } catch (err) { setError(playerMessage(err)); }
     setBusy(false);
@@ -224,12 +240,23 @@ export function ScheduleForm({ groups, groupId, onDone }: { groups: { id: Id<'gr
           <textarea className="input min-h-[64px]" maxLength={300} placeholder="Rules, prizes, who should come…" value={note} onChange={(e) => setNote(e.target.value)} />
         </label>
       </div>
+      <div className="rounded-xl border border-border/60 p-3">
+        <button type="button" className="flex w-full items-center gap-2 text-left" aria-expanded={pickFriends} onClick={() => setPickFriends((x) => !x)}>
+          <Icon name="userPlus" size={16} className="text-primary" />
+          <span className="flex-1 font-semibold">Invite friends{friends.length ? ` (${friends.length})` : ''}</span>
+          <span className="text-xs text-muted">People you follow, or who follow you</span>
+          <Icon name="chevronDown" size={16} className={`transition ${pickFriends ? 'rotate-180' : ''}`} />
+        </button>
+        {pickFriends && <div className="mt-3"><FriendPicker selected={friends} onChange={setFriends} /></div>}
+      </div>
       {error && <p role="alert" className="text-sm font-semibold text-danger">{error}</p>}
       <div className="flex gap-2">
         <button className="btn btn-primary" disabled={busy}><Icon name="calendar" size={16} />{busy ? 'Scheduling…' : 'Schedule'}</button>
         {onDone && <button type="button" className="btn btn-ghost" onClick={onDone}>Cancel</button>}
       </div>
-      {share !== 'public' && <p className="text-xs text-muted">The group&apos;s members see it, and it&apos;s announced in the group&apos;s chat.</p>}
+      {share !== 'public'
+        ? <p className="text-xs text-muted">The group&apos;s members see it, and it&apos;s announced in the group&apos;s chat. Friends you invite can see it too.</p>
+        : <p className="text-xs text-muted">Everyone can see it, and your followers get a notification.</p>}
     </form>
   );
 }

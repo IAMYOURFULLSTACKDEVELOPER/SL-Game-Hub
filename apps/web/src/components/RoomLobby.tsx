@@ -11,6 +11,7 @@ import type { GameVariant } from '@slgh/shared';
 import { Icon } from './Icon';
 import { VariantPicker } from './VariantPicker';
 import { RecentRooms, RoomsLeft } from './RecentRooms';
+import { InviteFriends } from './social/Social';
 
 type Difficulty = 'easy' | 'medium' | 'hard';
 
@@ -238,6 +239,7 @@ export function RoomLobby({ room, title, maxSeats, timer = false, bots: allowBot
         </ul>
         {humans < maxSeats && <p className="hint">{allowBots ? 'Waiting for friends? Empty seats can be filled with bots.' : 'This is a race between people: invite at least one friend.'}</p>}
       </div>
+      {humans < maxSeats && <InviteFriends code={v!.code} title={title} />}
 
       {errorBox}
       {me.host && (

@@ -5,6 +5,8 @@ import { gameIcon } from '@/lib/games';
 import { NavBar, type NavItem, type NavSection } from './NavBar';
 import { Icon } from './Icon';
 import { SignOutButton } from './SignOutButton';
+import { ConvexIsland } from './ConvexIsland';
+import { NotificationBell } from './social/NotificationBell';
 
 export async function Header() {
   // The rail lists the published games; fetched alongside the session so pages don't wait twice.
@@ -24,6 +26,7 @@ export async function Header() {
     ] },
     ...(me ? [{ title: 'Community', items: [
       { href: '/chat', label: 'chat', icon: 'hash' },
+      { href: '/friends', label: 'Friends', icon: 'userPlus' },
       { href: '/groups', label: 'Groups', icon: 'users' },
     ] as NavItem[] }] : []),
     ...(me ? [{ title: 'You', items: [
@@ -43,6 +46,8 @@ export async function Header() {
   ];
   const account: NavItem[] = me ? [
     { href: '/profile', label: t('nav.profile'), icon: 'user' },
+    { href: `/u/${me.username}`, label: 'Your public page', icon: 'globe' },
+    { href: '/friends', label: 'Friends', icon: 'userPlus' },
     { href: '/wallet', label: 'Wallet', icon: 'wallet' },
     { href: '/achievements', label: 'Achievements', icon: 'medal' },
   ] : [];
@@ -52,6 +57,7 @@ export async function Header() {
       appName={t('app.name')} sections={sections} tabs={tabs} account={account}
       games={catalog.map((g) => ({ slug: g.slug, name: g.name, icon: gameIcon(g.slug) }))}
       user={me ? { name: me.username, avatar: me.avatar ?? null } : null} pro={!!me?.pro}
+      bell={me ? <ConvexIsland><NotificationBell /></ConvexIsland> : null}
       signIn={t('nav.signIn')} signUp={t('nav.signUp')} themeLabel={t('nav.theme')}
       signOut={
         <SignOutButton className="menu-item w-full menu-danger"><Icon name="logout" size={18} />{t('nav.signOut')}</SignOutButton>

@@ -5,6 +5,7 @@ import type { Doc, Id } from './_generated/dataModel';
 import { publicProfile, requireActiveUser, requireUser } from './lib';
 import { containsProfanity } from './chat';
 import { isPro } from './pro';
+import { notify } from './social';
 
 // Groups for teams: chat channels (#general and any the owner adds; messages in convex/messaging.ts), a forum
 // (threads and posts), and members. Creating a group is a Pro feature. People join with the group's invite code,
@@ -287,6 +288,10 @@ async function inviteUser(ctx: MutationCtx, group: Doc<'groups'>, from: Doc<'use
   const pending = await ctx.db.query('group_invites').withIndex('by_group_id_and_user_id', (q) => q.eq('group_id', group._id)).take(MAX_PENDING_INVITES);
   if (pending.length >= MAX_PENDING_INVITES) throw new ConvexError('Lots of invites are still waiting for an answer. Cancel some first.');
   await ctx.db.insert('group_invites', { group_id: group._id, user_id: target._id, invited_by: from._id, created_at: Date.now() });
+  await notify(ctx, target._id, {
+    kind: 'group_invite', actorId: from._id, href: '/groups', key: `group:${group._id}`,
+    text: `${from.username} invited you to join the group ${group.name}.`,
+  });
   return target.username;
 }
 

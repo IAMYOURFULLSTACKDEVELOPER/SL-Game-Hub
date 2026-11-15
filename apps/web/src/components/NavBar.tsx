@@ -29,11 +29,13 @@ type Props = {
   signOut: ReactNode;
   /** Dodo Pro is active (unlocks playing your own music) */
   pro: boolean;
+  /** The notification bell (signed in only), shown in the top bar */
+  bell?: ReactNode;
 };
 
 const isActive = (path: string, href: string) => (href === '/' ? path === '/' : path === href || path.startsWith(href + '/'));
 
-export function NavBar({ appName, sections, tabs, games, account, user, signIn, signUp, themeLabel, signOut, pro }: Props) {
+export function NavBar({ appName, sections, tabs, games, account, user, signIn, signUp, themeLabel, signOut, pro, bell }: Props) {
   const path = usePathname();
   const [drawer, setDrawer] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -181,6 +183,7 @@ export function NavBar({ appName, sections, tabs, games, account, user, signIn, 
         <h2 className="truncate text-base font-bold text-heading">{title}</h2>
         {playing && <span className="topbar-tag">Playing</span>}
         <div className="ml-auto flex items-center gap-1">
+          {bell}
           <Link href="/games" className="btn btn-icon" aria-label="Find a game" title="Find a game"><Icon name="search" size={20} /></Link>
           <Link href="/lobby" className="btn btn-icon" aria-label="Live games" title="Live games"><Icon name="live" size={20} /></Link>
         </div>

@@ -35,6 +35,7 @@ import type * as rooms from "../rooms.js";
 import type * as schedule from "../schedule.js";
 import type * as scrabbleNode from "../scrabbleNode.js";
 import type * as seed from "../seed.js";
+import type * as social from "../social.js";
 import type * as tournaments from "../tournaments.js";
 import type * as users from "../users.js";
 import type * as voice from "../voice.js";
@@ -74,6 +75,7 @@ declare const fullApi: ApiFromModules<{
   schedule: typeof schedule;
   scrabbleNode: typeof scrabbleNode;
   seed: typeof seed;
+  social: typeof social;
   tournaments: typeof tournaments;
   users: typeof users;
   voice: typeof voice;

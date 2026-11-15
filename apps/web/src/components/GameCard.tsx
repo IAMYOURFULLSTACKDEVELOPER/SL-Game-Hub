@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { t } from '@slgh/shared';
-import { gameImage, type GameRow } from '@/lib/games';
+import { gameAccent, gameIcon, gameImage, type GameRow } from '@/lib/games';
 import { GameGlyph } from './GameGlyph';
 import { Icon } from './Icon';
 
@@ -35,9 +35,10 @@ const V: Record<Variant, { card: string; thumb: string; body: string; desc: stri
 
 export function GameCard({ g, i = 0, variant = 'grid' }: { g: GameRow; i?: number; variant?: Variant }) {
   const img = gameImage(g);
+  const icon = gameIcon(g.slug);
   const v = V[variant];
   return (
-    <Link href={`/games/${g.slug}`} className={`game-card reveal ${v.card}`} style={{ ['--i' as string]: i }}>
+    <Link href={`/games/${g.slug}`} className={`game-card reveal ${v.card}`} style={{ ['--i' as string]: i, ['--game' as string]: gameAccent(g.slug) }}>
       <div className={`game-thumb ${v.thumb}`}>
         {img
           // eslint-disable-next-line @next/next/no-img-element
@@ -45,7 +46,14 @@ export function GameCard({ g, i = 0, variant = 'grid' }: { g: GameRow; i?: numbe
           : <span aria-hidden className="grid h-full place-items-center"><GameGlyph slug={g.slug} name={g.name} size={72} /></span>}
         {!g.coming_soon && <span className="game-play" aria-hidden><Icon name="play" size={18} /></span>}
       </div>
-      {variant === 'list' && <span className="m-3 hidden max-sm:block"><GameGlyph slug={g.slug} name={g.name} size={48} /></span>}
+      {variant === 'list' && (
+        <span className="list-cover m-3 hidden shrink-0 max-sm:block" aria-hidden>
+          {icon
+            // eslint-disable-next-line @next/next/no-img-element
+            ? <img src={icon} alt="" width={64} height={64} loading="lazy" decoding="async" />
+            : <GameGlyph slug={g.slug} name={g.name} size={64} />}
+        </span>
+      )}
       <div className={`relative flex min-w-0 flex-1 flex-col px-4 pb-4 pt-7 ${v.body}`}>
         <span className={`game-card-icon ${variant === 'list' ? 'max-sm:hidden' : ''}`}><GameGlyph slug={g.slug} name={g.name} size={44} /></span>
         <h3 className="text-base font-bold leading-tight text-heading">{g.name}</h3>

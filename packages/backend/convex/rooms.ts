@@ -14,6 +14,7 @@ import { FREE_DAILY_ROOMS, ROOM_IDLE_DAYS } from '@slgh/shared/src/pro';
 import { lockPot, openPot, heldEntries, settleShared, stakeIn, unstake, voidPot } from './pots';
 import { BOT_THINK_MS, botThinkMs, type BotThinkKind } from '@slgh/shared/src/bot-think';
 import { recordPlayedWith } from './groups';
+import { announceHosting } from './social';
 
 // Online rooms for every multiplayer game (see roomGames.ts). Players must be signed in (a free account is
 // fine). Free players can create FREE_DAILY_ROOMS rooms a day (Pro: unlimited); joining and playing are unlimited.
@@ -389,13 +390,16 @@ export const setPublic = mutation({
     const { room, me } = await requireMember(ctx, code, secret);
     if (!me.host) throw new ConvexError('Only the host can change this.');
     await ctx.db.patch(room._id, { is_public: isPublic });
+    // Followers hear that their friend is hosting (money rooms too: they still choose to stake)
+    if (isPublic && !room.is_public && me.user_id) await announceHosting(ctx, me.user_id, room.game);
   },
 });
 
-/** Every listed room, newest first. Never includes the room code: players ask the host instead. */
+/** Every listed room, newest first (rooms hosted by people you follow first). Never includes the room code: players ask the host instead. */
 export const publicList = query({
   args: {},
   handler: async (ctx) => {
+    const viewer = await currentUser(ctx);
     const rooms = await ctx.db.query('play_rooms').withIndex('by_is_public', (q) => q.eq('is_public', true)).order('desc').take(50);
     const list = await Promise.all(rooms.map(async (room) => {
       const members = await membersOf(ctx, room._id);
@@ -405,6 +409,8 @@ export const publicList = query({
         id: room._id,
         game: room.game,
         host: host?.name ?? 'Host',
+        friend: !!viewer && !!host?.user_id && host.user_id !== viewer._id && !!await ctx.db.query('follows')
+          .withIndex('by_follower_id_and_followee_id', (q) => q.eq('follower_id', viewer._id).eq('followee_id', host.user_id!)).unique(),
         players: members.length,
         maxPlayers: SPECS[room.game].max,
         playing: s?.status === 'playing',
@@ -412,7 +418,7 @@ export const publicList = query({
         createdAt: room.created_at,
       };
     }));
-    return list.filter((r) => r.players > 0);
+    return list.filter((r) => r.players > 0).sort((a, b) => Number(b.friend) - Number(a.friend));
   },
 });
 

@@ -778,8 +778,34 @@ export default defineSchema({
   schedule_rsvps: defineTable({
     event_id: v.id('scheduled_games'),
     user_id: v.id('users'),
-    status: v.union(v.literal('going'), v.literal('maybe'), v.literal('no')),
+    // 'invited': a friend asked them along and they haven't answered yet (it lets them see a private game)
+    status: v.union(v.literal('going'), v.literal('maybe'), v.literal('no'), v.literal('invited')),
   })
     .index('by_event_id_and_user_id', ['event_id', 'user_id'])
     .index('by_user_id', ['user_id']),
+  // Following: one-way, like a social feed. You see the people you follow when you invite players to a
+  // game, and you hear when they host one (unless you turn `notify` off for that person).
+  follows: defineTable({
+    follower_id: v.id('users'),
+    followee_id: v.id('users'),
+    notify: v.boolean(),
+  })
+    .index('by_follower_id_and_followee_id', ['follower_id', 'followee_id'])
+    .index('by_followee_id', ['followee_id']),
+  // The bell: someone followed you, invited you to a game, or someone you follow is hosting one.
+  // `key` stops repeats (one per room invite, one "is hosting" per host every half hour).
+  notifications: defineTable({
+    user_id: v.id('users'),
+    kind: v.union(
+      v.literal('follow'), v.literal('game_invite'), v.literal('new_game'), v.literal('game_open'), v.literal('group_invite'),
+    ),
+    actor_id: v.optional(v.id('users')),
+    text: v.string(),
+    href: v.string(),
+    read: v.boolean(),
+    key: v.optional(v.string()),
+  })
+    .index('by_user_id', ['user_id'])
+    .index('by_user_id_and_read', ['user_id', 'read'])
+    .index('by_user_id_and_key', ['user_id', 'key']),
 });

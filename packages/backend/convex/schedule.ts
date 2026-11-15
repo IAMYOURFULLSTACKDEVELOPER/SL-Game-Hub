@@ -6,6 +6,8 @@ import { isAdmin, publicProfile, requireActiveUser, requireUser } from './lib';
 import { containsProfanity } from './chat';
 import { ROOM_GAMES } from './roomGames';
 import { roomByCode } from './rooms';
+import { internal } from './_generated/api';
+import { invitees, notify } from './social';
 
 // Scheduled games. A player picks a game, a date and time, and either an online room or a tournament.
 //  - A room: at game time the host opens the room from the schedule; its code is attached, and everyone
@@ -13,6 +15,8 @@ import { roomByCode } from './rooms';
 //  - A tournament: also creates a `tournaments` row open for registration until it starts (the host is registered).
 // It can be shared with one of your groups (members see it, and it's announced in the group's first channel)
 // or listed for everyone. People say whether they're going. The host or the group owner can cancel it.
+// The host (and anyone going) can invite friends: they get a notification and can see the game even if it's
+// private to a group. A public game is also announced to the host's followers.
 
 const SCHEDULE_GAMES = [...ROOM_GAMES, 'dice'] as const;
 const MIN_LEAD_MS = 5 * 60_000; // at least 5 minutes from now
@@ -31,7 +35,10 @@ async function memberOf(ctx: QueryCtx, groupId: Id<'groups'>, userId: Id<'users'
 /** May this player see the event, and manage it? */
 async function access(ctx: QueryCtx, e: Doc<'scheduled_games'>, user: Doc<'users'>) {
   const member = e.group_id ? await memberOf(ctx, e.group_id, user._id) : null;
-  const see = e.public || e.created_by === user._id || !!member;
+  const invited = !e.public && !member && e.created_by !== user._id
+    ? !!await ctx.db.query('schedule_rsvps').withIndex('by_event_id_and_user_id', (q) => q.eq('event_id', e._id).eq('user_id', user._id)).unique()
+    : false;
+  const see = e.public || e.created_by === user._id || !!member || invited;
   const manage = e.created_by === user._id || member?.role === 'owner' || isAdmin(user);
   return { see, manage };
 }
@@ -48,7 +55,7 @@ async function toRow(ctx: QueryCtx, e: Doc<'scheduled_games'>, user: Doc<'users'
     isHost: e.created_by === user._id, canManage: manage,
     group: group ? { id: group._id, name: group.name } : null,
     roomCode: e.room_code ?? null, tournamentId: e.tournament_id ?? null, maxPlayers: e.max_players ?? null,
-    going: going.length, maybe: rsvps.filter((r) => r.status === 'maybe').length,
+    going: going.length, maybe: rsvps.filter((r) => r.status === 'maybe').length, invited: rsvps.filter((r) => r.status === 'invited').length,
     goingNames: await Promise.all(going.slice(0, 6).map(async (r) => (await publicProfile(ctx, r.user_id)).username)),
     myRsvp: rsvps.find((r) => r.user_id === user._id)?.status ?? null,
   };
@@ -115,6 +122,7 @@ export const create = mutation({
     note: v.optional(v.string()),
     groupId: v.optional(v.id('groups')),
     maxPlayers: v.optional(v.number()),
+    invite: v.optional(v.array(v.id('users'))), // friends to invite
   },
   handler: async (ctx, a) => {
     const me = await requireActiveUser(ctx, 'errors.suspended');
@@ -151,11 +159,50 @@ export const create = mutation({
       group_id: a.groupId, public: !a.groupId, status: 'scheduled', tournament_id: tournamentId, max_players: maxPlayers,
     });
     await ctx.db.insert('schedule_rsvps', { event_id: id, user_id: me._id, status: 'going' });
+    const what = a.kind === 'tournament' ? 'a tournament' : 'a game';
+    await inviteFriends(ctx, me, (await ctx.db.get(id))!, game.name, a.invite ?? []);
+    if (!a.groupId) {
+      // Followers hear about public games (the friends just invited already have their invite)
+      await ctx.scheduler.runAfter(0, internal.social.notifyFollowers, {
+        actorId: me._id, kind: 'new_game', href: '/schedule', key: `event:${id}`,
+        text: `${me.username} scheduled ${what}: ${title} (${game.name}), ${when(a.startsAt)}.`,
+      });
+    }
     if (a.groupId) {
       await announce(ctx, a.groupId, me._id,
         `📅 I scheduled ${a.kind === 'tournament' ? 'a tournament' : 'a game'}: ${title} (${game.name}), ${when(a.startsAt)}. Open the group's Games tab to say if you're coming.`);
     }
     return id;
+  },
+});
+
+async function inviteFriends(ctx: MutationCtx, me: Doc<'users'>, e: Doc<'scheduled_games'>, gameName: string, userIds: Id<'users'>[]) {
+  let sent = 0;
+  for (const u of await invitees(ctx, me, userIds)) {
+    const r = await ctx.db.query('schedule_rsvps').withIndex('by_event_id_and_user_id', (q) => q.eq('event_id', e._id).eq('user_id', u._id)).unique();
+    if (!r) await ctx.db.insert('schedule_rsvps', { event_id: e._id, user_id: u._id, status: 'invited' });
+    const added = await notify(ctx, u._id, {
+      kind: 'game_invite', actorId: me._id, href: '/schedule', key: `event:${e._id}`,
+      text: `${me.username} invited you to ${e.kind === 'tournament' ? 'a tournament' : 'a game'}: ${e.title} (${gameName}), ${when(e.starts_at)}.`,
+    });
+    if (added) sent++;
+  }
+  return sent;
+}
+
+/** The host, or anyone going: invite friends to a scheduled game. */
+export const invite = mutation({
+  args: { eventId: v.id('scheduled_games'), userIds: v.array(v.id('users')) },
+  handler: async (ctx, { eventId, userIds }) => {
+    const me = await requireActiveUser(ctx, 'errors.suspended');
+    const e = await ctx.db.get(eventId);
+    if (!e || !(await access(ctx, e, me)).see) throw new ConvexError('errors.notFound');
+    if (e.status === 'cancelled') throw new ConvexError('This game was cancelled.');
+    if (e.starts_at + SHOW_AFTER_START_MS < Date.now()) throw new ConvexError('This game is over.');
+    const mine = await ctx.db.query('schedule_rsvps').withIndex('by_event_id_and_user_id', (q) => q.eq('event_id', e._id).eq('user_id', me._id)).unique();
+    if (e.created_by !== me._id && mine?.status !== 'going') throw new ConvexError('Say you are going first, then invite friends.');
+    const game = await ctx.db.query('games').withIndex('by_slug', (q) => q.eq('slug', e.game)).unique();
+    return { sent: await inviteFriends(ctx, me, e, game?.name ?? e.game, userIds) };
   },
 });
 
@@ -210,6 +257,15 @@ export const attachRoom = mutation({
     const room = await roomByCode(ctx, code);
     if (!room || room.game !== e.game) return;
     await ctx.db.patch(e._id, { room_code: room.code });
+    // Everyone who said yes or maybe, or was invited, hears that the room is open
+    const rsvps = await ctx.db.query('schedule_rsvps').withIndex('by_event_id_and_user_id', (q) => q.eq('event_id', e._id)).take(300);
+    for (const r of rsvps) {
+      if (r.status === 'no') continue;
+      await notify(ctx, r.user_id, {
+        kind: 'game_open', actorId: me._id, href: `/games/${e.game}/play?room=${room.code}`, key: `open:${e._id}`,
+        text: `${e.title} is starting: ${me.username} opened the room. Join now.`,
+      });
+    }
     if (e.group_id) await announce(ctx, e.group_id, me._id, `🎮 ${e.title} is open now. Join from the group's Games tab.`);
   },
 });

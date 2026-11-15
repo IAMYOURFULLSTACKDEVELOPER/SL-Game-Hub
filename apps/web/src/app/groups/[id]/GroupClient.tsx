@@ -261,7 +261,7 @@ function MembersTab({ g, id }: { g: Group; id: string }) {
             <li key={m.userId} className="flex items-center gap-2 rounded-xl border border-border p-2">
               <Avatar id={m.avatar} size={36} />
               <span className="min-w-0 flex-1">
-                <span className="block truncate font-semibold">{m.username}</span>
+                <Link href={`/u/${m.username}`} className="block truncate font-semibold text-text hover:underline">{m.username}</Link>
                 <span className="text-xs text-muted">joined {new Date(m.joinedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
               </span>
               {m.role === 'owner' ? <span className="chip chip-muted"><Icon name="crown" size={12} />Owner</span> : g.isOwner && (

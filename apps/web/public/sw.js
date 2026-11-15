@@ -166,3 +166,15 @@ async function saveOffline(urls, client) {
   }
   if (client) client.postMessage({ type: 'SAVED_OFFLINE', urls, ok });
 }
+
+// Alerts from the notification bell (shown while the app is open in the background): tapping one opens its page.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = new URL(event.notification.data?.url || '/', self.location.origin).href;
+  event.waitUntil((async () => {
+    const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const win = wins.find((w) => 'focus' in w);
+    if (win) { await win.focus(); if ('navigate' in win) await win.navigate(url); return; }
+    await self.clients.openWindow(url);
+  })());
+});

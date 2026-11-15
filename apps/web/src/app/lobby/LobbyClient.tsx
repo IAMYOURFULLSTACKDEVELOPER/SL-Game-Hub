@@ -39,7 +39,7 @@ export default function LobbyClient() {
   return <ConvexRoomProvider><Lobby /></ConvexRoomProvider>;
 }
 
-type Listed = { id: string; game: RoomGame; host: string; players: number; maxPlayers: number; playing: boolean; stake: number | null; createdAt: number };
+type Listed = { id: string; game: RoomGame; host: string; friend: boolean; players: number; maxPlayers: number; playing: boolean; stake: number | null; createdAt: number };
 
 function Lobby() {
   const rooms = useQuery(api.rooms.publicList) as Listed[] | undefined;
@@ -147,7 +147,9 @@ function RoomCard({ room: r, index, secret, name, asked, onAsked, guest }: {
         <GameGlyph slug={r.game} name={g.name} size={48} className="rounded-[30%]" />
         <div className="min-w-0 flex-1">
           <p className="font-display text-lg font-bold">{g.name}</p>
-          <p className="truncate text-sm text-muted">Hosted by {r.host}</p>
+          <p className="flex items-center gap-1.5 truncate text-sm text-muted">Hosted by {r.host}
+            {r.friend && <span className="chip px-1.5 py-0 text-[11px] text-primary"><Icon name="userCheck" size={11} />You follow them</span>}
+          </p>
           {r.stake !== null && <p className="flex items-center gap-1.5 text-sm font-semibold"><Icon name="coins" size={16} className="text-accent" />{formatLeones(r.stake)} stake · winner takes the pot</p>}
         </div>
         <div className="text-right text-sm">
