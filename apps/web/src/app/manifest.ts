@@ -14,15 +14,15 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     id: '/',
     name: t('app.name'),
-    short_name: 'Game Hub',
+    short_name: 'Dodo',
     description: t('home.heroText'),
     lang: 'en',
     start_url: '/?source=pwa',
     scope: '/',
     display: 'standalone',
     orientation: 'any', // board games are often nicer in landscape
-    background_color: '#f2f7f5',
-    theme_color: '#048750',
+    background_color: '#1e1f22',
+    theme_color: '#5865f2',
     categories: ['games', 'entertainment'],
     icons: [
       { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },

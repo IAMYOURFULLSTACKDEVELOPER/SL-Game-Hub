@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   description: t('home.heroText'),
   applicationName: t('app.name'),
   // Installed on iPhone/iPad: launches full screen with our icon and name
-  appleWebApp: { capable: true, title: 'Game Hub', statusBarStyle: 'default' },
+  appleWebApp: { capable: true, title: 'Dodo', statusBarStyle: 'default' },
   icons: { apple: '/icons/apple-touch-icon.png' },
   formatDetection: { telephone: false },
 };

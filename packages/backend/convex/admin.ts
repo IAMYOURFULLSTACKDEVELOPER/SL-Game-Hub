@@ -159,7 +159,7 @@ export const adjustWallet = mutation({
     const why = cleanReason(reason);
     if (!Number.isInteger(amount) || amount === 0 || Math.abs(amount) > 10_000_000) throw new ConvexError('Enter an amount in leones (up to SLE 100,000).');
     if (!await ctx.db.get(userId)) throw new ConvexError('errors.notFound');
-    await post(ctx, userId, 'adjustment', { amount }, `${amount > 0 ? 'Credit' : 'Debit'} from SL Game Hub: ${why}`);
+    await post(ctx, userId, 'adjustment', { amount }, `${amount > 0 ? 'Credit' : 'Debit'} from Dodo: ${why}`);
     await audit(ctx, admin._id, amount > 0 ? 'wallet credit' : 'wallet debit', `${formatLeones(Math.abs(amount))}: ${why}`, userId, amount);
   },
 });
@@ -233,7 +233,7 @@ export const closeRoom = mutation({
     const why = cleanReason(reason);
     const room = await ctx.db.get(roomId);
     if (!room) return;
-    if (room.pot_id) await voidPot(ctx, room.pot_id, `room ${room.code} (closed by SL Game Hub)`);
+    if (room.pot_id) await voidPot(ctx, room.pot_id, `room ${room.code} (closed by Dodo)`);
     for (const m of await ctx.db.query('play_members').withIndex('by_room_id_and_joined_at', (q) => q.eq('room_id', roomId)).take(50)) await ctx.db.delete(m._id);
     for (const r of await ctx.db.query('play_requests').withIndex('by_room_id_and_status', (q) => q.eq('room_id', roomId)).take(100)) await ctx.db.delete(r._id);
     for (const x of await ctx.db.query('voice_signals').withIndex('by_room_id_and_to', (q) => q.eq('room_id', roomId)).take(500)) await ctx.db.delete(x._id);

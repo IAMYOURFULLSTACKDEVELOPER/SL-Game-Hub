@@ -1,4 +1,4 @@
-/* SL Game Hub service worker. Hand-written, no build step.
+/* Dodo service worker. Hand-written, no build step.
  *
  * Strategy
  *  - /_next/static/*     cache-first (file names are content-hashed, so never stale)

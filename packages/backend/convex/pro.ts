@@ -8,7 +8,7 @@ import { formatLeones } from '@slgh/shared/src/wallet';
 import { currentUser, requireActiveUser } from './lib';
 import { chargeFor, monimeConfigured, post, requireWalletUser } from './wallet';
 
-// SL Game Hub Pro: SLE 10 for 30 days, paid from the wallet (players aged 18+) or by a Monime USSD
+// Dodo Pro: SLE 10 for 30 days, paid from the wallet (players aged 18+) or by a Monime USSD
 // code (anyone, e.g. a parent pays). Paying again adds 30 more days; nothing renews by itself.
 // Pro gives unlimited online rooms (free players create 10 a day; joining and playing are unlimited for everyone),
 // creating groups, and talking in voice chat.
@@ -90,7 +90,7 @@ export const buyWithWallet = mutation({
   args: {},
   handler: async (ctx) => {
     const me = await requireWalletUser(ctx);
-    await post(ctx, me._id, 'pro', { amount: -PRO_PRICE }, `SL Game Hub Pro: 30 days (${formatLeones(PRO_PRICE)})`);
+    await post(ctx, me._id, 'pro', { amount: -PRO_PRICE }, `Dodo Pro: 30 days (${formatLeones(PRO_PRICE)})`);
     await grantPro(ctx, me._id, 'wallet', PRO_PRICE);
   },
 });

@@ -9,7 +9,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <div className="mx-auto max-w-5xl p-4">
       <nav className="mb-4 flex flex-wrap gap-2" aria-label={t('admin.title')}>
-        {[['/admin', 'overview'], ['/admin/players', 'players'], ['/admin/wallet', 'wallet'], ['/admin/rooms', 'rooms'], ['/admin/games', 'games'], ['/admin/reports', 'reports'], ['/admin/chat', 'chat'], ['/admin/log', 'log']]
+        {[['/admin', 'overview'], ['/admin/players', 'players'], ['/admin/wallet', 'wallet'], ['/admin/rooms', 'rooms'], ['/admin/broadcasts', 'broadcasts'], ['/admin/games', 'games'], ['/admin/reports', 'reports'], ['/admin/chat', 'chat'], ['/admin/log', 'log']]
           .map(([href, k]) => <Link key={href} href={href} className="btn btn-outline btn-sm">{t(`admin.${k}`)}</Link>)}
       </nav>
       {children}

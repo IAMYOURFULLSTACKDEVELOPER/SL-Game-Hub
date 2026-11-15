@@ -38,7 +38,7 @@ export default function ProClient() {
 
   return (
     <main className="mx-auto max-w-3xl space-y-6 p-4">
-      <PageHeader icon="star" tone="gold" title="SL Game Hub Pro" subtitle={`${price} for ${PRO_DAYS} days. No automatic renewal.`} />
+      <PageHeader icon="star" tone="gold" title="Dodo Pro" subtitle={`${price} for ${PRO_DAYS} days. No automatic renewal.`} />
 
       <section className="card space-y-2 p-5">
         {s.pro ? (

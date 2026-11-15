@@ -1,4 +1,4 @@
-# SL Game Hub
+# Dodo
 
 Online games platform for players in Sierra Leone. Web (Next.js) + mobile (Expo) on one Convex backend.
 
@@ -58,7 +58,7 @@ forced private. Coins, achievements and Elo are changed only by server code.
    `cd packages/backend && npx convex run seed:makeAdmin '{"username":"YOUR_USERNAME"}'`.
 
 **Password reset** emails a 6-digit code through [Resend](https://resend.com). Set it up on the deployment with
-`npx convex env set AUTH_RESEND_KEY re_...` and, optionally, `npx convex env set AUTH_EMAIL_FROM "SL Game Hub <noreply@your-domain>"`
+`npx convex env set AUTH_RESEND_KEY re_...` (`RESEND_API_KEY` works too) and, optionally, `npx convex env set AUTH_EMAIL_FROM "Dodo <noreply@your-domain>"`
 (run both in `packages/backend`). Without a key, reset requests fail quietly and players see the usual "code sent" message.
 
 ## Wallet and money games (Monime)
@@ -93,7 +93,7 @@ Deployment environment variables (`cd packages/backend && npx convex env set NAM
 
 A cron re-checks top-ups and payouts every 5 minutes, in case a webhook is missed.
 
-## SL Game Hub Pro
+## Dodo Pro
 SLE 10 for 30 days (`convex/pro.ts`, constants in `packages/shared/src/pro.ts`), paid from the wallet (players aged 18+)
 or by a Monime USSD code (anyone, e.g. a parent pays; a deposit with `purpose: 'pro'` adds Pro days instead of wallet money).
 Paying again adds 30 days; nothing renews automatically.
@@ -133,6 +133,28 @@ Paying again adds 30 days; nothing renews automatically.
   browsers (WebRTC); Convex only relays the connection set-up. Uses public STUN servers; for players on mobile networks
   that block direct connections, add a TURN relay with `NEXT_PUBLIC_TURN_URL` / `_USERNAME` / `_CREDENTIAL`
   (see `apps/web/.env.example`).
+
+## Video and voice chat, and broadcasts
+Two separate services, because they do different jobs:
+
+**Video and voice chat in game rooms (LiveKit).** Players in a room talk and see each other in real time. Code:
+`convex/livekit.ts` (call tokens), `components/LiveCall.tsx`. Pro players may send their microphone and camera; everyone else
+watches and listens (the token itself forbids publishing, so this can't be bypassed in the browser). Cameras start off and send
+360p. Until the three `LIVEKIT_*` variables are set, rooms keep the browser-to-browser voice chat described above.
+
+**Broadcasts to spectators (Mux).** An admin creates a channel in **Admin → Broadcasts**, puts the server URL and stream key
+into OBS (Settings → Stream → Service: Custom) or a phone app such as Larix Broadcaster, and goes live. Anyone watches on `/live`,
+a few seconds behind. Every broadcast is recorded and listed under "Past broadcasts". Code: `convex/mux.ts`, `app/live`,
+`components/BroadcastPlayer.tsx` (Video.js 10 player; its skin CSS is copied to `public/vendor` by `scripts/copy-player-css.mjs`).
+
+| Variable (Convex deployment) | |
+|---|---|
+| `LIVEKIT_URL` | `wss://<project>.livekit.cloud` |
+| `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` | LiveKit Cloud → project → Settings → API keys |
+| `MUX_TOKEN_ID` / `MUX_TOKEN_SECRET` | Mux dashboard → Settings → Access Tokens, with **Mux Video: Read and Write** |
+| `MUX_WEBHOOK_SECRET` | Mux dashboard → Settings → Webhooks → a webhook to `https://<deployment>.convex.site/mux/webhook`; its signing secret |
+
+Without the webhook, use "Check status" on the admin page after starting or stopping a stream.
 
 ## Mobile app (Expo)
 ```

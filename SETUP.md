@@ -1,4 +1,4 @@
-# SL Game Hub - Complete Setup Guide
+# Dodo - Complete Setup Guide
 
 This guide walks you through setting up and running the whole project: the Convex backend, the web app and the mobile app.
 
@@ -62,7 +62,7 @@ Password reset sends a 6-digit code by email through [Resend](https://resend.com
 ```bash
 cd packages/backend
 npx convex env set AUTH_RESEND_KEY re_your_key
-npx convex env set AUTH_EMAIL_FROM "SL Game Hub <noreply@your-domain>"   # optional
+npx convex env set AUTH_EMAIL_FROM "Dodo <noreply@your-domain>"   # optional
 ```
 
 Without a key, reset requests fail quietly, and players still see the usual "code sent" message.

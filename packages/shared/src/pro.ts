@@ -1,4 +1,4 @@
-// SL Game Hub Pro: a paid month of extras. Used by the Convex backend, the web app and the mobile app.
+// Dodo Pro: a paid month of extras. Used by the Convex backend, the web app and the mobile app.
 // Amounts are minor units like the wallet (100 = SLE 1).
 
 export const PRO_PRICE = 1_000; // SLE 10

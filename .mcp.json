@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "mux": {
+      "type": "http",
+      "url": "https://mcp.mux.com?client=claude-code"
+    }
+  }
+}

@@ -137,3 +137,28 @@ export const iceServers = action({
     return { iceServers: STUN, relay: false };
   },
 });
+
+// ---- Video and voice through LiveKit -------------------------------------------------------------------
+// When LIVEKIT_URL, LIVEKIT_API_KEY and LIVEKIT_API_SECRET are set on the deployment, rooms use a LiveKit
+// server instead of browser-to-browser calls: it carries video as well as voice, works on networks that block
+// direct calls, and doesn't slow down as more people join. Tokens are minted in convex/livekit.ts.
+
+export const liveKitReady = () => !!(process.env.LIVEKIT_URL && process.env.LIVEKIT_API_KEY && process.env.LIVEKIT_API_SECRET);
+
+/** Which kind of call the room page should start. */
+export const mode = query({
+  args: {},
+  handler: async () => ({ server: liveKitReady() }),
+});
+
+/** Who a room secret belongs to, for a call token: their member id, name and whether they may talk. */
+export const callPass = internalQuery({
+  args: { code: v.string(), secret: v.string() },
+  handler: async (ctx, { code, secret }) => {
+    const room = await roomByCode(ctx, code);
+    const me = room && await memberBySecret(ctx, room._id, secret);
+    if (!room || !me) return null;
+    const user = me.user_id ? await ctx.db.get(me.user_id) : null;
+    return { roomId: room._id as string, memberId: me.member_id, name: me.name, talk: isPro(user) };
+  },
+});

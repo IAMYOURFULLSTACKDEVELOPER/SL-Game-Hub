@@ -12,7 +12,8 @@
     "@auth/core": "0.41.1",
     "@convex-dev/auth": "^0.0.98",
     "@slgh/shared": "*",
-    "convex": "^1.49.0"
+    "convex": "^1.49.0",
+    "livekit-server-sdk": "2.19.3"
   },
   "devDependencies": {
     "typescript": "^5.5.0"

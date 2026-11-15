@@ -47,7 +47,7 @@ export default defineSchema({
     is_public: v.boolean(),
     banned: v.boolean(),
     updated_at: v.number(),
-    pro_until: v.optional(v.number()), // SL Game Hub Pro is active until this time (see convex/pro.ts)
+    pro_until: v.optional(v.number()), // Dodo Pro is active until this time (see convex/pro.ts)
   })
     .index('email', ['email'])
     .index('by_username_lower', ['username_lower']),
@@ -451,7 +451,7 @@ export default defineSchema({
     details: v.string(),
   }).index('by_target', ['target_user_id']),
 
-  // SL Game Hub Pro -------------------------------------------------------------------
+  // Dodo Pro -------------------------------------------------------------------
   // One row per payment (wallet or USSD); each adds 30 days to users.pro_until.
   pro_payments: defineTable({
     user_id: v.id('users'),
@@ -677,4 +677,30 @@ export default defineSchema({
     .index('by_room_id_and_status', ['room_id', 'status'])
     .index('by_room_id_and_secret', ['room_id', 'secret'])
     .index('by_created_at', ['created_at']),
+  // Broadcasts (Mux): admins stream a tournament or featured game from OBS/Streamlabs/a phone app,
+  // spectators watch on /live. The stream key is a secret: only admin functions return it.
+  live_streams: defineTable({
+    title: v.string(),
+    mux_id: v.string(), // Mux live stream id
+    stream_key: v.string(),
+    playback_id: v.string(), // public playback id (HLS at stream.mux.com/<id>.m3u8)
+    status: v.union(v.literal('idle'), v.literal('active')), // active while the encoder is sending
+    created_by: v.id('users'),
+    created_at: v.number(),
+    started_at: v.optional(v.number()),
+  })
+    .index('by_mux_id', ['mux_id'])
+    .index('by_status', ['status']),
+  // Recordings Mux makes of each broadcast, playable on /live once ready.
+  live_recordings: defineTable({
+    stream_id: v.id('live_streams'),
+    asset_id: v.string(),
+    playback_id: v.optional(v.string()),
+    status: v.union(v.literal('preparing'), v.literal('ready'), v.literal('errored')),
+    duration: v.optional(v.number()), // seconds
+    created_at: v.number(),
+  })
+    .index('by_asset_id', ['asset_id'])
+    .index('by_stream_id', ['stream_id'])
+    .index('by_status', ['status']),
 });

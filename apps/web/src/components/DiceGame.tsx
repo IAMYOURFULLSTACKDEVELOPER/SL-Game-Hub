@@ -380,7 +380,7 @@ function OnlineDice({ rollMode }: { rollMode: RollMode }) {
               <input id="dice-stake" inputMode="decimal" value={stakeInput} onChange={(e) => setStakeInput(e.target.value)} className="input" />
               <p className="text-xs text-muted">
                 Wallet: <b>{money(wallet!.balance)}</b> · <Link href="/wallet" className="text-primary underline">Top up</Link>.
-                Stakes are held by SL Game Hub until the round ends; the winner gets the whole pot.
+                Stakes are held by Dodo until the round ends; the winner gets the whole pot.
               </p>
             </div>
           )

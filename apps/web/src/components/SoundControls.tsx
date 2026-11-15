@@ -50,7 +50,7 @@ export function SoundControls() {
         <p className="px-2 pb-1 pt-1 text-xs font-bold uppercase tracking-wide text-muted">Music</p>
         <button type="button" className="menu-item" role="switch" aria-checked={p.music} onClick={() => beats(!p.music)}>
           <Icon name="music" size={18} />
-          <span className="flex-1">Game Hub beats</span>
+          <span className="flex-1">Dodo beats</span>
           <span className={`switch ${p.music ? 'is-on' : ''}`} aria-hidden />
         </button>
         <div className="menu-sep" />

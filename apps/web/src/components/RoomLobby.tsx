@@ -182,7 +182,7 @@ export function RoomLobby({ room, title, maxSeats, timer = false, bots: allowBot
   // In a room, waiting for (or between) games
   const me = v!.me!;
   const link = typeof window === 'undefined' ? '' : `${location.origin}${location.pathname}?room=${v!.code}`;
-  const invite = `Come and play ${title} with me on SL Game Hub! Room code ${v!.code}: ${link}`;
+  const invite = `Come and play ${title} with me on Dodo! Room code ${v!.code}: ${link}`;
   return (
     <div className="space-y-4">
       <div className="card p-4">

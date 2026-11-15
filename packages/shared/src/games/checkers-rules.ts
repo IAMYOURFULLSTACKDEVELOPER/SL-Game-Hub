@@ -8,7 +8,7 @@ export const CHECKERS_RULES: RuleSection[] = [
   { title: 'Set-up', rules: [
     'The board is placed so each player has a light square in the bottom-right corner. Only the dark squares are used.',
     'Red’s 12 discs fill the dark squares of the three rows nearest Red; Black’s 12 discs fill the three rows nearest Black.',
-    'On SL Game Hub, Red moves first, then players alternate turns.',
+    'On Dodo, Red moves first, then players alternate turns.',
   ] },
   { title: 'Moving', rules: [
     'An ordinary piece (a “man”) moves one square diagonally forward onto an empty dark square.',
@@ -29,7 +29,7 @@ export const CHECKERS_RULES: RuleSection[] = [
     'You win when your opponent has no pieces left, or cannot make any legal move.',
     'Draw: if 40 moves pass for each player with no capture and no new king, or if both players agree to a draw.',
   ] },
-  { title: 'Playing on SL Game Hub', rules: [
+  { title: 'Playing on Dodo', rules: [
     'Tap a piece to see where it can go (highlighted), then tap the destination. Pieces that must capture are outlined.',
     'Play against a bot (Easy, Medium or Hard) or pass the device between two players.',
     'Undo, Offer draw and Resign are available. Your game is saved on this device.',

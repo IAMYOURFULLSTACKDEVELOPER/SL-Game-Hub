@@ -65,10 +65,10 @@ export function PwaManager() {
         </div>
       )}
       {showInstall && (
-        <div className="toast" role="dialog" aria-label="Install SL Game Hub">
+        <div className="toast" role="dialog" aria-label="Install Dodo">
           <LogoMark size={40} />
           <div className="flex-1">
-            <p className="font-semibold">Install SL Game Hub</p>
+            <p className="font-semibold">Install Dodo</p>
             <p className="text-sm text-muted">
               {s.installable ? 'Play from your home screen, even offline.'
                 : <>Tap <ShareGlyph /> then <b>Add to Home Screen</b>.</>}

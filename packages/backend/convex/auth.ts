@@ -11,7 +11,7 @@ const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
 /** Emails a 6-digit code; the player types it in with their new password. */
 const PasswordResetCode = Resend({
   id: 'password-reset-code',
-  apiKey: process.env.AUTH_RESEND_KEY,
+  apiKey: process.env.AUTH_RESEND_KEY ?? process.env.RESEND_API_KEY,
   maxAge: 15 * 60,
   async generateVerificationToken() {
     const n = crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000;
@@ -22,9 +22,9 @@ const PasswordResetCode = Resend({
       method: 'POST',
       headers: { Authorization: `Bearer ${provider.apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        from: process.env.AUTH_EMAIL_FROM ?? 'SL Game Hub <onboarding@resend.dev>',
+        from: process.env.AUTH_EMAIL_FROM ?? 'Dodo <onboarding@resend.dev>',
         to: [email],
-        subject: 'Your SL Game Hub password reset code',
+        subject: 'Your Dodo password reset code',
         text: `Your password reset code is ${token}. It expires in 15 minutes. If you did not ask for this, ignore this email.`,
       }),
     });

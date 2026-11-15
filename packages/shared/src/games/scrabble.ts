@@ -87,7 +87,7 @@ export const TILE_DISTRIBUTION: { letter: string; value: number; count: number }
 ];
 export const LETTER_VALUES: Record<string, number> = Object.fromEntries(TILE_DISTRIBUTION.map((t) => [t.letter, t.value]));
 
-/** Standard premium layout (matches the SL Game Hub board: rows A-O, columns 1-15, star at H8) */
+/** Standard premium layout (matches the Dodo board: rows A-O, columns 1-15, star at H8) */
 export const SCRABBLE_SQUARES: SquareType[][] = (() => {
   const s: SquareType[][] = Array.from({ length: 15 }, () => Array<SquareType>(15).fill('normal'));
   const mirror = (cells: [number, number][], t: SquareType) => {

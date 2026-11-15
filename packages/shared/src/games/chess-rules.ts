@@ -1,7 +1,7 @@
 import type { RuleSection } from '../rulebook';
 
 export const CHESS_RULES: RuleSection[] = [
-  { title: 'Introduction', intro: 'Chess is a two-player strategy game played on an 8 × 8 board of 64 squares. On the SL Game Hub board the Gold army plays against the Black army.' },
+  { title: 'Introduction', intro: 'Chess is a two-player strategy game played on an 8 × 8 board of 64 squares. On the Dodo board the Gold army plays against the Black army.' },
   { title: 'Objective', rules: [
     'Checkmate the opposing king: attack it so that it cannot escape capture.',
     'A game can also end in a draw (stalemate, 50-move rule or agreement) or by resignation.',
@@ -39,7 +39,7 @@ export const CHESS_RULES: RuleSection[] = [
     '50-move rule: 50 moves by each player without a pawn move or capture.',
     'Agreement: both players agree to a draw.',
   ] },
-  { title: 'Playing on SL Game Hub', rules: [
+  { title: 'Playing on Dodo', rules: [
     'Tap or click a piece to see its legal moves (dots), then tap the destination square.',
     'Play against a bot (Easy, Medium or Hard) or pass the device between two players.',
     'Use Undo (vs bot), Offer draw and Resign as needed. Your game is saved on this device.',

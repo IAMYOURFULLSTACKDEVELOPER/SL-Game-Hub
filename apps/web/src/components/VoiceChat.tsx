@@ -1,12 +1,18 @@
 'use client';
 import type { RoomApi } from '@/lib/useRoom';
-import { useVoice, type VoiceApi } from '@/lib/useVoice';
+import { useVoice } from '@/lib/useVoice';
 import { sfx } from '@/lib/sound';
 import { Icon } from './Icon';
 import { Portal } from './Portal';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
+import { useQuery } from 'convex/react';
+import { api } from '@slgh/backend/convex/_generated/api';
 
-const MicIcon = ({ off = false, size = 18 }: { off?: boolean; size?: number }) => (
+// The video/voice call only loads when the server has a call service set up (it is a large download).
+const ServerCall = dynamic(() => import('./LiveCall').then((m) => m.LiveCall), { ssr: false });
+
+export const MicIcon = ({ off = false, size = 18 }: { off?: boolean; size?: number }) => (
   <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
     <rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
     {off && <path d="M4 4l16 16" />}
@@ -19,7 +25,7 @@ const SpeakerOff = () => (
 );
 
 /** Live sound bars that follow how loud someone is */
-function Bars({ level, on }: { level: number; on: boolean }) {
+export function Bars({ level, on }: { level: number; on: boolean }) {
   return (
     <span className={`vc-bars ${on ? 'is-on' : ''}`} aria-hidden>
       {[0.6, 1, 0.75].map((k, i) => <i key={i} style={{ height: `${4 + Math.min(1, level * 2.4 * k) * 12}px` }} />)}
@@ -27,8 +33,18 @@ function Bars({ level, on }: { level: number; on: boolean }) {
   );
 }
 
-/** Talk to the other players in an online room. Shown above the lobby and the game. */
+/**
+ * Talk to the other players in an online room. Shown above the lobby and the game.
+ * With a call server configured (convex/livekit.ts) players can also turn on their camera;
+ * otherwise audio goes straight between the browsers.
+ */
 export function VoiceChat({ room }: { room: RoomApi }) {
+  const mode = useQuery(api.voice.mode);
+  if (!room.joined || !mode) return null;
+  return mode.server ? <ServerCall room={room} /> : <PeerVoiceChat room={room} />;
+}
+
+function PeerVoiceChat({ room }: { room: RoomApi }) {
   const voice = useVoice(room);
   if (!room.joined || !voice.supported) return null;
   const me = room.view?.me?.id;
@@ -120,27 +136,28 @@ export function VoiceChat({ room }: { room: RoomApi }) {
         </p>
       )}
       {voice.error && <p role="alert" className="text-sm font-semibold text-danger">{voice.error}</p>}
-      <SpeakingNow voice={voice} names={Object.fromEntries(inVoice.map((m) => [m.id, m.id === me ? 'You' : m.name]))} />
+      <SpeakingNow people={inVoice
+        .filter((m) => voice.speaking[m.id] && !voice.silenced[m.id])
+        .map((m) => ({ id: m.id, name: m.id === me ? 'You' : m.name, level: voice.levels[m.id] ?? 0 }))} />
     </div>
   );
 }
 
 /** A small pill over the game showing who is talking right now, so you can see it while you play. */
-function SpeakingNow({ voice, names }: { voice: VoiceApi; names: Record<string, string> }) {
-  const talking = Object.keys(voice.speaking).filter((id) => voice.speaking[id] && names[id] && !voice.silenced[id]);
-  if (!talking.length) return null;
+export function SpeakingNow({ people }: { people: { id: string; name: string; level: number }[] }) {
+  if (!people.length) return null;
   return (
     <Portal>
       <div className="vc-floating" role="status" aria-live="polite">
-        {talking.slice(0, 3).map((id) => (
-          <span key={id} className="flex items-center gap-1.5">
-            <span className="vc-avatar is-talking h-7 w-7 text-xs">{names[id][0]?.toUpperCase()}</span>
-            <span className="max-w-[6rem] truncate text-sm font-semibold">{names[id]}</span>
-            <Bars level={voice.levels[id] ?? 0} on />
+        {people.slice(0, 3).map((p) => (
+          <span key={p.id} className="flex items-center gap-1.5">
+            <span className="vc-avatar is-talking h-7 w-7 text-xs">{p.name[0]?.toUpperCase()}</span>
+            <span className="max-w-[6rem] truncate text-sm font-semibold">{p.name}</span>
+            <Bars level={p.level} on />
           </span>
         ))}
-        {talking.length > 3 && <span className="text-sm font-semibold">+{talking.length - 3}</span>}
-        <span className="sr-only">{talking.map((id) => names[id]).join(', ')} speaking</span>
+        {people.length > 3 && <span className="text-sm font-semibold">+{people.length - 3}</span>}
+        <span className="sr-only">{people.map((p) => p.name).join(', ')} speaking</span>
       </div>
     </Portal>
   );

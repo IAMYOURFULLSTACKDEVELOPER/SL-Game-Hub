@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "predev": "node ../../scripts/build-scrabble-dictionary.mjs",
+    "predev": "node ../../scripts/build-scrabble-dictionary.mjs && node ../../scripts/copy-player-css.mjs",
     "dev": "next dev",
-    "prebuild": "node ../../scripts/build-scrabble-dictionary.mjs",
+    "prebuild": "node ../../scripts/build-scrabble-dictionary.mjs && node ../../scripts/copy-player-css.mjs",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit"
@@ -14,7 +14,10 @@
     "@convex-dev/auth": "^0.0.98",
     "@slgh/backend": "*",
     "@slgh/shared": "*",
+    "@videojs/mux-video": "10.4.0",
+    "@videojs/react": "10.4.0",
     "convex": "^1.49.0",
+    "livekit-client": "2.24.1",
     "next": "14.2.15",
     "react": "18.3.1",
     "react-dom": "18.3.1"

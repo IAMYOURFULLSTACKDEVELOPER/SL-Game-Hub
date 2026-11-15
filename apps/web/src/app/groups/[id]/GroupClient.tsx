@@ -39,7 +39,7 @@ export default function GroupClient({ id }: { id: string }) {
       router.push(`/groups/${id}/t/${threadId}`);
     });
   };
-  const invite = g.inviteCode && `Join my team "${g.name}" on SL Game Hub: open ${typeof window === 'undefined' ? '' : location.origin}/groups and enter code ${g.inviteCode}`;
+  const invite = g.inviteCode && `Join my team "${g.name}" on Dodo: open ${typeof window === 'undefined' ? '' : location.origin}/groups and enter code ${g.inviteCode}`;
 
   return (
     <main className="mx-auto max-w-3xl space-y-5 p-4">

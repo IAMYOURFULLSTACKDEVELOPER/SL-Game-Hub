@@ -59,7 +59,7 @@ export const SNAKE_AND_LADDER_MANIFEST: GameManifest = {
   version: '2.0.0',
 };
 
-/** Snakes on the SL Game Hub board: head -> tail */
+/** Snakes on the Dodo board: head -> tail */
 export const SNAKE_AND_LADDER_SNAKES: Record<number, number> = {
   27: 5,
   40: 3,
@@ -71,7 +71,7 @@ export const SNAKE_AND_LADDER_SNAKES: Record<number, number> = {
   99: 41,
 };
 
-/** Ladders on the SL Game Hub board: foot -> top */
+/** Ladders on the Dodo board: foot -> top */
 export const SNAKE_AND_LADDER_LADDERS: Record<number, number> = {
   4: 25,
   13: 46,

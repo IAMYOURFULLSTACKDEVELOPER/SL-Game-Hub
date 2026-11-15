@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "SL Game Hub"
+    "name": "Dodo"
   },
   "nav": {
     "games": "Games",
@@ -165,6 +165,7 @@
     "openReports": "Open reports",
     "role": "Role",
     "rooms": "Live rooms",
+    "broadcasts": "Broadcasts",
     "chat": "Chat",
     "log": "Audit log"
   },

@@ -14,7 +14,8 @@ export async function Header() {
     { items: [
       { href: '/', label: t('nav.home'), icon: 'home' },
       { href: '/games', label: 'Browse games', icon: 'gamepad' },
-      { href: '/lobby', label: 'Live games', icon: 'live' },
+      { href: '/lobby', label: 'Live games', icon: 'compass' },
+      { href: '/live', label: 'Watch live', icon: 'live' }, // broadcasts and recordings (Mux)
     ] },
     { title: 'Compete', items: [
       { href: '/leaderboards', label: 'Leaderboards', icon: 'trophy' },
@@ -36,7 +37,7 @@ export async function Header() {
   const tabs: NavItem[] = [
     { href: '/', label: t('nav.home'), icon: 'home' },
     { href: '/games', label: t('nav.games'), icon: 'gamepad' },
-    { href: '/lobby', label: 'Live', icon: 'live' },
+    { href: '/lobby', label: 'Rooms', icon: 'compass' },
     { href: '/leaderboards', label: 'Ranks', icon: 'trophy' },
   ];
   const account: NavItem[] = me ? [
@@ -49,7 +50,7 @@ export async function Header() {
     <NavBar
       appName={t('app.name')} sections={sections} tabs={tabs} account={account}
       games={catalog.map((g) => ({ slug: g.slug, name: g.name, icon: gameIcon(g.slug) }))}
-      user={me ? { name: me.username, avatar: (me.username[0] ?? '?').toUpperCase() } : null}
+      user={me ? { name: me.username, avatar: me.avatar ?? null } : null}
       signIn={t('nav.signIn')} signUp={t('nav.signUp')} themeLabel={t('nav.theme')}
       signOut={
         <SignOutButton className="menu-item w-full menu-danger"><Icon name="logout" size={18} />{t('nav.signOut')}</SignOutButton>

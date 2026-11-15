@@ -10,17 +10,35 @@ const GREEN = '#23a55a';
 const YELLOW = '#f0b232';
 const PINK = '#eb459e';
 const RED = '#f23f43';
+const FLAG_GREEN = '#1eb53a';
+const FLAG_BLUE = '#3a9ff5';
+const BEAK_DARK = '#e8822a';
 
-/** App logo: a die on a brand-coloured squircle, with the green pip of the Sierra Leone flag. */
+/**
+ * The Dodo logo: a plump dodo whose body is a die showing three (the green pip is from the Sierra Leone flag),
+ * with a big hooked beak and a tail tuft in the flag's green, white and blue. `flat` drops the tile (sidebar rail).
+ */
 export function LogoMark({ size = 36, flat = false }: { size?: number; flat?: boolean }) {
+  const edge = flat ? { stroke: INK, strokeOpacity: 0.14, strokeWidth: 0.8 } : {}; // keeps the white body visible on light surfaces
   return (
     <svg aria-hidden="true" width={size} height={size} viewBox="0 0 40 40" className="logo-mark shrink-0">
-      {!flat && <rect width="40" height="40" rx="12" fill={BRAND} />}
-      <g className="logo-die">
-        <rect x="9.5" y="9.5" width="21" height="21" rx="5.5" fill="#fff" />
-        <circle cx="15" cy="15" r="2.1" fill={INK} />
-        <circle cx="20" cy="20" r="2.1" fill={GREEN} />
-        <circle cx="25" cy="25" r="2.1" fill={INK} />
+      {!flat && <rect width="40" height="40" rx="9.4" fill={BRAND} />}
+      <g className="logo-bird" transform="translate(-1.6 0.3)">
+        <g fill="none" strokeLinecap="round" strokeWidth="2.6" className="logo-tuft">
+          <path d="M10.6 19.4C7.4 18.8 5.6 16.4 6.4 13.6" stroke={FLAG_GREEN} />
+          <path d="M11 17.2C9.2 15.4 9.2 12.6 11 11" stroke={flat ? '#c4c9ce' : '#fff'} />
+          <path d="M12.8 16.2c-.2-2.4 1-4.4 3.2-5" stroke={FLAG_BLUE} />
+        </g>
+        <path d="M15.5 31v4.2M13.6 35.2h3.4M23 31v4.2M21.1 35.2h3.4" stroke={BEAK_DARK} strokeWidth="2.2" strokeLinecap="round" fill="none" />
+        <path d="M21 17.5c0-3 .6-5 1.6-6.6a5.6 5.6 0 0 1 9.6 1.4c.6 1.6.2 3.4-.8 4.8-1.2 1.6-2 2.4-2 4.4z" fill="#fff" {...edge} />
+        <rect x="8.5" y="14.5" width="21" height="18.5" rx="7" fill="#fff" {...edge} />
+        <rect x="21.6" y="14" width="7.2" height="7.4" fill="#fff" />{/* joins neck and body without an outline between them */}
+        <path d="M30.6 10.2c2.6-.6 5.6.4 6.6 2.8.8 1.8.4 4-1 5.2-.4-1.4-1.4-2.2-2.8-2.2h-3.6z" fill={YELLOW} />
+        <path d="M36.2 18.2c-.4-1.4-1.4-2.2-2.8-2.2h-3.6v-1.6h4.4c1.6 0 2.8.8 3.2 1.8-.2.8-.6 1.5-1.2 2z" fill={BEAK_DARK} />
+        <circle cx="28.4" cy="11.6" r="1.6" fill={INK} /><circle cx="28.9" cy="11.1" r=".55" fill="#fff" />
+        <circle cx="13.6" cy="19.6" r="2" fill={INK} />
+        <circle cx="19" cy="23.8" r="2" fill={FLAG_GREEN} />
+        <circle cx="24.4" cy="28" r="2" fill={INK} />
       </g>
     </svg>
   );

@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Icon, type IconName } from './Icon';
 import { LogoMark } from './Art';
+import { Avatar } from './Avatar';
 import { GameGlyph } from './GameGlyph';
 import { SoundControls } from './SoundControls';
 import { ThemeToggle } from './ThemeToggle';
@@ -22,7 +23,8 @@ type Props = {
   /** `icon`: a small crop of the game's cover for the rail (null: the game's vector glyph) */
   games: { slug: string; name: string; icon?: string | null }[];
   account: NavItem[];
-  user: { name: string; avatar: string } | null;
+  /** `avatar`: the player's preset avatar id (drawn by <Avatar>) */
+  user: { name: string; avatar: string | null } | null;
   signIn: string; signUp: string; themeLabel: string;
   signOut: ReactNode;
 };
@@ -119,7 +121,7 @@ export function NavBar({ appName, sections, tabs, games, account, user, signIn, 
                   return (
                     <Link key={i.href} href={i.href} className={`channel ${on ? 'is-active' : ''}`} aria-current={on ? 'page' : undefined}>
                       <Icon name={i.icon} size={20} />{i.label}
-                      {i.href === '/lobby' && <span className="channel-live">LIVE</span>}
+                      {i.href === '/live' && <span className="channel-live">LIVE</span>}
                     </Link>
                   );
                 })}
@@ -131,7 +133,7 @@ export function NavBar({ appName, sections, tabs, games, account, user, signIn, 
           <div className="user-panel" ref={menuRef}>
             {user ? (
               <button type="button" className="user-chip" aria-expanded={menu} aria-haspopup="menu" onClick={() => setMenu((m) => !m)}>
-                <span className="user-avatar" aria-hidden="true">{user.avatar}<span className="status-dot" /></span>
+                <span className="user-avatar" aria-hidden="true"><Avatar id={user.avatar} size={32} /><span className="status-dot" /></span>
                 <span className="min-w-0 text-left">
                   <span className="block truncate text-sm font-semibold text-heading">{user.name}</span>
                   <span className="block truncate text-xs text-muted">Online</span>
@@ -193,7 +195,7 @@ export function NavBar({ appName, sections, tabs, games, account, user, signIn, 
           );
         })}
         <button type="button" className={`tab ${drawer ? 'is-active' : ''}`} aria-expanded={drawer} onClick={() => setDrawer(true)}>
-          {user ? <span className="text-lg leading-none">{user.avatar}</span> : <Icon name="menu" size={22} />}
+          {user ? <Avatar id={user.avatar} size={28} /> : <Icon name="menu" size={22} />}
           {user ? 'You' : 'Menu'}
         </button>
       </nav>

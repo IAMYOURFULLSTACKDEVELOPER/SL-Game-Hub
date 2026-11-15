@@ -2,7 +2,7 @@
 
 ## Overview
 
-Phase 5 adds comprehensive community features to SL Game Hub, including leaderboards, tournaments, achievements, chat, and a rewards system. All features are designed to be engaging while maintaining a safe, non-gambling environment.
+Phase 5 adds comprehensive community features to Dodo, including leaderboards, tournaments, achievements, chat, and a rewards system. All features are designed to be engaging while maintaining a safe, non-gambling environment.
 
 ## Features Implemented
 
@@ -391,7 +391,7 @@ SELECT purchase_cosmetic('cosmetic-uuid');
 
 ## Conclusion
 
-Phase 5 adds comprehensive community features to SL Game Hub while maintaining:
+Phase 5 adds comprehensive community features to Dodo while maintaining:
 - Safety through moderation tools
 - Fairness through server-side validation
 - Engagement through achievements and rewards
