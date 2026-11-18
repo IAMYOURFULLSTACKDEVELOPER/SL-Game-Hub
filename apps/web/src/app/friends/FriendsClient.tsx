@@ -13,6 +13,14 @@ import { FollowButton, PersonRow } from '@/components/social/Social';
 
 type Tab = 'following' | 'followers' | 'find';
 
+/** "Followed by ada", "Followed by ada and ben", "Followed by ada, ben and 3 others you follow" */
+function followedBy(via: string[], mutual: number) {
+  const names = via.map((n) => <b key={n} className="font-semibold text-text">{n}</b>);
+  const rest = mutual - via.length;
+  if (rest <= 0) return <>Followed by {names[0]}{names[1] && <> and {names[1]}</>}</>;
+  return <>Followed by {names[0]}{names[1] && <>, {names[1]}</>} and {rest} other{rest === 1 ? '' : 's'} you follow</>;
+}
+
 function Empty({ icon, title, text, children }: { icon: IconName; title: string; text: string; children?: React.ReactNode }) {
   return (
     <div className="flex flex-col items-center gap-1.5 p-8 text-center">
@@ -114,6 +122,20 @@ export function FriendsClient() {
           <ul className="space-y-0.5">
             {data.suggestions.map((p) => (
               <PersonRow key={p.id} p={p} sub={p.games ? `Played ${p.games} game${p.games === 1 ? '' : 's'} together` : 'Was in a room with you'}>
+                <FollowButton person={p} />
+              </PersonRow>
+            ))}
+          </ul>
+        </section>
+      )}
+      {data && data.friendsOfFriends.length > 0 && (
+        <section className="card p-2" aria-labelledby="fof">
+          <h2 id="fof" className="flex items-center gap-2 px-2 pb-1 pt-1.5 text-xs font-bold uppercase tracking-wide text-muted">
+            <Icon name="users" size={14} />Friends of friends
+          </h2>
+          <ul className="space-y-0.5">
+            {data.friendsOfFriends.map((p) => (
+              <PersonRow key={p.id} p={p} sub={followedBy(p.via, p.mutual)}>
                 <FollowButton person={p} />
               </PersonRow>
             ))}

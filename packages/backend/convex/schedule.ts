@@ -8,6 +8,7 @@ import { ROOM_GAMES } from './roomGames';
 import { roomByCode } from './rooms';
 import { internal } from './_generated/api';
 import { invitees, notify } from './social';
+import { emailScheduleInvite } from './emails';
 
 // Scheduled games. A player picks a game, a date and time, and either an online room or a tournament.
 //  - A room: at game time the host opens the room from the schedule; its code is attached, and everyone
@@ -185,7 +186,7 @@ async function inviteFriends(ctx: MutationCtx, me: Doc<'users'>, e: Doc<'schedul
       kind: 'game_invite', actorId: me._id, href: '/schedule', key: `event:${e._id}`,
       text: `${me.username} invited you to ${e.kind === 'tournament' ? 'a tournament' : 'a game'}: ${e.title} (${gameName}), ${when(e.starts_at)}.`,
     });
-    if (added) sent++;
+    if (added) { sent++; await emailScheduleInvite(ctx, e, me, u._id, gameName); }
   }
   return sent;
 }

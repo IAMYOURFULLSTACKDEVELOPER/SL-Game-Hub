@@ -172,6 +172,44 @@ async function suggestionsFor(ctx: QueryCtx, me: Doc<'users'>, limit: number) {
   return out;
 }
 
+const FOF_FRIENDS = 150; // people you follow that we look through
+const FOF_EACH = 60; // ... and how many of the people each of them follows
+
+/**
+ * Friends of friends: people followed by the people you follow, most shared connections first, with
+ * up to two of those friends named ("Followed by ada and 3 others you follow"). Private profiles
+ * (all under-13s) are never suggested, nor anyone either of you has blocked.
+ */
+async function friendsOfFriendsFor(ctx: QueryCtx, me: Doc<'users'>, limit: number, skip: Set<Id<'users'>>) {
+  const friends = await ctx.db.query('follows').withIndex('by_follower_id_and_followee_id', (q) => q.eq('follower_id', me._id)).take(FOF_FRIENDS);
+  const mine = new Set(friends.map((f) => f.followee_id));
+  const found = new Map<Id<'users'>, Id<'users'>[]>(); // candidate -> the friends who follow them
+  for (const f of friends) {
+    const theirs = await ctx.db.query('follows').withIndex('by_follower_id_and_followee_id', (q) => q.eq('follower_id', f.followee_id)).take(FOF_EACH);
+    for (const t of theirs) {
+      const id = t.followee_id;
+      if (id === me._id || mine.has(id) || skip.has(id)) continue;
+      const via = found.get(id);
+      if (via) via.push(f.followee_id); else found.set(id, [f.followee_id]);
+    }
+  }
+  const ranked = [...found].sort((x, y) => y[1].length - x[1].length);
+  const names = new Map<Id<'users'>, string>();
+  const nameOf = async (id: Id<'users'>) => {
+    if (!names.has(id)) names.set(id, (await ctx.db.get(id))?.username ?? '');
+    return names.get(id)!;
+  };
+  const out = [];
+  for (const [id, via] of ranked) {
+    if (out.length >= limit) break;
+    const u = await ctx.db.get(id);
+    if (!u || u.banned || !u.is_public || await hasBlocked(ctx, id, me._id) || await hasBlocked(ctx, me._id, id)) continue;
+    const named = (await Promise.all(via.slice(0, 2).map(nameOf))).filter(Boolean);
+    out.push({ ...await person(ctx, me, u), mutual: via.length, via: named });
+  }
+  return out;
+}
+
 /** The Friends page: who you follow, who follows you, and people you might know. */
 export const people = query({
   args: {},
@@ -190,7 +228,9 @@ export const people = query({
       if (u && !u.banned) followers.push(await person(ctx, me, u));
     }
     following.sort((a, b) => a.username.localeCompare(b.username));
-    return { following, followers, suggestions: await suggestionsFor(ctx, me, 12) };
+    const suggestions = await suggestionsFor(ctx, me, 12);
+    const friendsOfFriends = await friendsOfFriendsFor(ctx, me, 12, new Set(suggestions.map((p) => p.id)));
+    return { following, followers, suggestions, friendsOfFriends };
   },
 });
 

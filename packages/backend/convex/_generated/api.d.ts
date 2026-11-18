@@ -15,6 +15,8 @@ import type * as auth from "../auth.js";
 import type * as chat from "../chat.js";
 import type * as crons from "../crons.js";
 import type * as dice from "../dice.js";
+import type * as emailTemplates from "../emailTemplates.js";
+import type * as emails from "../emails.js";
 import type * as gameVersions from "../gameVersions.js";
 import type * as games from "../games.js";
 import type * as groups from "../groups.js";
@@ -56,6 +58,8 @@ declare const fullApi: ApiFromModules<{
   chat: typeof chat;
   crons: typeof crons;
   dice: typeof dice;
+  emailTemplates: typeof emailTemplates;
+  emails: typeof emails;
   gameVersions: typeof gameVersions;
   games: typeof games;
   groups: typeof groups;

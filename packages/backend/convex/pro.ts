@@ -7,6 +7,7 @@ import { PRO_PRICE, FREE_DAILY_ROOMS, isProActive, extendPro, dayKey } from '@sl
 import { formatLeones } from '@slgh/shared/src/wallet';
 import { currentUser, requireActiveUser } from './lib';
 import { chargeFor, monimeConfigured, post, requireWalletUser, spendBonus } from './wallet';
+import { emailPro } from './emails';
 
 // Dodo Pro: SLE 10 for 30 days, paid from the wallet (players aged 18+) or by a Monime USSD
 // code (anyone, e.g. a parent pays). Paying again adds 30 more days; nothing renews by itself.
@@ -21,7 +22,8 @@ export async function grantPro(ctx: MutationCtx, userId: Id<'users'>, method: 'w
   if (!user) return;
   const proUntil = extendPro(user.pro_until);
   await ctx.db.patch(userId, { pro_until: proUntil, updated_at: Date.now() });
-  await ctx.db.insert('pro_payments', { user_id: userId, method, amount, pro_until: proUntil, deposit_id: depositId });
+  const paymentId = await ctx.db.insert('pro_payments', { user_id: userId, method, amount, pro_until: proUntil, deposit_id: depositId });
+  await emailPro(ctx, userId, { until: proUntil, amount, gift: method === 'promo', key: paymentId });
 }
 
 const playsRow = (ctx: QueryCtx, userId: Id<'users'>, day = dayKey()) =>

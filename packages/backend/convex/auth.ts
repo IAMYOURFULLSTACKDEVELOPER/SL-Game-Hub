@@ -5,6 +5,10 @@ import { ConvexError } from 'convex/values';
 import { USERNAME_RE, isAgeBand, isEmail } from '@slgh/shared/src/validation';
 import type { DataModel } from './_generated/dataModel';
 import type { MutationCtx } from './_generated/server';
+import { WELCOME_CREDIT, welcomeEligible } from '@slgh/shared/src/promo';
+import { formatLeones } from '@slgh/shared/src/wallet';
+import { emailUser } from './emails';
+import { welcome } from './emailTemplates';
 
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
 
@@ -62,11 +66,14 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
       const username_lower = p.username.toLowerCase();
       const taken = await ctx.db.query('users').withIndex('by_username_lower', (q) => q.eq('username_lower', username_lower)).first();
       if (taken) throw new ConvexError('errors.usernameTaken');
-      return ctx.db.insert('users', {
+      const id = await ctx.db.insert('users', {
         email: p.email, full_name: p.full_name, username: p.username, username_lower,
         avatar: 'av_lion', country: 'SL', age_band: p.age_band, role: 'player',
         is_public: p.age_band !== 'under_13', banned: false, updated_at: Date.now(),
       });
+      const welcomeCredit = welcomeEligible(Date.now()) ? formatLeones(WELCOME_CREDIT.amount) : undefined;
+      await emailUser(ctx, id, (who) => welcome(who, { welcomeCredit, walletOk: p.age_band === '18_plus' }), { key: `welcome/${id}` });
+      return id;
     },
   },
 });

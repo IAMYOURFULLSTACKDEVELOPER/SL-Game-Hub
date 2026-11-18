@@ -16,7 +16,18 @@ export const me = query({
       age_band: u.age_band, banned: u.banned, is_public: u.is_public,
       district_id: u.district_id ?? null, created_at: new Date(u._creationTime).toISOString(),
       pro: isProActive(u.pro_until),
+      email: u.email ?? null,
+      email_reminders: u.email_reminders !== false,
     };
+  },
+});
+
+/** Reminder and invite emails on or off. Account and money emails always go. */
+export const setEmailPrefs = mutation({
+  args: { reminders: v.boolean() },
+  handler: async (ctx, { reminders }) => {
+    const me = await requireActiveUser(ctx);
+    await ctx.db.patch(me._id, { email_reminders: reminders, updated_at: Date.now() });
   },
 });
 

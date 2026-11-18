@@ -48,9 +48,14 @@ export default defineSchema({
     banned: v.boolean(),
     updated_at: v.number(),
     pro_until: v.optional(v.number()), // Dodo Pro is active until this time (see convex/pro.ts)
+    // Emails (convex/emails.ts). false = no reminder or invite emails; account and money emails always go.
+    email_reminders: v.optional(v.boolean()),
+    pro_reminder_for: v.optional(v.number()), // the pro_until we last sent "your Pro ends soon" for
   })
     .index('email', ['email'])
-    .index('by_username_lower', ['username_lower']),
+    .index('by_username_lower', ['username_lower'])
+    .index('by_pro_until', ['pro_until'])
+    .index('by_role', ['role']),
 
   // Reference data -------------------------------------------------------
   districts: defineTable({ name: v.string() }).index('by_name', ['name']),
@@ -775,6 +780,7 @@ export default defineSchema({
     room_code: v.optional(v.string()), // set when the host opens the room
     tournament_id: v.optional(v.id('tournaments')),
     max_players: v.optional(v.number()),
+    reminded_at: v.optional(v.number()), // when the "starting soon" emails went out
   })
     .index('by_public_and_starts_at', ['public', 'starts_at'])
     .index('by_group_id_and_starts_at', ['group_id', 'starts_at'])

@@ -9,6 +9,7 @@ import {
 } from '@slgh/shared/src/wallet';
 import { currentUser, requireActiveUser, requireAdmin } from './lib';
 import { grantPro, isPro } from './pro';
+import { emailTopUp, emailWithdrawalPaid, emailWithdrawalRequested, emailWithdrawalReturned } from './emails';
 import { withdrawable } from '@slgh/shared/src/promo';
 import type { walletTxType } from './schema';
 
@@ -177,6 +178,7 @@ export const requestWithdrawal = mutation({
     });
     await post(ctx, me._id, 'withdrawal_hold', { amount: -a.amount, held: a.amount },
       `Withdrawal to ${providerName(a.provider)} ${phone}: you receive ${formatLeones(a.amount - fee)} after the ${formatLeones(fee)} fee (waiting for approval)`, id);
+    await emailWithdrawalRequested(ctx, (await ctx.db.get(id))!, me);
     return id;
   },
 });
@@ -270,6 +272,7 @@ export const rejectWithdrawal = mutation({
     if (!w || w.status !== 'requested') throw new ConvexError('This withdrawal is not waiting for approval.');
     await ctx.db.patch(id, { status: 'rejected', reviewed_by: admin._id, updated_at: Date.now() });
     await post(ctx, w.user_id, 'withdrawal_refund', { amount: w.amount, held: -w.amount }, 'Withdrawal declined, money returned', id);
+    await emailWithdrawalReturned(ctx, w, true);
   },
 });
 
@@ -330,7 +333,10 @@ export const applyDepositStatus = internalMutation({
       }
       await ctx.db.patch(d._id, { status: 'completed', completed_at: Date.now(), error: undefined, updated_at: Date.now() });
       if (d.purpose === 'pro') await grantPro(ctx, d.user_id, 'ussd', d.amount, d._id); // paid for Pro, not a top-up
-      else await post(ctx, d.user_id, 'deposit', { amount: d.amount }, 'Mobile money top-up', d._id);
+      else {
+        await post(ctx, d.user_id, 'deposit', { amount: d.amount }, 'Mobile money top-up', d._id);
+        await emailTopUp(ctx, d);
+      }
     } else if ((status === 'expired' || status === 'cancelled') && (d.status === 'pending' || d.status === 'creating')) {
       await ctx.db.patch(d._id, { status, updated_at: Date.now() });
     }
@@ -358,6 +364,7 @@ export const payoutError = internalMutation({
     if (!definitive) { await ctx.db.patch(w._id, { error, updated_at: Date.now() }); return; }
     await ctx.db.patch(w._id, { status: 'failed', error, updated_at: Date.now() });
     await post(ctx, w.user_id, 'withdrawal_refund', { amount: w.amount, held: -w.amount }, 'Withdrawal failed, money returned', w._id);
+    await emailWithdrawalReturned(ctx, w, false);
   },
 });
 
@@ -371,9 +378,11 @@ export const applyPayoutStatus = internalMutation({
       await ctx.db.patch(w._id, { status: 'completed', updated_at: Date.now() });
       await post(ctx, w.user_id, 'withdrawal_paid', { held: -w.amount },
         `Paid ${formatLeones(w.amount - (w.fee ?? 0))} to ${providerName(w.provider)} ${w.phone}${w.fee ? ` (${formatLeones(w.fee)} fee)` : ''}`, w._id);
+      await emailWithdrawalPaid(ctx, w);
     } else if (status === 'failed') {
       await ctx.db.patch(w._id, { status: 'failed', error: error?.slice(0, 300) ?? 'Payout failed', updated_at: Date.now() });
       await post(ctx, w.user_id, 'withdrawal_refund', { amount: w.amount, held: -w.amount }, 'Withdrawal failed, money returned', w._id);
+      await emailWithdrawalReturned(ctx, w, false);
     }
   },
 });

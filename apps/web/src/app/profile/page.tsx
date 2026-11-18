@@ -5,6 +5,7 @@ import { api, query } from '@/lib/convex';
 import { updateProfile } from '../actions';
 import { Flash } from '@/components/Flash';
 import { Icon } from '@/components/Icon';
+import { EmailSettings } from '@/components/EmailSettings';
 
 export const metadata = { title: t('profile.title') };
 
@@ -53,7 +54,9 @@ export default async function Profile({ searchParams }: { searchParams: { error?
         <button className="btn btn-primary btn-lg w-full"><Icon name="check" />{t('profile.save')}</button>
       </form>
 
-      <section className="card reveal p-5" style={{ ['--i' as string]: 2 }}><h2 className="mb-3 flex items-center gap-2"><span className="icon-badge icon-badge-blue h-9 w-9"><Icon name="chart" size={18} /></span>{t('profile.stats')}</h2>
+      <EmailSettings email={me.email} reminders={me.email_reminders} />
+
+      <section className="card reveal p-5" style={{ ['--i' as string]: 3 }}><h2 className="mb-3 flex items-center gap-2"><span className="icon-badge icon-badge-blue h-9 w-9"><Icon name="chart" size={18} /></span>{t('profile.stats')}</h2>
         {!stats?.length ? <p className="text-muted">{t('profile.noStats')}</p> : (
           <div className="overflow-x-auto"><table className="w-full text-left">
             <thead><tr className="text-muted"><th className="py-1">{t('nav.games')}</th><th>{t('game.played')}</th><th>{t('game.wins')}</th><th>{t('game.bestScore')}</th></tr></thead>
