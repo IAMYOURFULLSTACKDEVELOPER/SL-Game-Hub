@@ -2,7 +2,7 @@ import { ConvexError } from 'convex/values';
 import type { MutationCtx } from './_generated/server';
 import type { Id } from './_generated/dataModel';
 import { formatLeones, splitPot } from '@slgh/shared/src/wallet';
-import { post } from './wallet';
+import { post, spendBonus, restoreBonus } from './wallet';
 
 // Money staked on one round of a game. Each player's stake moves from their spendable balance to
 // "held" when they commit, and stays held until the round is settled:
@@ -36,7 +36,8 @@ export async function stakeIn(ctx: MutationCtx, potId: Id<'pots'>, userId: Id<'u
   if (!pot || pot.status !== 'open') throw new ConvexError('This round has already started. Wait for the next one.');
   if (await entryOf(ctx, potId, userId)) return; // already in
   await post(ctx, userId, 'stake', { amount: -pot.stake, held: pot.stake }, `Stake in ${label}`, potId);
-  await ctx.db.insert('pot_entries', { pot_id: potId, user_id: userId, amount: pot.stake, status: 'held' });
+  const bonus = await spendBonus(ctx, userId, pot.stake); // welcome credit is staked first
+  await ctx.db.insert('pot_entries', { pot_id: potId, user_id: userId, amount: pot.stake, status: 'held', ...(bonus ? { bonus } : {}) });
   await ctx.db.patch(potId, { total: pot.total + pot.stake });
 }
 
@@ -46,6 +47,7 @@ export async function unstake(ctx: MutationCtx, potId: Id<'pots'>, userId: Id<'u
   const entry = await entryOf(ctx, potId, userId);
   if (!pot || pot.status !== 'open' || !entry) return;
   await post(ctx, userId, 'stake_refund', { amount: entry.amount, held: -entry.amount }, `Stake returned from ${label}`, potId);
+  await restoreBonus(ctx, userId, entry.bonus);
   await ctx.db.patch(entry._id, { status: 'refunded' });
   await ctx.db.patch(potId, { total: pot.total - entry.amount });
 }
@@ -90,6 +92,7 @@ export async function voidPot(ctx: MutationCtx, potId: Id<'pots'>, label: string
   if (!pot || pot.status === 'settled' || pot.status === 'void') return;
   for (const e of await heldEntries(ctx, potId)) {
     await post(ctx, e.user_id, 'stake_refund', { amount: e.amount, held: -e.amount }, `Stake returned from ${label} (no winner)`, potId);
+    await restoreBonus(ctx, e.user_id, e.bonus);
     await ctx.db.patch(e._id, { status: 'refunded' });
   }
   await ctx.db.patch(potId, { status: 'void', total: 0, settled_at: Date.now() });

@@ -6,7 +6,7 @@ import { internal } from './_generated/api';
 import { PRO_PRICE, FREE_DAILY_ROOMS, isProActive, extendPro, dayKey } from '@slgh/shared/src/pro';
 import { formatLeones } from '@slgh/shared/src/wallet';
 import { currentUser, requireActiveUser } from './lib';
-import { chargeFor, monimeConfigured, post, requireWalletUser } from './wallet';
+import { chargeFor, monimeConfigured, post, requireWalletUser, spendBonus } from './wallet';
 
 // Dodo Pro: SLE 10 for 30 days, paid from the wallet (players aged 18+) or by a Monime USSD
 // code (anyone, e.g. a parent pays). Paying again adds 30 more days; nothing renews by itself.
@@ -16,7 +16,7 @@ import { chargeFor, monimeConfigured, post, requireWalletUser } from './wallet';
 export const isPro = (u: Pick<Doc<'users'>, 'pro_until'> | null | undefined) => isProActive(u?.pro_until);
 
 /** Adds 30 days of Pro and records the payment. */
-export async function grantPro(ctx: MutationCtx, userId: Id<'users'>, method: 'wallet' | 'ussd', amount: number, depositId?: Id<'deposits'>) {
+export async function grantPro(ctx: MutationCtx, userId: Id<'users'>, method: 'wallet' | 'ussd' | 'promo', amount: number, depositId?: Id<'deposits'>) {
   const user = await ctx.db.get(userId);
   if (!user) return;
   const proUntil = extendPro(user.pro_until);
@@ -91,6 +91,7 @@ export const buyWithWallet = mutation({
   handler: async (ctx) => {
     const me = await requireWalletUser(ctx);
     await post(ctx, me._id, 'pro', { amount: -PRO_PRICE }, `Dodo Pro: 30 days (${formatLeones(PRO_PRICE)})`);
+    await spendBonus(ctx, me._id, PRO_PRICE); // welcome credit can pay for Pro
     await grantPro(ctx, me._id, 'wallet', PRO_PRICE);
   },
 });

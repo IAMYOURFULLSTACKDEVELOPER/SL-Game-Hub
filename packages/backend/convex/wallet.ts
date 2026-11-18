@@ -9,6 +9,7 @@ import {
 } from '@slgh/shared/src/wallet';
 import { currentUser, requireActiveUser, requireAdmin } from './lib';
 import { grantPro, isPro } from './pro';
+import { withdrawable } from '@slgh/shared/src/promo';
 import type { walletTxType } from './schema';
 
 // Real-money wallet. Amounts are minor units (100 = SLE 1). Money only enters through a Monime
@@ -55,6 +56,27 @@ export async function post(
   });
 }
 
+/** Welcome credit added to a wallet (promo.ts). The money itself is added with post(). */
+export async function addBonus(ctx: MutationCtx, userId: Id<'users'>, amount: number) {
+  const w = await walletRow(ctx, userId);
+  if (w) await ctx.db.patch(w._id, { bonus: (w.bonus ?? 0) + amount });
+}
+
+/** Money was staked or spent: use up welcome credit first. Returns how much credit was used. */
+export async function spendBonus(ctx: MutationCtx, userId: Id<'users'>, amount: number) {
+  const w = await walletRow(ctx, userId);
+  const used = Math.min(Math.max(0, w?.bonus ?? 0), amount);
+  if (w && used > 0) await ctx.db.patch(w._id, { bonus: (w.bonus ?? 0) - used });
+  return used;
+}
+
+/** A stake that used welcome credit came back unplayed: it is credit again. */
+export async function restoreBonus(ctx: MutationCtx, userId: Id<'users'>, amount: number | undefined) {
+  if (!amount) return;
+  const w = await walletRow(ctx, userId);
+  if (w) await ctx.db.patch(w._id, { bonus: (w.bonus ?? 0) + amount });
+}
+
 function checkAmount(amount: number, min: number, max: number, what: string) {
   if (!Number.isInteger(amount) || amount < min || amount > max) {
     throw new ConvexError(`${what} must be between ${formatLeones(min)} and ${formatLeones(max)}.`);
@@ -82,6 +104,8 @@ export const summary = query({
       minWithdrawal: minWithdrawalFor(isPro(me)),
       balance: w?.balance ?? 0,
       held: w?.held ?? 0,
+      bonus: Math.min(w?.bonus ?? 0, w?.balance ?? 0), // welcome credit in the balance (the rest is staked)
+      withdrawable: withdrawable(w?.balance ?? 0, w?.bonus),
       deposits: deposits.filter((d) => d.purpose !== 'pro').map((d) => ({
         id: d._id, amount: d.amount, charge: d.charge ?? d.amount, status: d.status, ussd_code: d.ussd_code ?? null,
         expires_at: d.expires_at ?? null, error: d.error ?? null, created_at: d._creationTime,
@@ -139,6 +163,11 @@ export const requestWithdrawal = mutation({
         : `The smallest withdrawal is ${formatLeones(minWithdrawalFor(false))}. Pro members can withdraw from ${formatLeones(minWithdrawalFor(true))}.`);
     }
     checkAmount(a.amount, minWithdrawalFor(pro), WALLET_LIMITS.maxWithdrawal, 'A withdrawal');
+    const w = await walletRow(ctx, me._id);
+    const free = withdrawable(w?.balance ?? 0, w?.bonus);
+    if (w?.bonus && a.amount > free) {
+      throw new ConvexError(`You can withdraw up to ${formatLeones(free)}. Your welcome credit can't be withdrawn: play with it, and what you win can be.`);
+    }
     const phone = normalizeSlPhone(a.phone);
     if (!phone) throw new ConvexError('Enter a Sierra Leone mobile number, e.g. 076 123 456.');
     if (!isMomoProvider(a.provider)) throw new ConvexError('Choose Orange Money or Africell Money.');

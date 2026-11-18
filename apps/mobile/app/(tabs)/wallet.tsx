@@ -112,7 +112,7 @@ export default function Wallet() {
         {parseLeones(out.amount) !== null && (
           <Txt size={15} bold>You receive {formatLeones(parseLeones(out.amount)! - Math.ceil((parseLeones(out.amount)! * w.withdrawalFeeBps) / 10_000))} after the {w.withdrawalFeeBps / 100}% fee{w.pro ? '' : ' (Pro: 2%)'}</Txt>
         )}
-        <Button title="Withdraw to mobile money" onPress={withdraw} loading={busy} disabled={w.balance < w.minWithdrawal} />
+        <Button title="Withdraw to mobile money" onPress={withdraw} loading={busy} disabled={(w.withdrawable ?? w.balance) < w.minWithdrawal} />
         {w.withdrawals.slice(0, 5).map((x) => (
           <Txt key={x.id} size={14} muted>{formatLeones(x.amount)} → {providerName(x.provider)} {displaySlPhone(x.phone)} · {x.status}</Txt>
         ))}

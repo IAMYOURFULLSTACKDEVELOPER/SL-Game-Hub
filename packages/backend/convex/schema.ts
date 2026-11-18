@@ -20,7 +20,7 @@ export const momoProvider = v.union(v.literal('m17'), v.literal('m18'));
 export const walletTxType = v.union(
   v.literal('deposit'), v.literal('stake'), v.literal('stake_refund'), v.literal('stake_lost'), v.literal('winnings'),
   v.literal('withdrawal_hold'), v.literal('withdrawal_paid'), v.literal('withdrawal_refund'), v.literal('adjustment'),
-  v.literal('pro'),
+  v.literal('pro'), v.literal('bonus'),
 );
 const rarity = v.union(v.literal('common'), v.literal('rare'), v.literal('epic'), v.literal('legendary'));
 
@@ -460,7 +460,7 @@ export default defineSchema({
   // One row per payment (wallet or USSD); each adds 30 days to users.pro_until.
   pro_payments: defineTable({
     user_id: v.id('users'),
-    method: v.union(v.literal('wallet'), v.literal('ussd')),
+    method: v.union(v.literal('wallet'), v.literal('ussd'), v.literal('promo')), // promo: the welcome credit (amount 0)
     amount: v.number(),
     pro_until: v.number(), // the new end date this payment gave
     deposit_id: v.optional(v.id('deposits')),
@@ -511,6 +511,9 @@ export default defineSchema({
     user_id: v.id('users'),
     balance: v.number(),
     held: v.number(),
+    // Welcome credit not played yet (part of `balance`, or staked in a game). It can't be withdrawn;
+    // staking it uses it up, and a stake returned unplayed brings it back (see promo.ts).
+    bonus: v.optional(v.number()),
     updated_at: v.number(),
   }).index('by_user', ['user_id']),
 
@@ -583,6 +586,7 @@ export default defineSchema({
     pot_id: v.id('pots'),
     user_id: v.id('users'),
     amount: v.number(),
+    bonus: v.optional(v.number()), // how much of the stake was welcome credit (returned as credit if refunded)
     status: v.union(v.literal('held'), v.literal('refunded'), v.literal('won'), v.literal('lost')),
   })
     .index('by_pot', ['pot_id'])
@@ -808,4 +812,11 @@ export default defineSchema({
     .index('by_user_id', ['user_id'])
     .index('by_user_id_and_read', ['user_id', 'read'])
     .index('by_user_id_and_key', ['user_id', 'key']),
+  // The welcome credit (packages/shared/src/promo.ts): one row per player once they've chosen what to do with it.
+  promo_claims: defineTable({
+    user_id: v.id('users'),
+    promo: v.string(),
+    choice: v.union(v.literal('wallet'), v.literal('pro')),
+    amount: v.number(),
+  }).index('by_user_id_and_promo', ['user_id', 'promo']),
 });

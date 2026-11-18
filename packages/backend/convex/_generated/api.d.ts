@@ -28,6 +28,7 @@ import type * as multiplayer from "../multiplayer.js";
 import type * as mux from "../mux.js";
 import type * as pots from "../pots.js";
 import type * as pro from "../pro.js";
+import type * as promo from "../promo.js";
 import type * as reports from "../reports.js";
 import type * as rewards from "../rewards.js";
 import type * as roomGames from "../roomGames.js";
@@ -68,6 +69,7 @@ declare const fullApi: ApiFromModules<{
   mux: typeof mux;
   pots: typeof pots;
   pro: typeof pro;
+  promo: typeof promo;
   reports: typeof reports;
   rewards: typeof rewards;
   roomGames: typeof roomGames;

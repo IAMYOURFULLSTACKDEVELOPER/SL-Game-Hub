@@ -187,6 +187,12 @@ export default function WalletClient() {
             <div>
               <p className="text-sm text-muted">Available</p>
               <p className="text-4xl font-extrabold" data-testid="wallet-balance">{formatLeones(w.balance)}</p>
+              {w.bonus > 0 && (
+                <p className="mt-1 flex items-center gap-1.5 text-sm">
+                  <Icon name="gift" size={15} className="text-accent" />
+                  <span>Includes <b>{formatLeones(w.bonus)}</b> welcome credit to play with. It can&apos;t be withdrawn, but what you win with it can.</span>
+                </p>
+              )}
             </div>
             <div>
               <p className="text-sm text-muted">Held (stakes in games and withdrawals on the way)</p>
@@ -212,7 +218,7 @@ export default function WalletClient() {
 
           <section className="card space-y-4 p-5">
             <h2 className="text-xl font-bold">Withdraw</h2>
-            <Withdraw balance={w.balance} feeBps={w.withdrawalFeeBps} pro={w.pro} min={w.minWithdrawal} />
+            <Withdraw balance={w.withdrawable} feeBps={w.withdrawalFeeBps} pro={w.pro} min={w.minWithdrawal} />
             {w.withdrawals.length > 0 && (
               <ul className="divide-y divide-border">
                 {w.withdrawals.map((x) => (

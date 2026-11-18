@@ -7,6 +7,7 @@ import { Icon } from './Icon';
 import { SignOutButton } from './SignOutButton';
 import { ConvexIsland } from './ConvexIsland';
 import { NotificationBell } from './social/NotificationBell';
+import { WelcomeCredit } from './WelcomeCredit';
 
 export async function Header() {
   // The rail lists the published games; fetched alongside the session so pages don't wait twice.
@@ -57,7 +58,7 @@ export async function Header() {
       appName={t('app.name')} sections={sections} tabs={tabs} account={account}
       games={catalog.map((g) => ({ slug: g.slug, name: g.name, icon: gameIcon(g.slug) }))}
       user={me ? { name: me.username, avatar: me.avatar ?? null } : null} pro={!!me?.pro}
-      bell={me ? <ConvexIsland><NotificationBell /></ConvexIsland> : null}
+      bell={me ? <ConvexIsland><WelcomeCredit /><NotificationBell /></ConvexIsland> : null}
       signIn={t('nav.signIn')} signUp={t('nav.signUp')} themeLabel={t('nav.theme')}
       signOut={
         <SignOutButton className="menu-item w-full menu-danger"><Icon name="logout" size={18} />{t('nav.signOut')}</SignOutButton>

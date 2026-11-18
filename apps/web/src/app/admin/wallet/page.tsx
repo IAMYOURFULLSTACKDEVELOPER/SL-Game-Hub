@@ -97,7 +97,7 @@ export default async function AdminWallet({ searchParams }: { searchParams: { er
       <section className="space-y-2">
         <h2 className="font-bold">Pro payments</h2>
         {table(['When', 'Player', 'Paid', 'How', 'Pro until'], w.pro.map((p) => [
-          when(p.created_at), p.username, formatLeones(p.amount), p.method === 'wallet' ? 'Wallet' : 'USSD', when(p.until),
+          when(p.created_at), p.username, formatLeones(p.amount), p.method === 'wallet' ? 'Wallet' : p.method === 'promo' ? 'Welcome gift' : 'USSD', when(p.until),
         ]), 'No Pro payments yet.')}
       </section>
 
