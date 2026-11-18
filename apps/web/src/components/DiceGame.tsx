@@ -11,6 +11,7 @@ import { errorKeyFor, playerMessage } from '@slgh/shared/src/errors';
 import { api } from '@slgh/backend/convex/_generated/api';
 import { formatLeones, parseLeones } from '@slgh/shared/src/wallet';
 import { Icon } from './Icon';
+import { DiceVoiceChat } from './VoiceChat';
 import { GameGlyph } from './GameGlyph';
 import DiceTray from './DiceTray';
 import { ConvexClientProvider } from './ConvexClientProvider';
@@ -241,7 +242,7 @@ function LocalDice({ rollMode }: { rollMode: RollMode }) {
   );
 }
 
-interface Member { id: string; name: string; host: boolean; joinedAt: number; staked: boolean }
+interface Member { id: string; name: string; host: boolean; joinedAt: number; staked: boolean; voice: boolean }
 const HEARTBEAT_MS = 10_000; // keep in step with packages/backend/convex/dice.ts
 const money = (minor: number) => formatLeones(minor);
 
@@ -281,6 +282,7 @@ function OnlineDice({ rollMode }: { rollMode: RollMode }) {
   const connected = members.some((m) => m.id === myId);
   const amHost = members.some((m) => m.id === myId && m.host); // the server hands hosting on if the host leaves
   const canUseWallet = !!me && !!wallet?.eligible;
+  const voicePanel = room && connected ? <DiceVoiceChat code={room.code} members={members} pro={!!me?.pro} /> : null;
 
   // Your username by default; changing it only renames you in this game.
   const nameEdited = useRef(false);
@@ -451,6 +453,7 @@ function OnlineDice({ rollMode }: { rollMode: RollMode }) {
     return (
       <div className="space-y-3">
         {header}
+        {voicePanel}
         {potPanel}
         <h2 className="font-bold">Players ({Math.min(members.length, MAX)}/{MAX})</h2>
         {!connected && <p className="text-muted">Connecting…</p>}
@@ -484,6 +487,7 @@ function OnlineDice({ rollMode }: { rollMode: RollMode }) {
   return (
     <div className="space-y-3">
       {header}
+      {voicePanel}
       {spectating && !finished && <p className="text-sm text-muted">A game is in progress — you are watching.</p>}
       <Board state={state} myId={myId} canRoll={myTurn && !rollSent} onRoll={roll} rollMode={rollMode}>
         {finished && stake !== null && live?.lastPrize != null && (

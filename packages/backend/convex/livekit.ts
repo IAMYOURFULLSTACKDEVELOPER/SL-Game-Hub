@@ -1,6 +1,7 @@
 'use node';
 import { ConvexError, v } from 'convex/values';
 import { AccessToken, TrackSource } from 'livekit-server-sdk';
+import { getAuthUserId } from '@convex-dev/auth/server';
 import { action } from './_generated/server';
 import { internal } from './_generated/api';
 
@@ -25,6 +26,33 @@ export const token = action({
     const at = new AccessToken(key, apiSecret, { identity: pass.memberId, name: pass.name, ttl: TOKEN_TTL });
     at.addGrant({
       room: `dodo-${pass.roomId}`,
+      roomJoin: true,
+      canSubscribe: true,
+      canPublish: true,
+      canPublishData: false,
+      canPublishSources: pass.video ? [TrackSource.MICROPHONE, TrackSource.CAMERA] : [TrackSource.MICROPHONE],
+      canUpdateOwnMetadata: false,
+    });
+    return { url, token: await at.toJwt(), video: pass.video };
+  },
+});
+
+/**
+ * A call token for a Dice room. Dice seats aren't secret (everyone in the room sees them), so the
+ * signed-in account proves who you are instead: you get into the call as your seat in that room.
+ */
+export const diceToken = action({
+  args: { code: v.string() },
+  handler: async (ctx, { code }): Promise<{ url: string; token: string; video: boolean }> => {
+    const url = process.env.LIVEKIT_URL, key = process.env.LIVEKIT_API_KEY, apiSecret = process.env.LIVEKIT_API_SECRET;
+    if (!url || !key || !apiSecret) throw new ConvexError('Voice chat is not set up yet.');
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new ConvexError('errors.signInRequired');
+    const pass = await ctx.runQuery(internal.dice.callPass, { code, userId });
+    if (!pass) throw new ConvexError('Join the room first.');
+    const at = new AccessToken(key, apiSecret, { identity: pass.memberId, name: pass.name, ttl: TOKEN_TTL });
+    at.addGrant({
+      room: `dodo-dice-${pass.roomId}`,
       roomJoin: true,
       canSubscribe: true,
       canPublish: true,

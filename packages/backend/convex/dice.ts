@@ -1,11 +1,12 @@
 import { ConvexError, v } from 'convex/values';
-import { query, mutation, internalMutation } from './_generated/server';
+import { query, mutation, internalMutation, internalQuery } from './_generated/server';
 import type { MutationCtx } from './_generated/server';
 import type { Doc } from './_generated/dataModel';
 import { DiceEngine, DICE_MANIFEST, rollDice, type DiceState } from '@slgh/shared/src/games/dice';
 import { WALLET_LIMITS, formatLeones } from '@slgh/shared/src/wallet';
 import { requireWalletUser } from './wallet';
 import { currentUser } from './lib';
+import { isPro } from './pro';
 import { heldEntries, lockPot, openPot, settlePot, stakeIn, unstake, voidPot } from './pots';
 
 // Online Dice rooms. Free rooms are anonymous (no account needed): each browser makes up a
@@ -83,7 +84,7 @@ export const room = query({
       pot: pot && { total: pot.total, status: pot.status, feeBps: pot.fee_bps },
       lastPrize: room.last_prize ?? null,
       members: members.map((m) => ({
-        id: m.member_id, name: m.name, host: m.host, joinedAt: m.joined_at, staked: !!m.user_id && staked.has(m.user_id),
+        id: m.member_id, name: m.name, host: m.host, joinedAt: m.joined_at, staked: !!m.user_id && staked.has(m.user_id), voice: !!m.voice,
       })),
     };
   },
@@ -94,7 +95,8 @@ export const join = mutation({
   args: { code: v.string(), memberId: v.string(), name: v.string(), host: v.boolean(), stake: v.optional(v.number()) },
   handler: async (ctx, { code, memberId, name, host, stake }) => {
     if (!/^[A-Z0-9]{6}$/.test(code)) throw new ConvexError('Room codes are 6 letters and numbers.');
-    if (!(await currentUser(ctx))) throw new ConvexError('errors.signInRequired'); // online play needs an account
+    const account = await currentUser(ctx);
+    if (!account) throw new ConvexError('errors.signInRequired'); // online play needs an account
     const display = name.trim().slice(0, 20) || 'Player';
     let room = await roomByCode(ctx, code);
     if (host) {
@@ -108,7 +110,7 @@ export const join = mutation({
       throw new ConvexError(`Room ${code} was not found. Check the code and try again.`);
     }
 
-    let userId: Doc<'users'>['_id'] | undefined;
+    let userId: Doc<'users'>['_id'] = account._id;
     if (room.stake !== undefined) {
       const user = await requireWalletUser(ctx);
       if (memberId !== user._id) throw new ConvexError('Sign in again to join money rooms.');
@@ -124,12 +126,13 @@ export const join = mutation({
     const members = await membersOf(ctx, room);
     const existing = members.find((m) => m.member_id === memberId);
     if (existing) {
-      await ctx.db.patch(existing._id, { name: display, last_seen: Date.now() });
+      if (existing.user_id && existing.user_id !== userId) throw new ConvexError('Someone else is using that seat. Reload the page and join again.');
+      await ctx.db.patch(existing._id, { name: display, last_seen: Date.now(), user_id: userId });
       return;
     }
     const inGame = (room.state as DiceState | undefined)?.players.some((p) => p.id === memberId);
     if (members.length >= MAX && !inGame) throw new ConvexError(`Room ${code} is full (${MAX} players max).`);
-    if (userId && !inGame) {
+    if (room.stake !== undefined && !inGame) {
       const pot = await ctx.db.get(room.pot_id!);
       if (pot?.status !== 'open') throw new ConvexError('A round is being played in this room. Join again when it ends.');
       await stakeIn(ctx, pot._id, userId, label(code));
@@ -235,5 +238,30 @@ export const sweep = internalMutation({
       if (room) await removeMember(ctx, room, m);
       else await ctx.db.delete(m._id);
     }
+  },
+});
+
+/** Join or leave the room's voice chat (the call itself goes through convex/livekit.ts diceToken). */
+export const setVoice = mutation({
+  args: { code: v.string(), on: v.boolean() },
+  handler: async (ctx, { code, on }) => {
+    const me = await currentUser(ctx);
+    const room = me && await roomByCode(ctx, code);
+    if (!me || !room) return;
+    const mine = (await membersOf(ctx, room)).find((m) => m.user_id === me._id);
+    if (mine) await ctx.db.patch(mine._id, { voice: on });
+  },
+});
+
+/** Who a signed-in player is in a Dice room, for a call token (null if they aren't in it). */
+export const callPass = internalQuery({
+  args: { code: v.string(), userId: v.id('users') },
+  handler: async (ctx, { code, userId }) => {
+    const room = await ctx.db.query('dice_rooms').withIndex('by_code', (q) => q.eq('code', code)).unique();
+    if (!room) return null;
+    const members = await ctx.db.query('dice_members').withIndex('by_room', (q) => q.eq('room_id', room._id)).collect();
+    const me = members.find((m) => m.user_id === userId);
+    if (!me) return null;
+    return { roomId: room._id as string, memberId: me.member_id, name: me.name, video: isPro(await ctx.db.get(userId)) };
   },
 });

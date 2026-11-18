@@ -73,5 +73,7 @@ export function AuthForm({ kind, className, children }: { kind: Kind; className?
       busy.current = false;
     }
   }
-  return <form onSubmit={onSubmit} className={className} aria-live="polite">{children}</form>;
+  // method="post": if it's submitted before the page's JavaScript has loaded, the browser's own fallback
+  // must never put the fields (the password!) into the address bar, history and server logs as a GET would.
+  return <form method="post" onSubmit={onSubmit} className={className} aria-live="polite">{children}</form>;
 }

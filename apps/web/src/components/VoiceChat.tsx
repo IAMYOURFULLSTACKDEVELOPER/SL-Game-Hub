@@ -10,6 +10,17 @@ import { api } from '@slgh/backend/convex/_generated/api';
 
 // The video/voice call only loads when the server has a call service set up (it is a large download).
 const ServerCall = dynamic(() => import('./LiveCall').then((m) => m.LiveCall), { ssr: false });
+const DiceServerCall = dynamic(() => import('./LiveCall').then((m) => m.DiceCall), { ssr: false });
+
+/**
+ * Voice chat in an online Dice room (Dice rooms work differently from the others, see convex/dice.ts).
+ * It needs the call server; without one, nothing is shown.
+ */
+export function DiceVoiceChat({ code, members, pro }: { code: string; members: { id: string; name: string; voice: boolean }[]; pro: boolean }) {
+  const mode = useQuery(api.voice.mode);
+  if (!mode?.server) return null;
+  return <DiceServerCall code={code} members={members} pro={pro} />;
+}
 
 export const MicIcon = ({ off = false, size = 18 }: { off?: boolean; size?: number }) => (
   <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>

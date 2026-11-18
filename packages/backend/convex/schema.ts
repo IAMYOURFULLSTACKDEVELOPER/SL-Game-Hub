@@ -605,11 +605,12 @@ export default defineSchema({
   dice_members: defineTable({
     room_id: v.id('dice_rooms'),
     member_id: v.string(),
-    user_id: v.optional(v.id('users')),
+    user_id: v.optional(v.id('users')), // the signed-in player (proves who they are for voice chat; money rooms: whose wallet)
     name: v.string(),
     host: v.boolean(),
     joined_at: v.number(),
     last_seen: v.number(),
+    voice: v.optional(v.boolean()), // in the room's voice chat
   })
     .index('by_room', ['room_id', 'joined_at'])
     .index('by_room_member', ['room_id', 'member_id']),

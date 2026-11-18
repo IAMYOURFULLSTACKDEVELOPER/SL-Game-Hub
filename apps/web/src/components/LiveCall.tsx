@@ -55,9 +55,41 @@ function VideoTile({ p, mine }: { p: Participant; mine: boolean }) {
   );
 }
 
+/** What the call needs from a room: who is in it, and how to get a call token and mark yourself in voice. */
+export type CallRoom = {
+  joined: boolean;
+  members: { id: string; name: string; voice: boolean }[];
+  /** Pro players may turn on their camera */
+  pro: boolean;
+  getToken: () => Promise<{ url: string; token: string; video: boolean }>;
+  setVoice: (on: boolean) => Promise<unknown>;
+};
+
+/** The call for an online room (every game except Dice, which uses DiceCall). */
 export function LiveCall({ room }: { room: RoomApi }) {
-  const getToken = useAction(api.livekit.token);
-  const setVoice = useMutation(api.voice.setVoice);
+  const token = useAction(api.livekit.token);
+  const setVoiceM = useMutation(api.voice.setVoice);
+  const { code, secret } = room;
+  const getToken = useCallback(() => token({ code: code!, secret: secret! }), [token, code, secret]);
+  const setVoice = useCallback((on: boolean) => (code && secret ? setVoiceM({ code, secret, on }) : Promise.resolve()), [setVoiceM, code, secret]);
+  return (
+    <CallPanel room={{
+      joined: room.joined && !!code && !!secret, members: room.view?.members ?? [], pro: !!room.view?.me?.pro, getToken, setVoice,
+    }} />
+  );
+}
+
+/** The call for an online Dice room: the signed-in account proves which seat is yours. */
+export function DiceCall({ code, members, pro }: { code: string; members: CallRoom['members']; pro: boolean }) {
+  const token = useAction(api.livekit.diceToken);
+  const setVoiceM = useMutation(api.dice.setVoice);
+  const getToken = useCallback(() => token({ code }), [token, code]);
+  const setVoice = useCallback((on: boolean) => setVoiceM({ code, on }), [setVoiceM, code]);
+  return <CallPanel room={{ joined: true, members, pro, getToken, setVoice }} />;
+}
+
+export function CallPanel({ room }: { room: CallRoom }) {
+  const { getToken, setVoice } = room;
   const [call, setCall] = useState<Room | null>(null);
   const [video, setVideo] = useState(false);
   const [joining, setJoining] = useState(false);
@@ -66,17 +98,16 @@ export function LiveCall({ room }: { room: RoomApi }) {
   const [, rerender] = useReducer((n: number) => n + 1, 0);
   const callRef = useRef<Room | null>(null);
 
-  const members = room.view?.members ?? [];
-  const inVoice = members.filter((m) => m.voice);
-  const proHere = !!room.view?.me?.pro;
+  const inVoice = room.members.filter((m) => m.voice);
+  const proHere = room.pro;
 
   const leave = useCallback(async (quiet = false) => {
     const c = callRef.current;
     callRef.current = null;
     setCall(null);
     if (c) await c.disconnect();
-    if (!quiet && room.code && room.secret) await setVoice({ code: room.code, secret: room.secret, on: false }).catch(() => {});
-  }, [room.code, room.secret, setVoice]);
+    if (!quiet) await setVoice(false).catch(() => {});
+  }, [setVoice]);
 
   // Leave the call when the page closes or the player leaves the room
   useEffect(() => () => { void callRef.current?.disconnect(); }, []);
@@ -89,10 +120,10 @@ export function LiveCall({ room }: { room: RoomApi }) {
   }, [call]);
 
   const join = async () => {
-    if (!room.code || !room.secret) return;
+    if (!room.joined) return;
     setJoining(true); setError(null);
     try {
-      const { url, token, video: mayShowVideo } = await getToken({ code: room.code, secret: room.secret });
+      const { url, token, video: mayShowVideo } = await getToken();
       const c = new Room({
         adaptiveStream: true, // only download video at the size it is shown
         dynacast: true, // stop sending video layers nobody is watching
@@ -109,7 +140,7 @@ export function LiveCall({ room }: { room: RoomApi }) {
       callRef.current = c;
       setCall(c);
       setVideo(mayShowVideo);
-      await setVoice({ code: room.code, secret: room.secret, on: true });
+      await setVoice(true);
       try { await c.localParticipant.setMicrophoneEnabled(true); } catch { setError('Allow the microphone in your browser to talk.'); }
       sfx('toggleOn');
     } catch (e) {
